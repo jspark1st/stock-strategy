@@ -114,8 +114,11 @@ def build_basis(r: dict) -> str:
     fx = r.get("fx") or {}
     if fx.get("price"):
         c = fx.get("chg_pct")
+        # 방향 명시: USD/KRW 하락 = 원화 강세, 상승 = 원화 약세(오독 방지).
+        won = ("원화 강세" if (c or 0) < 0 else "원화 약세" if (c or 0) > 0 else "보합")
         bits.append(f'<span class="basis-k">원달러</span> {fmt(fx["price"],2)} '
-                    f'<span style="color:{dir_color(c)}">{signed(c)}%</span>')
+                    f'<span style="color:{dir_color(c)}">{signed(c)}%</span> '
+                    f'<span class="basis-note">({won})</span>')
     if not bits:
         return ""
     return f'<div class="basis">{" · ".join(bits)}</div>'
@@ -148,6 +151,9 @@ def build_hero(r: dict) -> str:
     if raw is not None and p_up is not None and abs(raw - p_up) > 1e-9:
         calib = (f'<div class="hero-note">자가학습 보정 전 {raw*100:.0f}% '
                  f'→ 보정 후 {p_up*100:.0f}%</div>')
+    elif p_up is not None:
+        # 점추정임을 명시 — 신뢰구간 없는 단일 확률을 4자리로 과신하지 않도록.
+        calib = '<div class="hero-note">방향 확률은 점추정(신뢰구간 없음) · 표본 누적 시 캘리브레이션</div>'
     return f"""
     <div class="stat">
       <div class="big" style="color:var(--accent)">{total_txt}</div>
@@ -390,9 +396,11 @@ def build_intraday(r: dict) -> str:
     hi_when = "초반" if hi < 0.4 else ("후반" if hi > 0.6 else "중반")
     sess = iv.get("sess_ret")
     leg = iv.get("last_leg")
+    basis = iv.get("basis", "ETF 프록시")
     tiles = "".join([
         _tile("종가 위치", f"{cp*100:.0f}%", col, "당일 레인지 내 (0=저가·100=고가)"),
-        _tile("세션 수익률", signed(sess) + "%" if sess is not None else "—", dir_color(sess), "시초 대비"),
+        _tile("세션 수익률", signed(sess) + "%" if sess is not None else "—", dir_color(sess),
+              f"{basis} 시초 대비 (지수 등락률과 다름)"),
         _tile("마지막 봉", signed(leg) + "%" if leg is not None else "—", dir_color(leg)),
         _tile("고점 타이밍", hi_when, sub=f"{hi*100:.0f}% 지점"),
     ])
@@ -494,34 +502,67 @@ def build_risks(r: dict) -> str:
 
 
 def build_materials(r: dict) -> str:
-    mats = (r.get("narrative", {}) or {}).get("materials") or []
+    """주요 재료 카드. **화면에 보이는 재료 = 점수에 반영된 재료**가 되도록,
+    팩트체크 재료(Tavily·발행시각 검증)를 주 목록으로 올린다. LLM narrative 재료는
+    미검증이라 '실시간 리서치(참고·비점수)'로 명확히 분리한다(평가 지적: 화면 호재/악재
+    개수가 점수와 어긋나던 불일치 해소)."""
+    fc = r.get("materials_fc") or {}
+    fc_items = fc.get("items") or []
+    llm_mats = (r.get("narrative", {}) or {}).get("materials") or []
     sources = r.get("sources", []) or []
-    if not mats and not sources:
+    if not fc_items and not llm_mats and not sources:
         return ""
     tag_col = {"호재": "var(--up)", "악재": "var(--down)"}
-    mat_html = ""
-    for m in mats:
-        if isinstance(m, dict):
-            tag = m.get("tag", "중립")
-            text = m.get("text", "")
-        else:
-            tag, text = "중립", str(m)
-        col = tag_col.get(tag, "var(--muted)")
-        mat_html += (f'<li><span class="mtag" style="background:{col}">{esc(tag)}</span>'
-                     f'{esc(text)}</li>')
-    mat_sec = (f'<div class="sub-h">주요 재료</div>'
-               f'<ul class="mat-ul">{mat_html}</ul>' if mats else "")
 
+    # ── 1) 점수 반영 재료(팩트체크) ──
+    fc_sec = ""
+    if fc_items:
+        rows = ""
+        for m in fc_items:
+            tag = m.get("tag", "중립")
+            col = tag_col.get(tag, "var(--muted)")
+            hhmm = esc(m.get("hhmm", ""))
+            excl = ("" if m.get("scored") else
+                    f'<span class="mtag mtag-off">점수제외·{esc(m.get("reason") or "")}</span>')
+            title, url = esc(m.get("title", "")), m.get("url", "")
+            body = (f'<a href="{esc(url)}" target="_blank" rel="noreferrer">{title}</a>'
+                    if url else title)
+            rows += (f'<li><span class="mtag" style="background:{col}">{esc(tag)}</span>'
+                     f'<span class="mtime">{hhmm}</span> {body} {excl}</li>')
+        cnt = (f'호재 {fc.get("good_count", 0)} · 악재 {fc.get("bad_count", 0)} '
+               f'(점수 반영 {fc.get("scored_count", 0)}건 / 당일 검증 {fc.get("fresh_count", 0)}건)')
+        fc_sec = (f'<div class="sub-h">점수 반영 재료 · 팩트체크</div>'
+                  f'<div class="note muted">{esc(cnt)}</div>'
+                  f'<ul class="mat-ul">{rows}</ul>')
+
+    # ── 2) 실시간 리서치(참고·비점수) — LLM 서술 재료 ──
+    llm_sec = ""
+    if llm_mats:
+        rows = ""
+        for m in llm_mats:
+            if isinstance(m, dict):
+                tag, text = m.get("tag", "중립"), m.get("text", "")
+            else:
+                tag, text = "중립", str(m)
+            col = tag_col.get(tag, "var(--muted)")
+            rows += (f'<li><span class="mtag" style="background:{col}">{esc(tag)}</span>'
+                     f'{esc(text)}</li>')
+        llm_sec = (f'<div class="sub-h">실시간 리서치 <span class="mtag mtag-off">참고·비점수·미검증</span></div>'
+                   f'<ul class="mat-ul">{rows}</ul>')
+
+    # ── 3) 출처 ──
     def _src_li(s: dict) -> str:
         title = esc(s.get("title", ""))
         url = s.get("url", "")
         if url:
             return f'<li><a href="{esc(url)}" target="_blank" rel="noreferrer">{title}</a></li>'
         return f'<li class="factcheck">{title}</li>'
-    src_html = "".join(_src_li(s) for s in sources)
-    src_sec = (f'<div class="sub-h">출처 · 팩트체크</div>'
-               f'<ul class="src-ul">{src_html}</ul>' if sources else "")
-    return f'<div class="card"><h2>주요 재료</h2>{mat_sec}{src_sec}</div>'
+    src_sec = ""
+    if sources:
+        src_html = "".join(_src_li(s) for s in sources)
+        src_sec = f'<div class="sub-h">출처 · 팩트체크</div><ul class="src-ul">{src_html}</ul>'
+
+    return f'<div class="card"><h2>주요 재료</h2>{fc_sec}{llm_sec}{src_sec}</div>'
 
 
 def build_accuracy(r: dict) -> str:
@@ -816,6 +857,7 @@ TEMPLATE = r"""<!doctype html>
   .basis{margin-top:8px;font-size:.79rem;color:var(--muted);line-height:1.7;
     border-left:3px solid var(--border);padding:2px 0 2px 10px}
   .basis-k{color:var(--text);opacity:.75;font-weight:700;margin-right:3px}
+  .basis-note{color:var(--muted);font-size:.92em}
   .basis b{font-weight:800}
   .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:14px}
   .headline{font-size:1.06rem;font-weight:600;line-height:1.7}
@@ -915,6 +957,8 @@ TEMPLATE = r"""<!doctype html>
   .mat-ul{list-style:none;margin-left:-18px}
   .mat-ul li{display:flex;gap:8px;align-items:flex-start}
   .mtag{color:#fff;font-size:.7rem;font-weight:800;padding:1px 8px;border-radius:6px;white-space:nowrap;margin-top:3px}
+  .mtag-off{background:transparent;color:var(--muted);border:1px solid var(--border);font-weight:700}
+  .mtime{color:var(--muted);font-size:.78rem;font-variant-numeric:tabular-nums;white-space:nowrap;margin-top:3px}
   .check li{list-style:none;margin-left:-6px}
   .check li::before{content:"☐ ";color:var(--accent);font-weight:800}
   .src-ul li{font-size:.88rem}

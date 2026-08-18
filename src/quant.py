@@ -154,7 +154,10 @@ def intraday_analysis(intraday: CandleSeries | None) -> dict | None:
             "close_pos": round(close_pos, 2), "hi_idx": round(hi_idx, 2),
             "lo_idx": round(lo_idx, 2), "last_leg": round(last_leg, 2),
             "sess_ret": round(sess_ret, 2), "contrib": round(contrib, 1),
-            "n_bars": len(cs), "timeframe": intraday.timeframe}
+            "n_bars": len(cs), "timeframe": intraday.timeframe,
+            # 세션 수익률·종가위치는 ETF(KODEX) 프록시 시간봉 기준 — 지수 등락률과 소수%p
+            # 차이가 날 수 있어 출처를 명시(혼용 오해 방지).
+            "basis": "ETF 프록시"}
 
 
 def compute(daily: CandleSeries, intraday: CandleSeries | None = None) -> QuantSignals:

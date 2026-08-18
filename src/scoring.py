@@ -125,9 +125,9 @@ def score_flow(inp: FlowInput) -> SubScore:
     if retail_only:
         comment = "개인만 순매수 — 추가 감점"
     elif inp.foreign_streak >= 1:
-        comment = "외국인 3일 연속 순매수"
+        comment = f"외국인 {inp.foreign_streak}거래일 연속 순매수"
     elif inp.foreign_streak <= -1:
-        comment = "외국인 3일 연속 순매도"
+        comment = f"외국인 {abs(inp.foreign_streak)}거래일 연속 순매도"
     elif inp.foreign_net > 0 and inp.inst_net > 0:
         comment = "외국인·기관 동반 순매수"
     else:

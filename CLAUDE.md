@@ -2,6 +2,14 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Where you are running (read this first)
+
+Claude Code now runs **directly on the production server** — `KS5F-PROXMOX-VM2` (Ubuntu, KST clock, Korean/SK-BB IP so Naver/KRX work), repo at `~/stock_strategy`. This is the same box the "서버 운영" section describes. Practical consequences:
+
+- **Ignore the Windows-era notes below.** `E:\Projects\...` paths, the cp949/`PYTHONUTF8=1` mandate, and the "sibling repo open in the IDE" caveat are legacy from the old dev laptop and **do not apply here**. On Linux, plain `python3 scripts/...` prints Korean fine (still pass `PYTHONUTF8=1` if you want belt-and-suspenders; it is harmless, not required).
+- **Python is `python3` (3.12.3)**, deps installed via `pip --user` (`httpx`, `anthropic`). No venv (`python3.12-venv` not installed, needs sudo). No `requests` needed — code uses stdlib + `httpx` only.
+- **Edits here are live on prod.** Normal loop: edit → `git push` from wherever → on server `git pull`. But when you edit here you are already on the server, so a local commit + the cron/deploy chain in "서버 운영" applies immediately. Be deliberate about `public/index.html` changes — a push triggers a Vercel redeploy.
+
 ## Project overview
 
 `stock_strategy` is the **runnable implementation** of the market-scoring logic that was designed as Perplexity skills in the sibling repo `E:\Projects\perpelexity-finance-skills`. It takes Korean equities (KOSPI/KOSDAQ) end-of-day data, scores the market, and renders a **single self-contained HTML report**. All user-facing output is Korean. It is a personal tool — **not investment advice**.
@@ -12,41 +20,45 @@ Full intent, scope, data sources, and the phased build plan live in `docs/PLAN.m
 
 ## Source of truth for formulas (sibling repo)
 
-The scoring formulas, weights, gates, and output format are **defined** in the skills repo, not here. When implementing `src/scoring.py` or the report layout, treat these as canonical and mirror them exactly:
+The scoring formulas, weights, gates, and output format are **defined** in the skills repo, not here. A read-only copy of those reference files is now checked out **locally under `guide_docs/sample/`** (untracked) — use these paths on the server; the old `E:\Projects\perpelexity-finance-skills\...` paths are the original source and won't exist here. Treat these as canonical and mirror them exactly:
 
-- `E:\Projects\perpelexity-finance-skills\market-close-review\references\scoring-close.md` — 6 sub-scores, weights (0.20/0.20/0.25/0.15/0.10/0.10), `p_up = 1/(1+exp(-(total-55)/10))` clip 0.20~0.80, grades, gates, missing-data handling, `phase` enum.
-- `.../references/review-playbook.md` — next-day candidate filter + entry types.
-- `.../references/atr-risk-sizing.md` — ATR stop/target + edge/Kelly sizing.
-- `.../market-close-review/SKILL.md` — 9-block output format, timetable, risk notes.
-- `.../market-open-sentiment/references/broker-api.md` §7 — LS token issuance spec.
+- `guide_docs/sample/market-close-review/references/scoring-close.md` — 6 sub-scores, weights (0.20/0.20/0.25/0.15/0.10/0.10), `p_up = 1/(1+exp(-(total-55)/10))` clip 0.20~0.80, grades, gates, missing-data handling, `phase` enum.
+- `guide_docs/sample/market-close-review/references/review-playbook.md` — next-day candidate filter + entry types.
+- `guide_docs/sample/market-close-review/references/atr-risk-sizing.md` — ATR stop/target + edge/Kelly sizing.
+- `guide_docs/sample/market-close-review/SKILL.md` — 9-block output format, timetable, risk notes.
+- `guide_docs/sample/market-open-sentiment/references/broker-api.md` §7 — LS token issuance spec.
 
-If a formula changes, change it there too (or note the divergence) — this repo is downstream of that spec.
+If a formula changes, change it in the upstream skills repo too (or note the divergence) — this repo is downstream of that spec. Known easystock divergences from the SoT are listed in "이어서 할 곳" item 3 (ATR normalization, signal agreement, quant extension, gate-first sizing, news 시황 exclusion).
 
 ## Commands
 
+On this Linux server, `python3` and plain UTF-8 output both just work — the `PYTHONUTF8=1` prefix below is a harmless Windows holdover, keep it or drop it.
+
 ```bash
-# Always run Python with UTF-8 forced — the Windows console is cp949 and will
-# crash on Korean text / ✓ / emoji otherwise.
-PYTHONUTF8=1 python scripts/test_connection.py     # verify LS + Tavily keys
-PYTHONUTF8=1 python scripts/render_report.py        # data/sample_close.json -> out/report_<date>.html
-PYTHONUTF8=1 python scripts/render_report.py <path-to-scores.json>
+python3 scripts/test_connection.py                 # verify LS + Tavily keys
+python3 scripts/run_close.py                        # 마감(종가베팅) pipeline → dashboard bundle + public/index.html
+python3 scripts/run_preopen.py                      # 개장 전 재확인 → out/preopen_<date>.json
+#   run_close flags: --auto (scheduler) --dry-run (no write) --now ISO (force time) --write (persist --now)
+python3 scripts/render_report.py                    # data/sample_dashboard.json -> out/report_<date>.html
+python3 scripts/render_report.py <path-to-bundle-or-scores.json>
 
-# Preview a generated report visually: file:// is blocked in the Playwright
-# browser, so serve over localhost first.
-cd out && python -m http.server 8931 --bind 127.0.0.1
-#   then navigate to http://127.0.0.1:8931/report_<date>.html
+# Preview a generated report visually: serve over localhost (file:// is blocked
+# in headless browsers).
+cd out && python3 -m http.server 8931 --bind 127.0.0.1
+#   then open http://127.0.0.1:8931/report_<date>.html
 
-# Tests (once src/scoring.py exists)
-PYTHONUTF8=1 python -m pytest tests/ -q
+# Tests
+python3 -m pytest tests/ -q                          # 66 pass in <1s
+python3 -m pytest tests/test_scoring.py -q            # scoring engine only
+python3 -m pytest tests/test_scoring.py::<name> -q    # single test
 ```
 
-Environment: Python 3.12.10, `httpx` 0.28 and `requests` 2.32 available. No virtualenv is set up yet; scripts use only stdlib + httpx.
+Environment: Python 3.12.3, `httpx` present (installed via `pip --user`, plus `anthropic` for LLM narrative). No virtualenv; scripts use stdlib + httpx.
 
 ## Conventions and gotchas
 
-- **UTF-8 is mandatory on output.** `test_connection.py` self-reconfigures stdout, but `render_report.py` does not — always invoke with `PYTHONUTF8=1`. New scripts that print Korean should reconfigure stdout to UTF-8 at the top.
-- **Secrets stay in `.env`.** Scripts read them via a dependency-free parser (`load_env`) or `os.environ` — never hardcode, never print raw key/token values (mask to `first4...last4`). `.env` is gitignored; `.env.example` documents key names only.
-- **The `.env` this project reads is `E:\Projects\stock_strategy\.env`** — not the one in the sibling `perpelexity-finance-skills` repo (that one is often open in the IDE and is a different file).
+- **UTF-8:** on Linux it's automatic. New scripts that print Korean should still reconfigure stdout to UTF-8 at the top so they survive a cp949 console if ever run on Windows.
+- **Secrets stay in `.env`.** Scripts read them via a dependency-free parser (`load_env`) or `os.environ` — never hardcode, never print raw key/token values (mask to `first4...last4`). `.env` is gitignored; `.env.example` documents key names only. The live `.env` on this server has 9 keys and is placed by the user (`~/stock_strategy/.env`).
 - Reports follow the skills' teal/dark-light design language (from `assets/dashboard-template.html`); keep new UI consistent with `scripts/render_report.py`.
 
 ## Data sources and keys
@@ -84,7 +96,8 @@ scripts/run_close.py             [done] 마감(종가베팅) 파이프라인. �
                                  플래그: --auto(스케줄러) --dry-run(무반영) --now ISO(시각강제) --write(--now 반영)
 scripts/run_preopen.py           [done] 개장 전 재확인(앵커 신선도 검증 포함) → out/preopen_<date>.json 저장
                                  (오후 마감 회차가 같은 날 대시보드에 4뷰로 합침)
-scripts/auto_close.sh / auto_preopen.sh  [done] 서버 cron 러너(파이프라인 → git push → Vercel)
+scripts/auto_close.sh / auto_final.sh / auto_preopen.sh  [done] 서버 cron 러너(파이프라인 → git push → Vercel)
+                                 auto_close=15:00 잠정 · auto_final=16:30 마감확정 재계산 · auto_preopen=08:00 개장전
 scripts/auto_close.bat / auto_preopen.bat / setup_schedule.bat  [done] (대안) 로컬 Windows 스케줄러
 scripts/make_sample_dashboard.py [done] 코스피/코스닥 시장레벨 데모 번들(sample_dashboard.json) 생성
 scripts/make_sample_charts.py    [done] (레거시) 단일 리포트용 OHLC → sample_close.json charts 주입
@@ -112,6 +125,11 @@ public/login.html                [done] easystock 비밀번호 로그인 폼
 middleware.js / api/login.js      [done] Vercel 비번 게이트(쿠키 검증·fail-closed) + 로그인 API
 vercel.json / package.json / .vercelignore  [done] Vercel 정적+함수 배포 설정(framework:null)
 data/history.db                  SQLite 자가학습 DB (gitignored; 정본은 서버)
+guide_docs/sample/…              [untracked] SoT 스킬 참조본 로컬 사본(scoring-close·atr-risk-sizing·
+                                 review-playbook·SKILL·broker-api). "Source of truth" 섹션이 여기를 가리킴.
+guide_docs/source/evaluation.md  [untracked] 2026-08-18 라이브 리포트 사후검증 — 확정치 대조로 드러난
+                                 실제 결함(수급 ~4천억 과소반영, 외국인 연속일수 3→실제5 오류, 원달러
+                                 등락률 방향 오독, 세션수익률 지수/ETF 혼용). **점수 정확도 회귀 시 참고**.
 ```
 남은 데이터 갭: 마감 동시호가(call — 15:00 리포트 시점엔 **구조적으로 미발생** → 결측이 아니라
 '제외' 처리), 지수 거래대금(점수는 '거래량' 기준 — LS t1511/네이버 실시간이 당일 `value` 는 주지만
@@ -191,7 +209,8 @@ Keep this section updated as work advances. Status legend: ✅ done · 🔶 part
 ### 서버 운영 (인수인계 — 이제 작업/실행은 이 서버에서)
 - **서버**: `ssh KS5F-PROXMOX-VM2` = `ssh -i C:/keys/anyang-private-key-openssh.pem -p 4159 jspark1st@1.241.52.6`. Ubuntu·**KST**·**한국 IP(SK BB)**로 네이버/KRX 정상. python3.12(deps는 `pip --user`: httpx·anthropic. venv 아님 — python3.12-venv 미설치, sudo 필요).
 - **코드 위치**: `~/stock_strategy` (git in-place, remote fetch=https·push=git@github deploy key `~/.ssh/easystock_deploy`). **DB**: `~/stock_strategy/data/history.db` → 심볼릭 → `~/stock_strategy/db/history.db`(정본, 누적). **`.env`는 서버에 사용자가 배치**(9키). 로컬 `remote.py`는 서버에 key 없어 자동으로 local-only degrade.
-- **cron**(평일): `0 15 * * 1-5` 마감(종가베팅 15:00 KST) `auto_close.sh` · `0 8 * * 1-5` 개장전 재확인 08:00 `auto_preopen.sh`. 각 스크립트: 파이프라인(--auto) → `public/index.html` 변경 시만 git push → **Vercel 자동배포**. 로그: `out/auto_*.log`. `auto_update=false`(.env)면 예약 건너뜀(비용 절약).
+- **cron**(평일): `0 15 * * 1-5` 마감(종가베팅 15:00 KST, 장중 잠정) `auto_close.sh` · `30 16 * * 1-5` **마감 후 확정 재계산** `auto_final.sh` · `0 8 * * 1-5` 개장전 재확인 08:00 `auto_preopen.sh`. 각 스크립트: 파이프라인(--auto) → `public/index.html` 변경 시만 git push → **Vercel 자동배포**. 로그: `out/auto_*.log`. `auto_update=false`(.env)면 예약 건너뜀(비용 절약).
+  - **15:00 vs 16:30 회차**: `run_close.py` 는 실행 시각이 16:00(`FINAL_AFTER_HHMM`)을 지나면 `resolve_session` 이 `intraday=False` 를 돌려줘 **확정 일봉·확정 수급·확정 종가**로 재계산하고 같은 날 리포트를 덮어쓴다(잠정 배지 → '마감 확정치'). 별도 코드 분기 없이 같은 스크립트를 두 시각에 돌리는 구조. 등록: `crontab -e` 에 `30 16 * * 1-5 /home/jspark1st/stock_strategy/scripts/auto_final.sh` 추가.
 - **수동 실행**: `cd ~/stock_strategy && python3 scripts/run_close.py` (또는 run_preopen). **코드 수정 후**: 로컬에서 push → 서버 `cd ~/stock_strategy && git pull`.
 - **Vercel**: 프로젝트 `easystock`(prj_MVEYDzFx7LG0WddGqIQeMfsM1qSO, team_4rQsEoiwakRmCY4Ru0QJ7c1o), URL **easystock-junaitech.vercel.app**. 게이트 env **`view_password`·`auth_token`**(대시보드 설정 — MCP에 env 도구 없음). 네이티브 비번보호는 유료라 커스텀 미들웨어(middleware.js+api/login.js) 사용.
 
@@ -226,6 +245,14 @@ Keep this section updated as work advances. Status legend: ✅ done · 🔶 part
     진입가 대비 위치**로(숏에서 뒤집히던 문제), 사이드바 점수 칩, 리스크 중복 표시 제거,
     모바일 hero 2열·인쇄 스타일·포커스 링·prefers-reduced-motion.
   - ✅ 회귀 테스트 23개 추가(`tests/test_pipeline_logic.py`) — 총 66개 통과.
+
+### Claude Code 프로젝트 설정 (`.claude/`)
+- **agents/** — `scoring-auditor`(스코어링 SoT 대조 감사·읽기전용·opus) · `pipeline-runner`(run_close/preopen
+  실행·산출 검증·기본 dry-run) · `data-collector-debug`(LS/네이버/Tavily 수집 디버깅).
+- **skills/** — `/close-report`(마감 리포트 실행·검증) · `/preopen-report`(개장전 재확인) · `/checkup`(전면 점검 체크리스트).
+- **workflows/** — `checkup.js`(5축 병렬 감사→적대적 검증→종합) · `scoring-audit.js`(서브스코어·게이트·ATR SoT
+  대조 + 3관점 교차판정). Workflow 도구는 **명시 opt-in("워크플로 돌려줘"/ultracode) 시에만** 실행. 위 함정
+  체크리스트를 코드에 박아 둠 — 점검 재현이 필요하면 여기부터.
 
 ### 이어서 할 곳 (open items)
 1. **첫 라이브 15:00 회차 확인** — 코드는 장중 경로를 모두 갖췄지만 *실제 장중* 응답으로는 아직 미검증.

@@ -31,6 +31,27 @@ GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
 # 종합 단계 모델 체인. Opus 5 가 과부하(529)면 Sonnet 5 로 내려가 서술을 살린다.
 # (모델을 임의로 낮추지 않되, '아예 못 쓰는 것'보다는 한 단계 아래가 낫다.)
 CLAUDE_MODELS = ["claude-opus-5", "claude-sonnet-5"]
+
+
+def resolve_models(env: dict | None = None) -> dict:
+    """엔진별 사용할 모델명 — **.env 로 오버라이드**(없으면 위 기본값).
+
+    콤마로 폴백 체인을 지정할 수 있다(앞이 우선, 실패 시 다음). 예:
+        perplexity_model=sonar-pro
+        gemini_model=gemini-2.5-pro,gemini-2.5-flash
+        claude_model=claude-opus-5,claude-sonnet-5
+    """
+    env = env or load_env()
+
+    def _chain(key: str, default: list[str]) -> list[str]:
+        raw = str(env.get(key) or "").strip()
+        return [x.strip() for x in raw.split(",") if x.strip()] or default
+
+    return {
+        "perplexity": (str(env.get("perplexity_model") or "").strip() or PPLX_MODEL),
+        "gemini": _chain("gemini_model", GEMINI_MODELS),
+        "claude": _chain("claude_model", CLAUDE_MODELS),
+    }
 # Opus 5 는 적응형 사고(adaptive thinking)가 기본 ON 이라 사고 토큰도 max_tokens 를 먹는다.
 # 4000 이면 JSON 이 중간에 잘릴 수 있어 넉넉히 잡는다(비용은 실제 출력분만 청구).
 CLAUDE_MAX_TOKENS = 16000
@@ -90,10 +111,21 @@ def facts_block(ctx: dict) -> str:
         if m.get("index_chg_pct") is not None
         else f"[지수] {px_label} {m.get('index_close')}",
         f"[총점] {m.get('total')} / 100 · 등급 {m.get('grade')}",
-        f"[익일확률] 상승 {m.get('p_up')} · 하락 {m.get('p_down')}",
+        # 확률은 정수 %로 넘긴다 — 0.7703 같은 4자리 소수를 그대로 주면 LLM 이 과잉정밀하게
+        # 인용한다(점추정일 뿐 신뢰구간 없음). 표시·인용 모두 % 정수로 통일.
+        (f"[익일확률(점추정)] 상승 {m['p_up']*100:.0f}% · 하락 "
+         f"{(m.get('p_down') if m.get('p_down') is not None else 1-m['p_up'])*100:.0f}%"
+         if m.get("p_up") is not None else "[익일확률] 산출 안 됨(데이터 부족)"),
     ]
     if m.get("usdkrw"):
-        lines.append(f"[원달러] {m.get('usdkrw')}")
+        chg = m.get("usdkrw_chg")
+        # 방향을 명시해 준다 — LLM 이 'USD/KRW 하락'을 '원화 약세'로 뒤집는 오독을 막는다.
+        if chg is not None:
+            won = "원화 강세" if chg < 0 else "원화 약세" if chg > 0 else "보합"
+            lines.append(f"[원달러] {m.get('usdkrw')} ({chg:+.2f}% → {won}. "
+                         f"USD/KRW 하락=원화 강세)")
+        else:
+            lines.append(f"[원달러] {m.get('usdkrw')}")
     subs = m.get("subscores") or []
     if subs:
         lines.append("[항목점수] " + " · ".join(
@@ -137,7 +169,7 @@ def perplexity_research(ctx: dict, env: dict) -> dict | None:
             "4) 지금 경계할 실시간 주의 신호/리스크(지정학·환율·야간선물·금리·공시·수급 등)\n"
             "5) 익일(다음 거래일) 주목할 이벤트·트리거(경제지표·실적·해외증시·선물옵션 만기 등)\n"
             "각 항목 간결하게. 마지막에 한 줄 총평.")
-    body = {"model": PPLX_MODEL, "temperature": 0.2, "max_tokens": 900,
+    body = {"model": resolve_models(env)["perplexity"], "temperature": 0.2, "max_tokens": 900,
             "messages": [{"role": "system", "content": sys}, {"role": "user", "content": user}]}
     try:
         r = httpx.post(PPLX_URL, headers={"Authorization": f"Bearer {key}"},
@@ -179,7 +211,7 @@ def gemini_draft(ctx: dict, research: dict | None, env: dict) -> str | None:
     payload = {"contents": [{"role": "user", "parts": [{"text": prompt}]}],
                "systemInstruction": {"parts": [{"text": sys}]},
                "generationConfig": {"temperature": 0.3, "maxOutputTokens": 1400}}
-    for model in GEMINI_MODELS:
+    for model in resolve_models(env)["gemini"]:
         try:
             r = httpx.post(GEMINI_URL.format(model=model), params={"key": key},
                            json=payload, timeout=TIMEOUT)
@@ -238,7 +270,7 @@ def claude_synthesize(ctx: dict, research: dict | None, draft: str | None,
     # 결론 섹션이 통째로 비면 안 되므로: SDK 자동 재시도 → 모델 체인 강등 → 결정론 폴백.
     client = anthropic.Anthropic(api_key=key, max_retries=3)
     last = None
-    for model in CLAUDE_MODELS:
+    for model in resolve_models(env)["claude"]:
         for attempt in range(2):
             try:
                 msg = client.messages.create(

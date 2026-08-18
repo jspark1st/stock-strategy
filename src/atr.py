@@ -31,6 +31,9 @@ MAX_POSITION_PCT = 25.0   # 정본 §4: 종목당 상한 25%
 KELLY_FRACTION = 0.5      # Half Kelly (정본 §4 기본값)
 CHANDELIER_LOOKBACK = 22
 CHANDELIER_MULT = 3.0
+# 기본 타점(단기 1~3일)의 목표가 진입가 대비 이 %를 넘으면 '단기 도달 난도 높음' 경고.
+# 지수 기준 하루 변동은 보통 1~2%대라 8%(≈수일치 급변)를 넘으면 1~3일 도달은 비현실적.
+HORIZON_MOVE_WARN_PCT = 8.0
 
 
 def clamp(x: float, lo: float, hi: float) -> float:
@@ -335,6 +338,16 @@ def compute_plan(market: str, daily: CandleSeries, p_up: float | None,
         comment += " · 변동성 과열 → 정규화 ATR 적용(스톱 과대 방지), 구조 손절 우선."
     elif regime == "저변동":
         comment += " · 저변동 → ATR 타이트, whipsaw 유의(배수 상향 고려)."
+
+    # ── 목표-기간 현실성: 기본 타점은 '단기(1~3일)'인데, 변동성 급확대 국면에선
+    # k2·ATR 목표가 단기 도달이 비현실적인 폭(예: 지수 -13%)까지 벌어진다.
+    # 목표를 조용히 그대로 두면 오해하므로, 도달 난도를 명시하고 1·ATR 중간 목표를 병기한다.
+    tgt_move = abs(primary.target - entry) / entry * 100 if entry else 0.0
+    if tgt_move > HORIZON_MOVE_WARN_PCT:
+        interim = entry + a_eff if direction != "short" else entry - a_eff
+        comment += (f" · ⚠ {primary.label} 목표 {primary.target:.2f}는 진입가 대비 "
+                    f"{tgt_move:.1f}%({primary.k2:.1f}·ATR)로 단기 도달 난도 높음 "
+                    f"— 1차 중간목표 {interim:.2f}(1·ATR) 우선 대응 권장.")
 
     return AtrPlan(
         market=market, direction=direction, atr14=a14, atr22=a22, entry=entry,

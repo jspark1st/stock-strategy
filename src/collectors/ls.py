@@ -315,3 +315,82 @@ class LSClient:
             upper_limit=_f(d.get("uplmtprice")),
             lower_limit=_f(d.get("dnlmtprice")),
         )
+
+    def investor_raw(self, market: str = "1", gubun: str = "0") -> dict:
+        """t1601 투자자별매매종합 **원시** 응답 → {블록명: {suffix: net}}.
+
+        market: '1'=코스피 '2'=코스닥(추정 — 실증 확정 대상). gubun: 매매유형 코드.
+        각 OutBlockN 은 suffix 01~18 의 `svolume_NN`(순매수=ms-md) 을 담는다. **어느 블록이
+        금액(억원)/수량(주)이고 어느 suffix 가 외국인/기관/개인인지는 공개 스펙에 없다**
+        → 이 원시값을 네이버 확정치와 대조(match_investor_suffixes)해 실증으로 확정한다.
+        추측 금지: 확정 전에는 스코어에 쓰지 않는다."""
+        d = self.call_tr("/stock/investor", "t1601", {"market": market, "gubun": gubun})
+        out: dict = {}
+        for bname, block in d.items():
+            if "OutBlock" not in bname or not isinstance(block, dict):
+                continue
+            suf: dict = {}
+            for k, v in block.items():
+                if k.startswith("svolume_"):
+                    suf[k.split("_", 1)[1]] = _f(v)
+            if suf:
+                out[bname] = suf
+        return out
+
+
+# ── t1601 suffix → 투자자 실증 역매핑 (순수 함수, IO 없음) ─────────────────────
+def match_investor_suffixes(block: dict, naver_net: dict) -> dict:
+    """t1601 한 블록의 {suffix: net} 을 네이버 확정 {라벨: 억원} 에 대조해 매핑을 추정.
+
+    **추측이 아니라 실측 대조다**: 네이버(외국인/기관/개인/기타법인, 억원)는 KRX 확정치이므로,
+    LS 원시값 중 그 4개 값을 (부호+크기 비율로) 재현하는 suffix 조합이 유일하게 결정되면
+    그게 정답이다. 단위(주/억원/백만원)가 달라도 '단일 스케일'로 4개가 동시에 맞아야 하므로
+    우연 일치 확률이 낮다.
+
+    반환: {"mapping": {라벨: suffix}, "scale": float(LS→억원), "confidence": 0~1,
+           "identity_ok": bool(매핑된 4개 순매수 합≈0)}.  confidence 는 스케일 적용 후
+    평균 상대오차의 보수값. 호출부(프로브)가 6개 블록 중 최고 confidence 를 채택한다.
+    """
+    labels = list(naver_net)
+    items = [(s, v) for s, v in block.items()]
+    b_max = max((abs(v) for _, v in items), default=0.0) or 1.0
+    n_max = max((abs(v) for v in naver_net.values()), default=0.0) or 1.0
+
+    # 1) 정규화(각 side 를 max-abs 로) 후 큰 값부터 가장 가까운 suffix 배정(모호성 최소)
+    used, mapping = set(), {}
+    for lab in sorted(labels, key=lambda l: -abs(naver_net[l])):
+        target = naver_net[lab] / n_max
+        best, bestd = None, 1e9
+        for s, v in items:
+            if s in used:
+                continue
+            d = abs(v / b_max - target)
+            if d < bestd:
+                bestd, best = d, s
+        if best is not None:
+            used.add(best)
+            mapping[lab] = best
+
+    # 2) 스케일(LS→억원) = 매핑된 비영(非零) 쌍들의 중앙값 비율
+    ratios = []
+    for lab, s in mapping.items():
+        bv = block.get(s, 0.0)
+        if bv:
+            ratios.append(naver_net[lab] / bv)
+    if not ratios:
+        return {"mapping": mapping, "scale": 0.0, "confidence": 0.0, "identity_ok": False}
+    ratios.sort()
+    scale = ratios[len(ratios) // 2]
+
+    # 3) 스케일 적용 후 평균 상대오차 → confidence
+    errs = []
+    for lab, s in mapping.items():
+        pred = block.get(s, 0.0) * scale
+        denom = abs(naver_net[lab]) or 1.0
+        errs.append(abs(pred - naver_net[lab]) / denom)
+    confidence = max(0.0, 1.0 - (sum(errs) / len(errs)))
+
+    net_sum = sum(block.get(s, 0.0) * scale for s in mapping.values())
+    identity_ok = abs(net_sum) < 0.02 * n_max
+    return {"mapping": mapping, "scale": scale,
+            "confidence": round(confidence, 4), "identity_ok": identity_ok}

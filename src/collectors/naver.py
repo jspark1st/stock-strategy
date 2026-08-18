@@ -108,7 +108,12 @@ def investor_history(market: str, date: str | None = None, limit: int = 10,
 
 
 def foreign_streak(history: list[InvestorFlows]) -> int:
-    """외국인 순매수 연속성: 3일 이상 연속 순매수 +1 / 순매도 -1 / 그 외 0."""
+    """외국인 순매수 연속성 — **부호 있는 연속일수**. 3일 이상 연속 순매수 → +N /
+    순매도 → -N / 그 외 0.
+
+    점수 기여는 부호만 쓰도록 scoring 이 ±1 로 clamp 하지만, 표시에는 실제 일수(|N|)를
+    써야 한다. 예전엔 ±1 만 돌려줘 실제 5일 연속도 리포트에 '3일 연속'으로 박히던 버그가
+    있었다(연속일수 정보를 여기서 버렸기 때문)."""
     if not history:
         return 0
     sign = 1 if history[0].foreign_net > 0 else (-1 if history[0].foreign_net < 0 else 0)
@@ -120,7 +125,7 @@ def foreign_streak(history: list[InvestorFlows]) -> int:
             run += 1
         else:
             break
-    return sign if run >= 3 else 0
+    return sign * run if run >= 3 else 0
 
 
 def investor_flows_intraday(market: str, date: str, client: httpx.Client | None = None

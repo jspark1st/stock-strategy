@@ -203,6 +203,7 @@ def _llm_ctx(cfg, rep, atr_dict, materials, session: Session) -> dict:
         "index_close": rep["market"].get(f"{cfg['mk']}_close"),
         "index_chg_pct": rep["market"].get(f"{cfg['mk']}_chg_pct"),
         "usdkrw": rep["market"].get("usdkrw"),
+        "usdkrw_chg": (rep.get("fx") or {}).get("chg_pct"),
         "total": rep.get("total"), "grade": rep.get("grade"),
         "p_up": rep.get("p_up"), "p_down": rep.get("p_down"),
         "subscores": rep.get("subscores", []), "flows": rep.get("flows", {}),
@@ -301,8 +302,11 @@ def build_report(cfg: dict, ls, client, conn, env, session_of: dict,
         flow=flow, value=value, call_auction=None, news=news_in, quant=quant_sig,
         market=ms, flags=DayFlags(), as_of=as_of,
         intraday_snapshot=session.intraday,
-        # 15:20~15:30 동시호가는 이 리포트가 나온 뒤에 일어난다 → 결측이 아니라 해당 없음
-        call_not_applicable=session.intraday)
+        # 마감 동시호가(15:20~15:30): 15:00 장중엔 아직 미발생, 마감 후 재계산 회차에도
+        # 이 파이프라인엔 동시호가 수집기가 없다 → 어느 회차든 '결측'이 아니라 '제외'로
+        # 통일한다(확정 회차에서 갑자기 결측→재배분으로 총점이 출렁이지 않게). 전용 수집기가
+        # 생기면 그때 실제 값으로 채운다.
+        call_not_applicable=True)
     result = score_close(inputs)
     rep = result.to_report_dict(sources=sources)
     rep["id"] = cfg["id"]
@@ -311,6 +315,10 @@ def build_report(cfg: dict, ls, client, conn, env, session_of: dict,
     rep["data_source"] = session.source
     rep["charts"] = {"index": _index_charts(market, client, session, intraday_series)}
     rep["intraday"] = intraday_block
+    # 화면 '주요 재료' = 점수에 반영된 팩트체크 재료(호재/악재 개수가 news 서브스코어와 일치).
+    # LLM narrative 재료는 미검증이라 렌더러가 '참고(비점수)'로 따로 표시한다.
+    if materials is not None:
+        rep["materials_fc"] = materials.to_report()
     if fx:
         rep["fx"] = fx
     if flow_warn:

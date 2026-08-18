@@ -118,6 +118,24 @@ class MaterialsAssessment:
                 f"(최신 {lt} KST) → 지수 점수 반영 {n_scored}건 "
                 f"(시황 중복·개별종목 이슈 {drop}건 제외)")
 
+    def to_report(self, limit: int = 10) -> dict:
+        """리포트 '주요 재료' 카드에 넣을 **구조화된 팩트체크 재료**.
+
+        렌더러가 이 값을 주 재료로 표시한다 → 화면에 보이는 재료 = 실제 점수에 반영된
+        재료. (LLM narrative 의 재료는 미검증이라 '참고'로 따로 표시.) good/bad_count 는
+        news 서브스코어 산출에 쓴 값과 동일하므로, 화면 호재/악재 개수가 점수와 어긋나지
+        않는다(평가 지적: 화면 호재2·악재3 vs 점수 호재0·악재1 불일치 해소)."""
+        items = []
+        for m in self.fresh[:limit]:
+            reason = ("" if m.scored else
+                      ("시황(가격·수급 항목과 중복)" if m.kind == "시황" else "개별종목 이슈"))
+            items.append({"tag": m.tag, "title": m.title, "url": m.url,
+                          "hhmm": m.hhmm(), "scored": m.scored, "reason": reason})
+        return {"fact_check": self.fact_check_line(),
+                "good_count": self.good_count, "bad_count": self.bad_count,
+                "scored_count": len(self.scored), "fresh_count": len(self.fresh),
+                "items": items}
+
     def sources(self, limit: int = 8) -> list[dict]:
         """리포트 '주요 재료' 소스. 첫 항목은 팩트체크 요약(링크 없음)."""
         out = [{"title": self.fact_check_line(), "url": ""}]
