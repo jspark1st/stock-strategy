@@ -29,8 +29,8 @@ NEUTRAL = {"중립", "관망", "혼조", "보통"}
 
 # 사이드바: 그룹 헤더가 유형을 표시하므로 아이템은 시장명만("코스피"/"코스닥").
 DEFAULT_PLACEHOLDERS = [
-    {"id": "kospi-preopen", "group": "개장 전", "label": "코스피", "note": "준비 중"},
-    {"id": "kosdaq-preopen", "group": "개장 전", "label": "코스닥", "note": "준비 중"},
+    {"id": "kospi-preopen", "group": "개장 전", "label": "코스피", "note": "08:00 갱신"},
+    {"id": "kosdaq-preopen", "group": "개장 전", "label": "코스닥", "note": "08:00 갱신"},
 ]
 
 
@@ -92,29 +92,71 @@ def build_market_line(m: dict) -> str:
     return " · ".join(parts)
 
 
+def build_basis(r: dict) -> str:
+    """데이터 기준 스트립 — 언제·어디서 온 수치인지 한 줄로 못박는다.
+
+    15:00 리포트의 지수는 종가가 아니다. 이 한 줄이 없으면 사용자가 '마감 확정치'로 오해한다.
+    """
+    bits = []
+    as_of = r.get("as_of")
+    if as_of:
+        bits.append(f'<span class="basis-k">기준시각</span> {esc(as_of)}')
+    if r.get("report_type") == "preopen":
+        if r.get("anchor_date"):
+            bits.append(f'<span class="basis-k">수치 앵커</span> {esc(r["anchor_date"])} 마감')
+    elif r.get("intraday_snapshot"):
+        bits.append('<span class="basis-k">상태</span> '
+                    '<b style="color:var(--neutral)">장 종료 전 스냅샷 · 종가 아님</b>')
+    elif r.get("total") is not None:
+        bits.append('<span class="basis-k">상태</span> 마감 확정치')
+    if r.get("data_source"):
+        bits.append(f'<span class="basis-k">지수 출처</span> {esc(r["data_source"])}')
+    fx = r.get("fx") or {}
+    if fx.get("price"):
+        c = fx.get("chg_pct")
+        bits.append(f'<span class="basis-k">원달러</span> {fmt(fx["price"],2)} '
+                    f'<span style="color:{dir_color(c)}">{signed(c)}%</span>')
+    if not bits:
+        return ""
+    return f'<div class="basis">{" · ".join(bits)}</div>'
+
+
+def _donut(value, color: str, label: str) -> str:
+    """확률 도넛. value=None 이면 '—' (0% 로 그리면 반대편이 100%처럼 읽힌다)."""
+    if value is None:
+        return (f'<div class="stat"><div class="donut donut-na" style="--p:0;--dc:var(--muted)">'
+                f'<div class="inner" style="color:var(--muted)">—</div></div>'
+                f'<div class="lbl">{label}</div></div>')
+    return (f'<div class="stat"><div class="donut" style="--p:{value*100:.0f};--dc:{color}">'
+            f'<div class="inner" style="color:{color}">{value*100:.0f}%</div></div>'
+            f'<div class="lbl">{label}</div></div>')
+
+
 def build_hero(r: dict) -> str:
     total = r.get("total")
     grade = esc(r.get("grade", ""))
-    p_up = r.get("p_up") or 0.0
-    p_down = r.get("p_down") or (1 - p_up)
+    p_up = r.get("p_up")
+    p_down = r.get("p_down") if r.get("p_down") is not None else (
+        1 - p_up if p_up is not None else None)
     total_txt = fmt(total) if total is not None else "—"
     preopen = r.get("report_type") == "preopen"
     total_lbl = "전일 마감 총점 / 100" if preopen else "총점 / 100"
-    up_lbl, down_lbl = ("오늘 상승 확률", "오늘 하락 확률") if preopen else ("익일 상승 확률", "익일 하락 확률")
+    up_lbl, down_lbl = (("오늘 상승 확률", "오늘 하락 확률") if preopen
+                        else ("익일 상승 확률", "익일 하락 확률"))
+    raw = r.get("p_up_raw")
+    calib = ""
+    if raw is not None and p_up is not None and abs(raw - p_up) > 1e-9:
+        calib = (f'<div class="hero-note">자가학습 보정 전 {raw*100:.0f}% '
+                 f'→ 보정 후 {p_up*100:.0f}%</div>')
     return f"""
     <div class="stat">
       <div class="big" style="color:var(--accent)">{total_txt}</div>
       <div class="lbl">{total_lbl}</div>
       <div class="grade" style="color:{grade_color(r.get('grade',''))}">{grade}</div>
     </div>
-    <div class="stat">
-      <div class="donut" style="--p:{p_up*100:.0f};--dc:var(--up)"><div class="inner" style="color:var(--up)">{p_up*100:.0f}%</div></div>
-      <div class="lbl">{up_lbl}</div>
-    </div>
-    <div class="stat">
-      <div class="donut" style="--p:{p_down*100:.0f};--dc:var(--down)"><div class="inner" style="color:var(--down)">{p_down*100:.0f}%</div></div>
-      <div class="lbl">{down_lbl}</div>
-    </div>"""
+    {_donut(p_up, 'var(--up)', up_lbl)}
+    {_donut(p_down, 'var(--down)', down_lbl)}
+    {calib}"""
 
 
 DIR_LABEL = {"long": ("매수 우위", "var(--up)"), "short": ("매도/현금", "var(--down)"),
@@ -131,32 +173,53 @@ def build_confidence(r: dict) -> str:
     sa = r.get("signal_agreement")
     if dc is None and sa is None:
         return ""
+    ko = {"close": "종가강도", "breadth": "시장폭", "flow": "수급", "amt": "거래대금",
+          "call": "마감동시호가", "news": "재료", "quant": "기술·퀀트"}
     chips = []
     if dc is not None:
-        ko = {"close": "종가강도", "breadth": "시장폭", "flow": "수급", "amt": "거래대금",
-              "call": "마감동시호가", "news": "재료"}
         miss = [ko.get(k, k) for k in (r.get("missing_keys") or [])]
-        note = f" · 결측 {', '.join(miss)}" if miss else ""
+        note = f" · 결측 {', '.join(miss)}" if miss else " · 결측 없음"
         chips.append(f'<span class="conf-chip">데이터 완전성 '
                      f'<b style="color:{_conf_color(dc)}">{dc*100:.0f}%</b>{note}</span>')
     if sa is not None:
         chips.append(f'<span class="conf-chip">신호 일치도 '
                      f'<b style="color:{_conf_color(sa, 0.8, 0.5)}">{sa*100:.0f}%</b></span>')
+    excl = [ko.get(k, k) for k in (r.get("excluded_keys") or [])]
+    if excl:
+        chips.append(f'<span class="conf-chip">가중치 재배분 '
+                     f'<b style="color:var(--muted)">{", ".join(excl)} 제외</b></span>')
     return f'<div class="conf-row">{"".join(chips)}</div>'
 
 
 def build_conclusion(r: dict) -> str:
-    """매매 결론 스트립 — 방향 배지 + 한 줄 결론."""
+    """매매 결론 스트립 — 방향 배지 + 등급 게이트 + 한 줄 결론."""
     nar = r.get("narrative", {}) or {}
     atr = r.get("atr") or {}
+    gate = r.get("gate") or {}
     concl = nar.get("conclusion", "")
     dlabel, dcol = DIR_LABEL.get(atr.get("direction"), ("판단 보류", "var(--muted)"))
+    if gate.get("new_entry_blocked"):
+        dlabel, dcol = "신규 진입 차단", "var(--caution)"
     if not concl and not atr:
         return ""
+    bits = []
+    if gate:
+        ps = gate.get("position_scale")
+        bits.append("신규 진입 <b>차단</b>" if gate.get("new_entry_blocked")
+                    else f"비중 배수 <b>{ps:.0%}</b>" if ps is not None else "")
+        bits.append(f"후보 최대 <b>{gate.get('max_candidates')}</b>종목")
+        bits.append("종가베팅 <b>" + ("검토 가능" if gate.get("close_betting") else "불가") + "</b>")
+    if atr.get("instrument"):
+        bits.append(f"실행 수단 <b>{esc(atr['instrument'])}</b>")
+    gate_html = (f'<div class="concl-gate">{" · ".join(b for b in bits if b)}</div>'
+                 if bits else "")
     return f"""
   <div class="card concl">
     <div class="concl-badge" style="background:{dcol}">{dlabel}</div>
-    <div class="concl-text">{esc(concl) or '데이터 기반 매매 결론은 준비 중입니다.'}</div>
+    <div class="concl-body">
+      <div class="concl-text">{esc(concl) or '데이터 기반 매매 결론은 준비 중입니다.'}</div>
+      {gate_html}
+    </div>
   </div>"""
 
 
@@ -175,18 +238,35 @@ def build_atr_plan(r: dict) -> str:
     edge = p.get("edge")
     edge_col = "var(--up)" if (edge or 0) > 0 else "var(--down)"
     kelly = p.get("kelly_pct") or 0
-    qual = "진입 자격 ✓" if p.get("qualified") else "진입 부적합(edge≤0)"
+    blocked = bool(atr.get("gate_blocked"))
+    if blocked:
+        qual = "등급 게이트 차단 — 신규 진입 없음"
+    elif p.get("qualified"):
+        qual = "진입 자격 ✓"
+    else:
+        qual = "진입 부적합(edge≤0)"
     rec_stop = atr.get("rec_stop")
     stop_sub = (f"권장 {fmt(rec_stop,2)}·{esc(atr.get('rec_stop_basis',''))}"
                 if rec_stop is not None else "")
+    # 숏이면 손절이 진입가 위(=상승 방향), 목표가 아래(=하락 방향)다. 역할이 아니라
+    # 가격 위치로 색을 정해야 빨강=위·파랑=아래라는 한국 HTS 관례가 깨지지 않는다.
+    entry_v = p.get("entry")
+    def _lvl_col(v):
+        if v is None or entry_v is None:
+            return "var(--text)"
+        return "var(--up)" if v >= entry_v else "var(--down)"
     tiles = "".join([
-        _tile("진입가", fmt(p.get("entry"), 2)),
-        _tile("손절가", fmt(p.get("stop"), 2), "var(--down)", stop_sub),
-        _tile("목표가", fmt(p.get("target"), 2), "var(--up)"),
+        _tile("진입가", fmt(entry_v, 2)),
+        _tile("손절가", fmt(p.get("stop"), 2), _lvl_col(p.get("stop")), stop_sub),
+        _tile("목표가", fmt(p.get("target"), 2), _lvl_col(p.get("target"))),
         _tile("손익비", f"1 : {fmt(p.get('rr'),1)}", "var(--accent)"),
         _tile("edge", signed(edge, 3) if edge is not None else "—", edge_col,
               f"손익분기 {fmt(p.get('p_breakeven'),2)}"),
-        _tile("권장비중", f"{kelly:.0f}%", "var(--accent)", "Half-Kelly · 상한 25%"),
+        _tile("권장비중", f"{kelly:.0f}%",
+              "var(--caution)" if blocked else "var(--accent)",
+              "등급 게이트 차단 → 0%" if blocked else
+              (f"Half-Kelly × 게이트 {atr.get('position_scale', 1):.0%} · 상한 25%"
+               if atr.get("position_scale", 1) != 1 else "Half-Kelly · 상한 25%")),
     ])
     # 보조 정보 (초고수 보강: 원본 vs 정규화 ATR, 변동성 국면, 구조 손절)
     extra = []
@@ -206,12 +286,18 @@ def build_atr_plan(r: dict) -> str:
         rows += (f"<tr><td>{esc(v.get('label'))}</td><td>{fmt(v.get('stop'),2)}</td>"
                  f"<td>{fmt(v.get('target'),2)}</td><td>1:{fmt(v.get('rr'),1)}</td>"
                  f"<td style='color:{'var(--up)' if (v.get('edge') or 0)>0 else 'var(--down)'}'>"
-                 f"{signed(v.get('edge'),3)}</td><td>{v.get('kelly_pct',0):.0f}%</td></tr>")
+                 f"{signed(v.get('edge'),3)}</td>"
+                 f"<td style='color:{'var(--muted)' if not (v.get('kelly_pct') or 0) else 'var(--text)'}'>"
+                 f"{v.get('kelly_pct',0):.0f}%</td></tr>")
     warn = ('<div class="atr-warn">⚠ 변동성 과열 — 정규화 ATR 적용(스톱 과대 방지), 구조 손절 우선</div>'
             if atr.get("price_limit_warn") else "")
     regime = atr.get("regime")
     regime_pill = (f'<span class="pill pill-ghost">변동성 {esc(regime)}</span>'
                    if regime and regime != "정상" else "")
+    anchor_note = ('<div class="atr-warn">⚠ 아래 타점은 '
+                   f'{esc(r.get("anchor_date", "전일"))} 종가 기준이다. 오늘 시가가 갭으로 벌어지면 '
+                   '진입·손절 거리가 달라지므로 개장 후 재계산할 것.</div>'
+                   if r.get("report_type") == "preopen" else "")
     return f"""
   <div class="card">
     <h2>ATR 매매 플랜 <span class="pill" style="background:{dcol}">{dlabel}</span>
@@ -220,11 +306,17 @@ def build_atr_plan(r: dict) -> str:
     <div class="atr-extra">{' · '.join(extra)}</div>
     {warn}
     <div class="obs muted">{esc(atr.get('comment',''))}</div>
-    <table class="mini">
-      <thead><tr><th>유형</th><th>손절</th><th>목표</th><th>손익비</th><th>edge</th><th>비중</th></tr></thead>
-      <tbody>{rows}</tbody>
-    </table>
-    <div class="note muted">지수 기준 타점 · 실제 체결은 ETF(KODEX 200 / 코스닥150). 투자 권유 아님.</div>
+    <div class="table-wrap">
+      <table class="mini">
+        <thead><tr><th>유형</th><th>손절</th><th>목표</th><th>손익비</th><th>edge</th><th>비중</th></tr></thead>
+        <tbody>{rows}</tbody>
+      </table>
+    </div>
+    {anchor_note}
+    <div class="note muted">지수 포인트 기준 타점 · 실제 체결 수단:
+      {esc(atr.get('instrument') or 'KODEX 200 / 코스닥150')}.
+      edge·켈리는 <b>익일 방향확률(p)</b>을 손익비 승률로 간주한 값이다 — 목표·손절 도달
+      확률과는 다르므로 비중은 항상 게이트·상한 안에서. 투자 권유 아님.</div>
   </div>"""
 
 
@@ -232,9 +324,11 @@ def build_scenarios(r: dict) -> str:
     sc = (r.get("narrative", {}) or {}).get("scenarios") or {}
     if not any(sc.get(k) for k in ("up", "down", "trigger")):
         return ""
+    preopen = r.get("report_type") == "preopen"
+    title = "오늘 시나리오" if preopen else "익일 시나리오"
     return f"""
   <div class="card">
-    <h2>익일 시나리오</h2>
+    <h2>{title}</h2>
     <div class="scen">
       <div class="scen-card scen-up">
         <div class="scen-h" style="color:var(--up)">▲ 상승 시나리오</div>
@@ -361,7 +455,9 @@ def build_index_chart(r: dict) -> str:
     name = esc(index.get("name", ""))
     default = index.get("default", "D") if index.get("default", "D") in frames else next(iter(frames))
     has_atr = bool(r.get("atr"))
-    atr_key = ('<span class="k k-target">━</span>목표 <span class="k k-stop">━</span>손절 '
+    short = ((r.get("atr") or {}).get("direction") == "short")
+    tk, sk = ("k-stop", "k-target") if short else ("k-target", "k-stop")
+    atr_key = (f'<span class="k {tk}">━</span>목표 <span class="k {sk}">━</span>손절 '
                '<span class="k k-entry">━</span>진입' if has_atr else "")
     btns = "".join(
         f'<button class="tf-btn{" active" if k == default else ""}" data-tf="{k}">{lab}</button>'
@@ -383,7 +479,9 @@ def build_index_chart(r: dict) -> str:
 
 def build_risks(r: dict) -> str:
     live = (r.get("narrative", {}) or {}).get("risks") or []
-    sys_warn = r.get("warnings", []) or []
+    seen = {str(x).strip() for x in live}
+    # 같은 문장을 '실시간 리스크'와 '시스템 신호' 양쪽에 찍지 않는다.
+    sys_warn = [w for w in (r.get("warnings") or []) if str(w).strip() not in seen]
     if not live and not sys_warn:
         return ""
     live_html = "".join(f'<li class="risk-live">{esc(x)}</li>' for x in live)
@@ -421,7 +519,8 @@ def build_materials(r: dict) -> str:
             return f'<li><a href="{esc(url)}" target="_blank" rel="noreferrer">{title}</a></li>'
         return f'<li class="factcheck">{title}</li>'
     src_html = "".join(_src_li(s) for s in sources)
-    src_sec = f'<div class="sub-h">출처 · 팩트체크</div><ul>{src_html}</ul>' if sources else ""
+    src_sec = (f'<div class="sub-h">출처 · 팩트체크</div>'
+               f'<ul class="src-ul">{src_html}</ul>' if sources else "")
     return f'<div class="card"><h2>주요 재료</h2>{mat_sec}{src_sec}</div>'
 
 
@@ -469,22 +568,33 @@ def build_engine_trace(r: dict) -> str:
     return f'<div class="engine muted">서술 엔진: {esc(" · ".join(tr))}</div>'
 
 
+def _status_badge(r: dict) -> str:
+    if r.get("report_type") == "preopen":
+        return '<span class="badge badge-info" title="전일 마감 수치를 앵커로 재검토">개장 전 재검토</span>'
+    if r.get("intraday_snapshot"):
+        return ('<span class="badge badge-warn" '
+                'title="종가 단일가 이전 스냅샷 — 종가·수급 확정치와 다를 수 있음">장중 잠정</span>')
+    if r.get("provisional"):
+        return '<span class="badge badge-warn">잠정</span>'
+    return '<span class="badge badge-ok">마감 확정</span>'
+
+
 def render_report_view(r: dict, date: str) -> str:
-    prov = r.get("provisional", False)
-    prov_badge = ('<span class="badge badge-warn">잠정</span>' if prov
-                  else '<span class="badge badge-ok">확정</span>')
     group = esc(r.get("group", "장 마감"))
     label = esc(r.get("label", "코스피"))
     view_date = esc(r.get("trade_date", date))
     nar = r.get("narrative", {}) or {}
     headline = nar.get("character") or r.get("headline", "")
+    headline_html = (f'<div class="card"><p class="headline">{esc(headline)}</p></div>'
+                     if headline else "")
     return f"""
     <div class="view-head">
-      <div class="view-title">{label} <span class="view-sub">· {group} · {view_date}</span> {prov_badge}</div>
+      <div class="view-title">{label} <span class="view-sub">· {group} · {view_date}</span> {_status_badge(r)}</div>
       <div class="muted">{build_market_line(r.get('market', {}))}</div>
+      {build_basis(r)}
     </div>
 
-    <div class="card"><p class="headline">{esc(headline)}</p></div>
+    {headline_html}
 
     <div class="card hero">{build_hero(r)}</div>
     {build_confidence(r)}
@@ -547,9 +657,18 @@ def build_sidebar(items: list[dict]) -> str:
         out.append(f'<div class="nav-group"><div class="nav-title">{esc(g)}</div>')
         for it in gmap[g]:
             cls = "nav-item" + (" ph" if it["ph"] else "")
-            badge = f'<span class="nav-badge">{esc(it.get("note","준비 중"))}</span>' if it["ph"] else ""
+            if it["ph"]:
+                badge = f'<span class="nav-badge">{esc(it.get("note", "준비 중"))}</span>'
+            elif it.get("total") is not None:
+                badge = (f'<span class="nav-score" style="color:{grade_color(it.get("grade",""))}">'
+                         f'{fmt(it["total"])}</span>')
+            elif it.get("grade"):
+                badge = f'<span class="nav-badge">{esc(it["grade"])}</span>'
+            else:
+                badge = ""
             out.append(
-                f'<a class="{cls}" data-target="{esc(it["id"])}" href="#{esc(it["id"])}">'
+                f'<a class="{cls}" data-target="{esc(it["id"])}" href="#{esc(it["id"])}" '
+                f'aria-label="{esc(it["label"])} {esc(g)}">'
                 f'<span>{esc(it["label"])}</span>{badge}</a>')
         out.append("</div>")
     return "".join(out)
@@ -569,7 +688,8 @@ def _chart_payload(r: dict) -> dict:
     p = atr.get("primary") or {}
     if p:
         idx["levels"] = {"entry": p.get("entry"), "stop": p.get("stop"),
-                         "target": p.get("target")}
+                         "target": p.get("target"),
+                         "short": atr.get("direction") == "short"}
     charts["index"] = idx
     return {"name": idx.get("name", ""), "charts": charts}
 
@@ -578,11 +698,15 @@ def render(data: dict) -> str:
     bundle = normalize_bundle(data)
     date = str(bundle.get("trade_date", ""))
 
+    bundle_as_of = bundle.get("as_of")
     items, views, chart_views = [], [], {}
     for r in bundle["reports"]:
         vid = r["id"]
+        if not r.get("as_of") and bundle_as_of:
+            r["as_of"] = bundle_as_of
         items.append({"id": vid, "label": r.get("label", vid),
-                      "group": r.get("group", "장 마감"), "ph": False})
+                      "group": r.get("group", "장 마감"), "ph": False,
+                      "total": r.get("total"), "grade": r.get("grade")})
         views.append((vid, render_report_view(r, date)))
         if r.get("charts"):
             chart_views[vid] = _chart_payload(r)
@@ -659,11 +783,17 @@ TEMPLATE = r"""<!doctype html>
   .nav-item.active{background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent)}
   .nav-item.ph{color:var(--muted);font-weight:500}
   .nav-badge{font-size:.62rem;background:var(--surface2);color:var(--muted);padding:1px 7px;border-radius:999px;white-space:nowrap}
+  .nav-score{font-size:.78rem;font-weight:800;font-variant-numeric:tabular-nums;
+    background:var(--surface2);padding:1px 8px;border-radius:999px}
+  .nav-item:focus-visible,.tf-btn:focus-visible,.toggle:focus-visible,.hamb:focus-visible{
+    outline:2px solid var(--accent);outline-offset:2px}
   .side-foot{margin-top:auto;padding-top:10px;border-top:1px solid var(--border)}
   .toggle{width:100%;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:8px;padding:9px 12px;cursor:pointer;font:inherit;min-height:42px}
 
   /* 본문 */
-  .main{flex:1;min-width:0;padding:24px;max-width:1080px;margin:0 auto;width:100%}
+  .main{flex:1;min-width:0;padding:24px;max-width:1080px;margin:0 auto;width:100%;overflow-x:hidden}
+  .app{max-width:100vw}
+  .card,.view-head{overflow-wrap:anywhere}
   .topnav{display:none;align-items:center;gap:12px;position:sticky;top:0;z-index:15;
     background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(8px);
     padding:12px 16px;border-bottom:1px solid var(--border)}
@@ -677,9 +807,16 @@ TEMPLATE = r"""<!doctype html>
   .view-title{font-size:1.5rem;font-weight:800}
   .view-sub{font-size:.9rem;font-weight:500;color:var(--muted)}
   .muted{color:var(--muted)}
-  .badge{font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:999px}
+  .badge{font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap}
   .badge-warn{background:color-mix(in srgb,var(--neutral) 20%,transparent);color:var(--neutral)}
   .badge-ok{background:color-mix(in srgb,var(--good) 20%,transparent);color:var(--good)}
+  .badge-info{background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent)}
+
+  /* 데이터 기준 스트립 — '이 수치가 언제/어디서 온 것인가' */
+  .basis{margin-top:8px;font-size:.79rem;color:var(--muted);line-height:1.7;
+    border-left:3px solid var(--border);padding:2px 0 2px 10px}
+  .basis-k{color:var(--text);opacity:.75;font-weight:700;margin-right:3px}
+  .basis b{font-weight:800}
   .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:14px}
   .headline{font-size:1.06rem;font-weight:600;line-height:1.7}
   .hero{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:16px}
@@ -690,6 +827,8 @@ TEMPLATE = r"""<!doctype html>
   .donut{width:120px;height:120px;border-radius:50%;margin:0 auto;
     background:conic-gradient(var(--dc) calc(var(--p)*1%), var(--surface2) 0);display:grid;place-items:center}
   .donut .inner{width:86px;height:86px;border-radius:50%;background:var(--surface);display:grid;place-items:center;font-weight:800;font-size:1.3rem;font-variant-numeric:tabular-nums}
+  .donut-na{background:var(--surface2)}
+  .hero-note{grid-column:1/-1;text-align:center;font-size:.76rem;color:var(--muted);margin-top:-4px}
 
   /* 신뢰도 칩 */
   .conf-row{display:flex;gap:10px;flex-wrap:wrap;margin:-6px 0 14px}
@@ -699,7 +838,10 @@ TEMPLATE = r"""<!doctype html>
   /* 매매 결론 */
   .concl{display:flex;align-items:center;gap:14px;border-left:4px solid var(--accent)}
   .concl-badge{color:#fff;font-weight:800;padding:8px 14px;border-radius:10px;white-space:nowrap;font-size:.95rem}
+  .concl-body{min-width:0}
   .concl-text{font-size:1.02rem;font-weight:600}
+  .concl-gate{margin-top:6px;font-size:.8rem;color:var(--muted)}
+  .concl-gate b{color:var(--text)}
 
   h2{font-size:1rem;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
   .pill{font-size:.72rem;font-weight:800;color:#fff;padding:2px 10px;border-radius:999px}
@@ -718,7 +860,8 @@ TEMPLATE = r"""<!doctype html>
   .gauge-fill{height:100%;border-radius:8px 0 0 8px;opacity:.55}
   .gauge-mark{position:absolute;top:-3px;bottom:-3px;width:3px;background:var(--text);transform:translateX(-1.5px);border-radius:2px}
   .gauge-ends{display:flex;justify-content:space-between;font-size:.72rem;color:var(--muted);margin-top:4px}
-  .mini{width:100%;border-collapse:collapse;margin-top:12px;font-size:.84rem;font-variant-numeric:tabular-nums}
+  .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin-top:12px}
+  .mini{width:100%;min-width:440px;border-collapse:collapse;font-size:.84rem;font-variant-numeric:tabular-nums}
   .mini th,.mini td{padding:6px 8px;text-align:right;border-bottom:1px solid var(--border)}
   .mini th:first-child,.mini td:first-child{text-align:left}
   .mini th{color:var(--muted);font-weight:600;font-size:.76rem}
@@ -774,6 +917,9 @@ TEMPLATE = r"""<!doctype html>
   .mtag{color:#fff;font-size:.7rem;font-weight:800;padding:1px 8px;border-radius:6px;white-space:nowrap;margin-top:3px}
   .check li{list-style:none;margin-left:-6px}
   .check li::before{content:"☐ ";color:var(--accent);font-weight:800}
+  .src-ul li{font-size:.88rem}
+  .src-ul a{text-decoration:none;border-bottom:1px solid color-mix(in srgb,var(--accent) 40%,transparent)}
+  .src-ul a:hover{border-bottom-color:var(--accent)}
   .factcheck{list-style:none;margin-left:-18px;color:var(--muted);font-size:.82rem;font-weight:600;border-left:3px solid var(--accent);padding-left:10px;margin-bottom:8px}
   .engine{font-size:.74rem;text-align:right;margin-top:4px}
 
@@ -789,7 +935,10 @@ TEMPLATE = r"""<!doctype html>
     .sidebar.open ~ .scrim{display:block}
     .topnav{display:flex}
     .main{padding:16px}
-    .hero{grid-template-columns:1fr}
+    .hero{grid-template-columns:1fr 1fr;gap:12px}
+    .hero .stat:first-child{grid-column:1/-1}
+    .donut{width:104px;height:104px}
+    .donut .inner{width:74px;height:74px;font-size:1.15rem}
     .scen{grid-template-columns:1fr}
     .concl{flex-direction:column;align-items:flex-start}
     .view-title{font-size:1.3rem}
@@ -797,6 +946,18 @@ TEMPLATE = r"""<!doctype html>
   @media(max-width:520px){
     .tiles{grid-template-columns:repeat(2,1fr)}
     .stat .big{font-size:2.4rem}
+    .card{padding:16px}
+    .concl-text{font-size:.96rem}
+  }
+  @media print{
+    .sidebar,.topnav,.scrim,.tf-bar{display:none!important}
+    .view{display:block!important;break-after:page}
+    .card{break-inside:avoid;border-color:#ccc}
+    body{background:#fff;color:#000}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .view.active{animation:none}
+    *{transition:none!important}
   }
 </style>
 </head>
@@ -884,8 +1045,12 @@ TEMPLATE = r"""<!doctype html>
       if(fr.ma5){ var a=chart.addLineSeries({color:t.ma5,lineWidth:2,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false}); a.setData(fr.ma5); }
       if(fr.ma20){ var b=chart.addLineSeries({color:t.ma20,lineWidth:2,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false}); b.setData(fr.ma20); }
       if(isD){
-        if(levels.target!=null) cs.createPriceLine({price:levels.target,color:t.target,lineWidth:1,lineStyle:2,axisLabelVisible:true,title:'목표'});
-        if(levels.stop!=null) cs.createPriceLine({price:levels.stop,color:t.stop,lineWidth:1,lineStyle:2,axisLabelVisible:true,title:'손절'});
+        // 색은 '진입가 위/아래'로. 숏이면 목표가 아래(파랑)·손절이 위(빨강)다.
+        var cUp=t.target, cDn=t.stop;
+        var tgtC=(levels.entry!=null&&levels.target!=null&&levels.target<levels.entry)?cDn:cUp;
+        var stpC=(levels.entry!=null&&levels.stop!=null&&levels.stop<levels.entry)?cDn:cUp;
+        if(levels.target!=null) cs.createPriceLine({price:levels.target,color:tgtC,lineWidth:1,lineStyle:2,axisLabelVisible:true,title:'목표'});
+        if(levels.stop!=null) cs.createPriceLine({price:levels.stop,color:stpC,lineWidth:1,lineStyle:2,axisLabelVisible:true,title:'손절'});
         if(levels.entry!=null) cs.createPriceLine({price:levels.entry,color:t.entry,lineWidth:1,lineStyle:0,axisLabelVisible:true,title:'진입'});
       }
       chart.timeScale().fitContent();

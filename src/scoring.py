@@ -106,7 +106,7 @@ def score_flow(inp: FlowInput) -> SubScore:
         50
         + 12 * clamp(inp.foreign_net / 3000, -2, 2)
         + 8 * clamp(inp.inst_net / 3000, -2, 2)
-        + 5 * clamp(inp.program_net / 3000, -2, 2)
+        + 5 * clamp((inp.program_net or 0.0) / 3000, -2, 2)
         + 10 * clamp(inp.foreign_streak, -1, 1)
     )
     # 개인만 순매수(외국인·기관 동반 순매도 + 개인 순매수)는 추가 -8
@@ -115,7 +115,13 @@ def score_flow(inp: FlowInput) -> SubScore:
         score -= 8
     score = clamp(score, 0, 100)
 
-    observed = f"외국인 {inp.foreign_net:+,.0f}억 · 기관 {inp.inst_net:+,.0f}억 · 프로그램 {inp.program_net:+,.0f}억"
+    observed = f"외국인 {inp.foreign_net:+,.0f}억 · 기관 {inp.inst_net:+,.0f}억"
+    if inp.retail_net is not None:
+        observed += f" · 개인 {inp.retail_net:+,.0f}억"
+    observed += (f" · 프로그램 {inp.program_net:+,.0f}억" if inp.program_net is not None
+                 else " · 프로그램 미수집")
+    if inp.provisional:
+        observed += " (장중 잠정)"
     if retail_only:
         comment = "개인만 순매수 — 추가 감점"
     elif inp.foreign_streak >= 1:
@@ -138,15 +144,29 @@ def score_value(inp: ValueInput, chg_pct: float | None) -> SubScore:
         score = 100 - score
     score = clamp(score, 0, 100)
 
-    observed = f"당일/20일평균 {amt_mult:.2f}배"
-    if reversed_ and amt_mult > 1.3:
-        comment = "대금 급증 + 하락 = 투매 감점"
-    elif not reversed_ and amt_mult > 1.3:
-        comment = "대금 증가 + 상승 = 가점"
-    elif amt_mult < 0.7:
-        comment = "대금 위축 — 관심 저조"
+    basis = inp.basis or "거래대금"
+    observed = f"{basis} 당일/직전20일평균 {amt_mult:.2f}배"
+    if inp.provisional:
+        cf = inp.completion_factor
+        observed += f" · 장중 누적→종일 환산 x{cf:.2f}" if cf else " · 장중 누적(잠정)"
+        if inp.factor_note:
+            observed += f"({inp.factor_note})"
+    # 코멘트는 반드시 '점수 방향'과 같은 편에 서야 한다.
+    # 하락일 반전 규칙상 대금 위축(<0.7)은 감점이 아니라 '투매 아님' 가점이다.
+    if reversed_:
+        if amt_mult > 1.3:
+            comment = "대금 급증 + 하락 = 투매 — 감점"
+        elif amt_mult < 0.7:
+            comment = "하락하나 대금 위축 — 투매 아님, 감점 완화"
+        else:
+            comment = "하락 · 대금 평이"
     else:
-        comment = "대금 평이"
+        if amt_mult > 1.3:
+            comment = "대금 증가 + 상승 = 가점"
+        elif amt_mult < 0.7:
+            comment = "상승하나 대금 위축 — 관심 저조, 신뢰도 낮음"
+        else:
+            comment = "상승 · 대금 평이"
     return SubScore("amt", LABELS["amt"], WEIGHTS["amt"], round(score, 1), observed, comment)
 
 
@@ -248,6 +268,13 @@ def score_close(inputs: CloseInputs) -> ScoreResult:
         warnings.append("지수 리밸런싱/옵션만기일 — 마감 동시호가 항목 제외, 가중치 재배분")
     elif inputs.call_auction is not None:
         subs["call"] = score_call(inputs.call_auction)
+    elif inputs.call_not_applicable:
+        # 종가베팅 리포트는 동시호가(15:20~15:30) *전에* 나와야 의미가 있다.
+        # 아직 일어나지 않은 이벤트는 '수집 실패(결측)'가 아니라 '해당 없음(제외)'이다.
+        # 결측으로 두면 항상 부분데이터 상태가 되어, 다른 항목 하나만 더 빠져도
+        # 총점이 통째로 미산출된다(과도한 취약성) — 논리·운영 양쪽에서 잘못.
+        excluded.append("call")
+        warnings.append("리포트 시점(장 종료 전)에 마감 동시호가 미발생 — 항목 제외, 가중치 재배분")
     else:
         missing.append("call")
 
@@ -275,9 +302,15 @@ def score_close(inputs: CloseInputs) -> ScoreResult:
     partial = miss_count == 1
 
     ordered = [subs[k] for k in WEIGHTS if k in subs]
-    provisional = bool(inputs.flow and inputs.flow.provisional)
-    if provisional:
-        warnings.append("투자자별 수급 잠정치 — 18:00 확정치 반영 후 재계산 필요")
+    flow_prov = bool(inputs.flow and inputs.flow.provisional)
+    value_prov = bool(inputs.value and inputs.value.provisional)
+    provisional = flow_prov or value_prov or inputs.intraday_snapshot
+    if inputs.intraday_snapshot:
+        warnings.append(
+            f"장중 스냅샷 기준(데이터 기준시각 {inputs.as_of or '—'}) — 지수·거래량은 "
+            "마감 확정치가 아니다. 종가베팅 판단을 장 종료 전에 내리기 위한 설계.")
+    if flow_prov:
+        warnings.append("투자자별 수급 잠정치(장중 시간별 순매수) — 장 마감 후 확정치와 다를 수 있음")
 
     flows: dict = {}
     if inputs.flow is not None:
@@ -315,6 +348,8 @@ def score_close(inputs: CloseInputs) -> ScoreResult:
             flows=flows,
             market=market,
             direction_hint=round(total_raw, 1) if present else None,
+            as_of=inputs.as_of,
+            intraday_snapshot=inputs.intraday_snapshot,
         )
 
     if partial:
@@ -350,7 +385,11 @@ def score_close(inputs: CloseInputs) -> ScoreResult:
 
     p_up = clamp(p_up, PROB_CLIP_LO, PROB_CLIP_HI)
     # 코어 6항목 데이터 완전성(present 비중) — 신뢰도 지표
-    data_completeness = round(min(sum(WEIGHTS[k] for k in present if k != "quant"), 1.0), 2)
+    core_present = sum(WEIGHTS[k] for k in present if k != "quant")
+    core_excluded = sum(WEIGHTS[k] for k in excluded)
+    # 의도적 제외(동시호가 미발생/만기일)는 '못 모은 데이터'가 아니므로 분모에서 뺀다.
+    denom = max(1.0 - core_excluded, 1e-9)
+    data_completeness = round(min(core_present / denom, 1.0), 2)
     p_down = 1 - p_up
 
     grade, gate = grade_and_gate(total)
@@ -373,4 +412,6 @@ def score_close(inputs: CloseInputs) -> ScoreResult:
         market=market,
         data_completeness=data_completeness,
         signal_agreement=signal_agreement,
+        as_of=inputs.as_of,
+        intraday_snapshot=inputs.intraday_snapshot,
     )

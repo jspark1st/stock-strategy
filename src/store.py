@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS daily (
   total         REAL,
   grade         TEXT,
   p_up          REAL,
+  p_up_raw      REAL,
   p_down        REAL,
   direction     TEXT,
   index_close   REAL,
@@ -53,7 +54,29 @@ CREATE TABLE IF NOT EXISTS daily (
   graded_at     TEXT,
   UNIQUE(market, report_type, trade_date)
 );
+
+-- 장중 스냅샷 시점의 누적 거래량 vs 그날 종일 확정 거래량.
+-- 15:00 리포트가 '15:00까지 누적'을 '종일 20일평균'과 비교하는 구조적 과소평가를
+-- 시장별 실측으로 교정하기 위한 자가학습 테이블. final 은 다음 실행 때 채운다.
+CREATE TABLE IF NOT EXISTS intraday_volume (
+  market       TEXT NOT NULL,
+  trade_date   TEXT NOT NULL,
+  as_of        TEXT,
+  partial_vol  REAL,
+  final_vol    REAL,
+  PRIMARY KEY (market, trade_date)
+);
 """
+
+# 15:00 시점 '누적/종일' 비율 부트스트랩 — KODEX 200 / 코스닥150 10분봉 5거래일
+# (2026-08-11~08-18) 실측 중앙값. DB에 시장별 실측이 MIN_VOL_SAMPLES 이상 쌓이면
+# 그 학습값이 이 기본값을 대체한다. 추정이 아니라 측정치이며 근거를 리포트에 표시한다.
+VOL_FACTOR_DEFAULT = {"KOSPI": 0.93, "KOSDAQ": 0.96}
+MIN_VOL_SAMPLES = 8
+
+
+# 기존 DB에 나중에 추가된 컬럼 — CREATE TABLE IF NOT EXISTS 로는 안 붙으므로 명시 마이그레이션.
+_MIGRATIONS = [("daily", "p_up_raw", "REAL")]
 
 
 def connect(path: str | Path) -> sqlite3.Connection:
@@ -62,6 +85,11 @@ def connect(path: str | Path) -> sqlite3.Connection:
     conn = sqlite3.connect(str(path))
     conn.row_factory = sqlite3.Row
     conn.executescript(SCHEMA)
+    for table, col, decl in _MIGRATIONS:
+        cols = {r[1] for r in conn.execute(f"PRAGMA table_info({table})")}
+        if col not in cols:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")
+    conn.commit()
     return conn
 
 
@@ -76,6 +104,7 @@ def record_prediction(conn: sqlite3.Connection, rep: dict, created_at: str,
         "trade_date": rep.get("trade_date"), "created_at": created_at,
         "total": rep.get("total"), "grade": rep.get("grade"),
         "p_up": rep.get("p_up"), "p_down": rep.get("p_down"),
+        "p_up_raw": rep.get("p_up_raw", rep.get("p_up")),
         "direction": atr.get("direction"),
         "index_close": _index_close(rep), "index_chg_pct": _index_chg(rep),
         "entry": prim.get("entry"), "stop": prim.get("stop"),
@@ -98,9 +127,10 @@ def record_prediction(conn: sqlite3.Connection, rep: dict, created_at: str,
 def grade_pending(conn: sqlite3.Connection, market: str, report_type: str,
                   outcome_date: str, outcome_chg_pct: float,
                   day_high: float, day_low: float, graded_at: str) -> dict | None:
-    """실행일(outcome_date)의 실측으로 '가장 최근 미채점 이전 예측'을 채점한다.
+    """(레거시) 단건 채점 — 호출부가 직접 실측을 넘길 때만 사용.
 
-    반환: 채점 결과 dict 또는 None(대상 없음).
+    ⚠ 장중(15:00)에 실행되는 파이프라인은 이 함수를 쓰면 **미완성 등락률로 채점**하고
+    graded_at 이 박혀 다시는 교정되지 않는다. 파이프라인은 `grade_with_candles()` 를 쓴다.
     """
     cur = conn.execute(
         "SELECT * FROM daily WHERE market=? AND report_type=? "
@@ -110,18 +140,65 @@ def grade_pending(conn: sqlite3.Connection, market: str, report_type: str,
     prev = cur.fetchone()
     if prev is None:
         return None
+    return _apply_grade(conn, prev, outcome_date, outcome_chg_pct, day_high, day_low, graded_at)
+
+
+def grade_with_candles(conn: sqlite3.Connection, market: str, report_type: str,
+                       candles: list, graded_at: str, exclude_dates: set | None = None
+                       ) -> list[dict]:
+    """미채점 예측을 **확정 일봉**으로 소급 채점한다(밀린 날짜 전부).
+
+    예측 trade_date=T 는 '익일' 방향을 말하므로, 시계열에서 T 다음 거래일 T' 의
+    확정 등락률/고가/저가로 채점한다. T' 가 아직 확정되지 않았으면(=오늘 장중분,
+    exclude_dates) 건너뛰고 다음 실행 때 채점한다 → **미완성 데이터로 채점하지 않는다.**
+
+    candles: naver.index_daily 의 Candle 리스트(오름차순). exclude_dates: 확정 아닌 날짜.
+    """
+    exclude_dates = exclude_dates or set()
+    by_date = {c.date: (i, c) for i, c in enumerate(candles)}
+    dates = [c.date for c in candles]
+    rows = conn.execute(
+        "SELECT * FROM daily WHERE market=? AND report_type=? AND graded_at IS NULL "
+        "ORDER BY trade_date ASC", (market, report_type)).fetchall()
+    out = []
+    for prev in rows:
+        t = (prev["trade_date"] or "").replace("-", "")
+        nxt = next((d for d in dates if d > t and d not in exclude_dates), None)
+        if nxt is None:
+            continue
+        i, c = by_date[nxt]
+        if i == 0:
+            continue
+        pc = candles[i - 1].close
+        if not pc:
+            continue
+        chg = (c.close - pc) / pc * 100
+        out.append(_apply_grade(conn, prev, f"{nxt[:4]}-{nxt[4:6]}-{nxt[6:8]}",
+                                chg, c.high, c.low, graded_at))
+    return [o for o in out if o]
+
+
+def _apply_grade(conn: sqlite3.Connection, prev, outcome_date: str, outcome_chg_pct: float,
+                 day_high: float, day_low: float, graded_at: str) -> dict:
     realized_up = 1 if outcome_chg_pct > 0 else 0
     p_up = prev["p_up"]
     correct = brier = None
     if p_up is not None:
         correct = 1 if (p_up >= 0.5) == bool(realized_up) else 0
         brier = round((p_up - realized_up) ** 2, 4)
-    # ATR 타점 도달(롱 기준): target=고가 도달, stop=저가 도달
+    # ATR 타점 도달. 롱/관망은 목표=고가·손절=저가, 숏은 방향이 뒤집힌다.
     hit_target = hit_stop = None
-    if prev["target"] is not None and prev["direction"] in ("long", "watch"):
-        hit_target = 1 if day_high >= prev["target"] else 0
-    if prev["stop"] is not None and prev["direction"] in ("long", "watch"):
-        hit_stop = 1 if day_low <= prev["stop"] else 0
+    direction = prev["direction"]
+    if direction in ("long", "watch"):
+        if prev["target"] is not None:
+            hit_target = 1 if day_high >= prev["target"] else 0
+        if prev["stop"] is not None:
+            hit_stop = 1 if day_low <= prev["stop"] else 0
+    elif direction == "short":
+        if prev["target"] is not None:
+            hit_target = 1 if day_low <= prev["target"] else 0
+        if prev["stop"] is not None:
+            hit_stop = 1 if day_high >= prev["stop"] else 0
     conn.execute(
         "UPDATE daily SET outcome_date=?, outcome_chg_pct=?, realized_up=?, "
         "hit_target=?, hit_stop=?, correct=?, brier=?, graded_at=? WHERE id=?",
@@ -131,6 +208,7 @@ def grade_pending(conn: sqlite3.Connection, market: str, report_type: str,
     return {"trade_date": prev["trade_date"], "p_up": p_up,
             "realized_up": realized_up, "correct": correct, "brier": brier,
             "hit_target": hit_target, "hit_stop": hit_stop,
+            "outcome_date": outcome_date,
             "outcome_chg_pct": round(outcome_chg_pct, 2)}
 
 
@@ -187,6 +265,62 @@ def calibration_shift(conn: sqlite3.Connection, market: str,
         return 0.0
     shift = -acc["calibration_bias"] * 0.5   # 편향의 절반만 반영(과보정 방지)
     return round(max(-max_shift, min(max_shift, shift)), 4)
+
+
+# ── 장중 거래량 완성계수 자가학습 ─────────────────────────────────────────
+
+def record_intraday_volume(conn: sqlite3.Connection, market: str, trade_date: str,
+                           as_of: str, partial_vol: float) -> None:
+    """오늘 15:00 스냅샷의 누적 거래량을 기록(종일 확정치는 다음 실행 때 채움)."""
+    conn.execute(
+        "INSERT INTO intraday_volume (market,trade_date,as_of,partial_vol) VALUES (?,?,?,?) "
+        "ON CONFLICT(market,trade_date) DO UPDATE SET as_of=excluded.as_of, "
+        "partial_vol=excluded.partial_vol", (market, trade_date, as_of, partial_vol))
+    conn.commit()
+
+
+def backfill_final_volume(conn: sqlite3.Connection, market: str, candles: list,
+                          exclude_dates: set | None = None) -> int:
+    """확정된 일봉으로 final_vol 을 채운다. 반환: 채운 행 수."""
+    exclude_dates = exclude_dates or set()
+    vol = {c.date: c.volume for c in candles if c.date not in exclude_dates}
+    rows = conn.execute("SELECT trade_date FROM intraday_volume "
+                        "WHERE market=? AND final_vol IS NULL", (market,)).fetchall()
+    n = 0
+    for r in rows:
+        v = vol.get(r["trade_date"])
+        if v:
+            conn.execute("UPDATE intraday_volume SET final_vol=? WHERE market=? AND trade_date=?",
+                         (v, market, r["trade_date"]))
+            n += 1
+    if n:
+        conn.commit()
+    return n
+
+
+def volume_completion_factor(conn: sqlite3.Connection | None, market: str,
+                             window: int = 40) -> tuple[float, str]:
+    """(계수, 근거설명). 계수 = 그 시각까지 소화되는 거래량 비율(0<f<=1).
+
+    실측 표본이 MIN_VOL_SAMPLES 이상이면 중앙값(학습치), 아니면 ETF 실측 부트스트랩.
+    """
+    default = VOL_FACTOR_DEFAULT.get(market.upper(), 0.94)
+    if conn is None:
+        return default, "기본값"
+    try:
+        rows = conn.execute(
+            "SELECT partial_vol, final_vol FROM intraday_volume WHERE market=? "
+            "AND final_vol IS NOT NULL AND final_vol>0 AND partial_vol>0 "
+            "ORDER BY trade_date DESC LIMIT ?", (market, window)).fetchall()
+    except Exception:  # noqa
+        return default, "기본값"
+    ratios = sorted(r["partial_vol"] / r["final_vol"] for r in rows)
+    if len(ratios) < MIN_VOL_SAMPLES:
+        return default, f"기본값·표본 {len(ratios)}/{MIN_VOL_SAMPLES}"
+    m = len(ratios) // 2
+    med = ratios[m] if len(ratios) % 2 else (ratios[m - 1] + ratios[m]) / 2
+    med = max(0.5, min(1.0, med))
+    return med, f"학습치 n={len(ratios)}"
 
 
 # ── 내부 헬퍼 ──────────────────────────────────────────────────────────────

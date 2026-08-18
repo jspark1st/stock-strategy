@@ -4,7 +4,14 @@
 있다(익명/워밍업 세션에 **HTTP 400 body="LOGOUT"** 반환 — pykrx 포함 실패, 2026-08-18
 한국 IP 실측). 같은 **KRX 원천 수치**를 네이버 금융에서 우회 취득한다:
 - 지수 일봉:   `fchart.stock.naver.com/sise.nhn` (XML)              → CandleSeries
-- 투자자 수급: `finance.naver.com/sise/investorDealTrendDay.naver` (EUC-KR HTML) → InvestorFlows
+- 투자자 수급(확정, 일별): `finance.naver.com/sise/investorDealTrendDay.naver` (EUC-KR HTML)
+- 투자자 수급(**장중 잠정**, 시간별): `finance.naver.com/sise/investorDealTrendTime.naver`
+  → 종가베팅 리포트는 15:00(장중)에 돌기 때문에 확정 일별 행이 아직 없다. 같은 컬럼 구조의
+    '시간별 순매수' 최신 행을 잠정치로 쓰고 `provisional=True` 로 표시한다(2026-08-19 실측).
+- 지수 실시간: `polling.finance.naver.com/api/realtime/domestic/index/{KOSPI|KOSDAQ}` (JSON)
+  → 장중 OHLC·누적 거래량/거래대금 + `marketStatus`(OPEN/CLOSE) + 체결시각. 15:00 실행 때
+    '오늘이 거래일인가'와 '지금 지수'를 한 번에 확정해 준다(일봉 반영 지연에 안 휘둘림).
+- 원달러:      `api.stock.naver.com/marketindex/exchange/FX_USDKRW` (JSON)
 
 투자자 값 단위 = **억원**, 라벨 = 개인/외국인/기관계(+기관 세부)/기타법인.
 시장 항등식(개인+외국인+기관계+기타법인 ≈ 0)으로 매핑을 검증한다(추측 금지 대원칙).
@@ -23,6 +30,9 @@ from ..models import Candle, CandleSeries, InvestorFlows
 
 FCHART = "https://fchart.stock.naver.com/sise.nhn"
 INVESTOR = "https://finance.naver.com/sise/investorDealTrendDay.naver"
+INVESTOR_TIME = "https://finance.naver.com/sise/investorDealTrendTime.naver"
+FX_USDKRW = "https://api.stock.naver.com/marketindex/exchange/FX_USDKRW"
+INDEX_RT = "https://polling.finance.naver.com/api/realtime/domestic/index/{symbol}"
 _UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
        "Referer": "https://finance.naver.com/sise/"}
 _SYMBOL = {"KOSPI": "KOSPI", "KOSDAQ": "KOSDAQ"}
@@ -32,6 +42,7 @@ _TF = {"D": "day", "W": "week", "M": "month"}
 _ITEM_RE = re.compile(r'<item data="([^"]+)"')
 _ROW_RE = re.compile(r"<tr[^>]*>(.*?)</tr>", re.S)
 _DATE_RE = re.compile(r"(\d{2})\.(\d{2})\.(\d{2})")
+_TIME_RE = re.compile(r'class="date2">\s*(\d{2}:\d{2})')
 _NUM_RE = re.compile(r"<td[^>]*>\s*(-?[\d,]+)\s*</td>")
 
 # investorDealTrendDay 컬럼 순서 (헤더 실측): 개인·외국인·기관계·[금융투자·보험·투신·은행·기타금융·연기금]·기타법인
@@ -110,6 +121,153 @@ def foreign_streak(history: list[InvestorFlows]) -> int:
         else:
             break
     return sign if run >= 3 else 0
+
+
+def investor_flows_intraday(market: str, date: str, client: httpx.Client | None = None
+                            ) -> InvestorFlows | None:
+    """**장중 잠정** 투자자 순매수(억원) — '시간별 순매수' 최신 행.
+
+    종가베팅 리포트는 15:00(장 종료 전)에 돌기 때문에 확정 일별 행이 아직 없다.
+    투자자별 잠정 순매수는 장중 몇 분 간격으로 갱신되므로 그 최신 행을 쓴다.
+    컬럼 구조는 일별 표와 동일(개인·외국인·기관계·기관6·기타법인, 단위 억원).
+    반환 InvestorFlows.provisional=True (리포트에 '잠정' 배지). 행이 없으면 None.
+    """
+    market = market.upper()
+    own = client is None
+    c = client or _client()
+    try:
+        r = c.get(INVESTOR_TIME, params={"sosok": _SOSOK[market], "bizdate": date})
+        r.raise_for_status()
+        rows = _all_time_rows(r.content.decode("euc-kr", "replace"))
+        if not rows:
+            return None
+        hhmm, vals = rows[0]
+        f = _flows_from(market, date, vals)
+        f.provisional = True
+        f.as_of = hhmm
+        return f
+    except Exception:  # noqa — 잠정 소스는 실패해도 파이프라인을 막지 않는다
+        return None
+    finally:
+        if own:
+            c.close()
+
+
+def market_flows(market: str, trade_date: str, client: httpx.Client | None = None
+                 ) -> tuple[InvestorFlows | None, list[InvestorFlows]]:
+    """거래일 수급 1건 + 과거 이력. **거래일 일치를 반드시 검증한다.**
+
+    ① 일별 표 최신 행의 날짜 == trade_date → 확정치 사용.
+    ② 아니면(장중이라 아직 확정 행 없음) 시간별 표의 잠정치 사용(provisional=True).
+    ③ 둘 다 없으면 (None, 이력) → 호출부가 수급 결측으로 처리.
+
+    이 검증이 없으면 '전일 수급'이 오늘 수급인 것처럼 점수에 들어간다(무결성 사고).
+    반환: (거래일 수급 or None, 과거→최근 정렬이 아닌 '최근순' 이력)
+    """
+    market = market.upper()
+    own = client is None
+    c = client or _client()
+    try:
+        hist = [_flows_from(market, ymd, vals)
+                for ymd, vals in _fetch_rows(c, market, trade_date)]
+        if hist and hist[0].date == trade_date:
+            return hist[0], hist
+        live = investor_flows_intraday(market, trade_date, client=c)
+        if live is not None:
+            return live, [live] + hist
+        return None, hist
+    finally:
+        if own:
+            c.close()
+
+
+def _num(x) -> float:
+    """'6,869.83' / '402,682천주' / '29,905,562백만' → float (단위 접미사 제거)."""
+    if x is None:
+        return 0.0
+    t = str(x).replace(",", "")
+    out = []
+    for ch in t:
+        if ch.isdigit() or ch in ".-+":
+            out.append(ch)
+        else:
+            break
+    try:
+        return float("".join(out))
+    except ValueError:
+        return 0.0
+
+
+def index_quote(market: str, client: httpx.Client | None = None) -> dict | None:
+    """지수 실시간 스냅샷. 장중이면 현재값, 마감 후면 종가.
+
+    반환 키: price·open·high·low·prev_close·chg_pct·volume(천주)·value(백만원)
+             ·traded_at(ISO, KST)·trade_date(YYYYMMDD)·market_status(OPEN/CLOSE)
+    trade_date 는 `localTradedAt` 에서 뽑는다 → **오늘이 거래일인지 직접 알려주는 신호**다.
+    """
+    market = market.upper()
+    own = client is None
+    c = client or _client()
+    try:
+        r = c.get(INDEX_RT.format(symbol=_SYMBOL[market]),
+                  headers={"Referer": "https://finance.naver.com/sise/"})
+        r.raise_for_status()
+        rows = (r.json() or {}).get("datas") or []
+        if not rows:
+            return None
+        d = rows[0]
+        price = _num(d.get("closePrice"))
+        diff = _num(d.get("compareToPreviousClosePrice"))
+        traded = str(d.get("localTradedAt") or "")
+        return {
+            "market": market, "price": price,
+            "open": _num(d.get("openPrice")), "high": _num(d.get("highPrice")),
+            "low": _num(d.get("lowPrice")), "prev_close": price - diff,
+            "chg_pct": _num(d.get("fluctuationsRatio")),
+            "volume": _num(d.get("accumulatedTradingVolume")),
+            "value": _num(d.get("accumulatedTradingValue")),
+            "traded_at": traded, "trade_date": traded[:10].replace("-", ""),
+            "market_status": d.get("marketStatus") or "",
+        }
+    except Exception:  # noqa — 보조 소스. 실패하면 호출부가 다른 소스로 넘어간다
+        return None
+    finally:
+        if own:
+            c.close()
+
+
+def usdkrw(client: httpx.Client | None = None) -> dict | None:
+    """원달러 환율 스냅샷(하나은행 고시). {'price','chg_pct','as_of'} 또는 None."""
+    own = client is None
+    c = client or _client()
+    try:
+        r = c.get(FX_USDKRW, headers={"Referer": "https://finance.naver.com/marketindex/"})
+        r.raise_for_status()
+        d = (r.json() or {}).get("exchangeInfo") or {}
+        price = float(str(d.get("closePrice", "")).replace(",", ""))
+        return {"price": price,
+                "chg_pct": float(str(d.get("fluctuationsRatio", "0")).replace(",", "")),
+                "as_of": d.get("localTradedAt", "")}
+    except Exception:  # noqa — 표시용 보조 지표. 실패해도 점수엔 영향 없음
+        return None
+    finally:
+        if own:
+            c.close()
+
+
+def _all_time_rows(html: str):
+    """시간별 순매수 행들 → [(HH:MM, [10개 값]), ...] 최신순."""
+    out = []
+    for m in _ROW_RE.finditer(html):
+        block = m.group(1)
+        tm = _TIME_RE.search(block)
+        if not tm:
+            continue
+        nums = _NUM_RE.findall(block)
+        if len(nums) < 10:
+            continue
+        out.append((tm.group(1), [float(n.replace(",", "")) for n in nums[:10]]))
+    return out
 
 
 def _fetch_rows(c: httpx.Client, market: str, date: str | None):

@@ -80,7 +80,8 @@ class InvestorFlows:
     inst_net: float      # 기관계
     etc_corp_net: float = 0.0            # 기타법인
     inst_breakdown: dict = field(default_factory=dict)  # 금융투자/보험/투신/은행/기타금융/연기금
-    provisional: bool = False
+    provisional: bool = False           # 장중 시간별 순매수 잠정치 여부
+    as_of: str = ""                     # 잠정치 기준 시각 HH:MM (확정치면 빈 값)
 
     def identity_sum(self) -> float:
         """개인+외국인+기관계+기타법인 — 정상이면 0 근처 (검증용)."""
@@ -166,7 +167,9 @@ class FlowInput:
     """
     foreign_net: float
     inst_net: float
-    program_net: float = 0.0
+    # 프로그램 매매는 현재 수집 소스가 없다. 0.0 으로 채워 넣고 화면에 '+0억'으로 보이면
+    # '프로그램 순매수가 0이었다'는 **거짓 정보**가 된다 → 미수집은 None(미표시).
+    program_net: float | None = None
     retail_net: float | None = None
     foreign_streak: int = 0
     provisional: bool = False
@@ -174,9 +177,19 @@ class FlowInput:
 
 @dataclass
 class ValueInput:
-    """4) 거래대금 (0.15). 당일 vs 20일 평균 (같은 단위면 무엇이든)."""
+    """4) 거래대금 (0.15). 당일 vs 직전 20거래일 평균 (같은 단위면 무엇이든).
+
+    **장중 실행 주의**: 15:00 스냅샷의 당일 값은 종일 누적이 아니라 15:00까지 누적이다.
+    그대로 종일 평균과 비교하면 배율이 구조적으로 과소평가된다 -> completion_factor
+    (그 시각까지 통상 소화되는 비율)로 종일 환산한 값을 today_value 에 넣고,
+    provisional=True + factor_note 로 근거를 리포트에 노출한다.
+    """
     today_value: float
     avg20_value: float
+    provisional: bool = False
+    completion_factor: float | None = None   # 종일 환산에 쓴 계수(1.0=환산 안 함)
+    factor_note: str = ""                    # 계수 출처(학습치/기본값)
+    basis: str = "거래대금"                   # 실제 사용한 지표명(지수는 거래량 대용)
 
 
 @dataclass
@@ -238,6 +251,10 @@ class CloseInputs:
     quant: QuantSignals | None = None      # 7) 기술·퀀트(SoT 확장, 선택). 없으면 6팩터로 동작.
     market: MarketSnapshot = field(default_factory=MarketSnapshot)
     flags: DayFlags = field(default_factory=DayFlags)
+    # 실행 시점 메타 — 종가베팅 리포트는 장 종료 전(15:00)에 돌기 때문에 필요하다.
+    as_of: str | None = None               # 데이터 기준시각 'YYYY-MM-DD HH:MM KST'
+    intraday_snapshot: bool = False        # True면 지수·거래량이 장중 스냅샷(잠정)
+    call_not_applicable: bool = False      # 실행시점에 동시호가 미발생 -> 결측 아닌 제외
 
 
 # ── 출력 ────────────────────────────────────────────────────────────────
@@ -293,6 +310,8 @@ class ScoreResult:
     direction_hint: float | None = None  # 데이터 부족 시 present 항목 가중평균
     data_completeness: float | None = None  # 코어 데이터 present 비중(0~1) — 신뢰도
     signal_agreement: float | None = None    # 항목 신호 일치도(0~1) — 낮을수록 방향 확신 완화
+    as_of: str | None = None                 # 데이터 기준시각(장중 스냅샷 투명화)
+    intraday_snapshot: bool = False          # 장중(마감 전) 스냅샷 기반 여부
 
     def headline(self) -> str:
         if not self.data_sufficient:
@@ -327,4 +346,13 @@ class ScoreResult:
             "data_completeness": self.data_completeness,
             "signal_agreement": self.signal_agreement,
             "missing_keys": self.missing_keys,
+            "excluded_keys": self.excluded_keys,
+            "as_of": self.as_of,
+            "intraday_snapshot": self.intraday_snapshot,
+            "gate": {
+                "max_candidates": self.gate.max_candidates,
+                "position_scale": self.gate.position_scale,
+                "close_betting": self.gate.close_betting,
+                "new_entry_blocked": self.gate.new_entry_blocked,
+            },
         }

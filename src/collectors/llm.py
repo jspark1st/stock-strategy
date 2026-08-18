@@ -17,6 +17,7 @@ Perplexity/Gemini 는 공식 파이썬 SDK 대상이 아니므로 httpx 로 직�
 from __future__ import annotations
 
 import json
+import time
 from dataclasses import dataclass, field
 
 import httpx
@@ -27,9 +28,17 @@ PPLX_URL = "https://api.perplexity.ai/chat/completions"
 PPLX_MODEL = "sonar"
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
-CLAUDE_MODEL = "claude-opus-5"
+# 종합 단계 모델 체인. Opus 5 가 과부하(529)면 Sonnet 5 로 내려가 서술을 살린다.
+# (모델을 임의로 낮추지 않되, '아예 못 쓰는 것'보다는 한 단계 아래가 낫다.)
+CLAUDE_MODELS = ["claude-opus-5", "claude-sonnet-5"]
+# Opus 5 는 적응형 사고(adaptive thinking)가 기본 ON 이라 사고 토큰도 max_tokens 를 먹는다.
+# 4000 이면 JSON 이 중간에 잘릴 수 있어 넉넉히 잡는다(비용은 실제 출력분만 청구).
+CLAUDE_MAX_TOKENS = 16000
 
 TIMEOUT = 40.0
+
+# 마지막 실패 사유(진단용) — engine_trace 에 실려 로그/번들로 남는다.
+_LAST_ERROR: dict = {}
 
 
 @dataclass
@@ -69,13 +78,22 @@ def available(env: dict | None = None) -> dict:
 # ── 사실(fact) 블록 — LLM 에 넘길 확정 수치. 여기 없는 수치는 만들지 말 것. ──
 def facts_block(ctx: dict) -> str:
     m = ctx
+    live = bool(m.get("intraday_snapshot"))
+    # 15:00 실행분은 '종가'가 아니라 '장중 현재지수'다. 여기서 단어를 틀리면
+    # LLM 이 그대로 '종가'라고 써서 리포트가 사실과 어긋난다.
+    px_label = "현재지수(장중 스냅샷·잠정)" if live else "종가"
     lines = [
         f"[시장] {m.get('label')} · 거래일 {m.get('trade_date')}",
-        f"[지수] 종가 {m.get('index_close')} ({m.get('index_chg_pct'):+.2f}%)"
-        if m.get("index_chg_pct") is not None else f"[지수] 종가 {m.get('index_close')}",
+        f"[기준시각] {m.get('as_of') or '—'}"
+        + (" · 장 종료 전 스냅샷(종가 아님)" if live else " · 마감 확정"),
+        f"[지수] {px_label} {m.get('index_close')} ({m.get('index_chg_pct'):+.2f}%)"
+        if m.get("index_chg_pct") is not None
+        else f"[지수] {px_label} {m.get('index_close')}",
         f"[총점] {m.get('total')} / 100 · 등급 {m.get('grade')}",
         f"[익일확률] 상승 {m.get('p_up')} · 하락 {m.get('p_down')}",
     ]
+    if m.get("usdkrw"):
+        lines.append(f"[원달러] {m.get('usdkrw')}")
     subs = m.get("subscores") or []
     if subs:
         lines.append("[항목점수] " + " · ".join(
@@ -83,13 +101,20 @@ def facts_block(ctx: dict) -> str:
     fl = m.get("flows") or {}
     if fl:
         lines.append(f"[수급(억)] 외국인 {fl.get('foreign_net')} · 기관 {fl.get('inst_net')} · 개인 {fl.get('retail_net')}")
+    g = m.get("gate") or {}
+    if g:
+        lines.append(
+            f"[등급게이트] 신규진입 {'차단' if g.get('new_entry_blocked') else '허용'} · "
+            f"비중배수 {g.get('position_scale')} · 후보 최대 {g.get('max_candidates')}종목 · "
+            f"종가베팅 {'가능' if g.get('close_betting') else '불가'}")
     atr = m.get("atr") or {}
     if atr:
         p = atr.get("primary") or {}
         lines.append(
             f"[ATR타점] 방향 {atr.get('direction')} · 진입 {p.get('entry')} · "
             f"손절 {p.get('stop')} · 목표 {p.get('target')} · 손익비 1:{p.get('rr')} · "
-            f"edge {p.get('edge')} · 권장비중 {p.get('kelly_pct')}%")
+            f"edge {p.get('edge')} · 권장비중 {p.get('kelly_pct')}%"
+            + (f" · 실행수단 {atr.get('instrument')}" if atr.get("instrument") else ""))
     if m.get("warnings"):
         lines.append("[주의] " + " / ".join(m["warnings"][:4]))
     heads = m.get("headlines") or []
@@ -127,7 +152,8 @@ def perplexity_research(ctx: dict, env: dict) -> dict | None:
             for u in (data.get("citations") or [])[:8]:
                 sources.append({"title": u, "url": u})
         return {"text": text, "sources": sources}
-    except Exception:  # noqa — 실패 시 리서치 없이 진행
+    except Exception as e:  # noqa — 실패 시 리서치 없이 진행
+        _LAST_ERROR["perplexity"] = type(e).__name__
         return None
 
 
@@ -180,6 +206,12 @@ _CLAUDE_SYS = (
     "③ 투자 권유가 아니라 판단 참고임을 전제로, 그러나 명확한 매매 결론(매수/분할/관망/현금)을 낸다. "
     "④ 사용자는 '장마감 리포트로 결정→익일 개장 재검토' 워크플로우를 쓴다. "
     "⑤ risks(실시간 주의 신호)와 materials(주요 재료)는 Perplexity 리서치의 실시간 정보 위주로 구성. "
+    "⑥ **등급게이트가 최우선이다.** '신규진입 차단'이면 매수든 숏이든 신규 베팅을 권하지 말고 "
+    "결론은 관망/현금이어야 한다(권장비중 0%). 비중배수가 0.5면 그만큼 줄여 말한다. "
+    "ATR 타점은 그 경우 '보유분 관리·참고 수치'로만 언급한다. "
+    "⑦ 확정 수치에 '장 종료 전 스냅샷'이라고 적혀 있으면 그 지수는 **종가가 아니다**. "
+    "'종가/마감했다'로 쓰지 말고 '현재 지수/장중 기준'으로 쓰고, 동시호가에서 바뀔 수 있음을 "
+    "한 번 언급한다. '마감 확정'이라고 적혀 있을 때만 종가라고 쓴다. "
     "출력은 반드시 아래 JSON 스키마 하나만(마크다운·설명 없이):\n"
     '{"character": str(2~3문장, 오늘 시장 성격),'
     ' "scenarios": {"up": str, "down": str, "trigger": str(익일 핵심 트리거)},'
@@ -202,15 +234,37 @@ def claude_synthesize(ctx: dict, research: dict | None, draft: str | None,
             ("\n\n[Perplexity 리서치]\n" + research["text"] if research else "") +
             ("\n\n[Gemini 초안]\n" + draft if draft else "") +
             "\n\n위 규칙대로 JSON 하나만 출력.")
-    try:
-        client = anthropic.Anthropic(api_key=key)
-        msg = client.messages.create(
-            model=CLAUDE_MODEL, max_tokens=4000,
-            system=sys or _CLAUDE_SYS, messages=[{"role": "user", "content": user}])
-        text = "".join(b.text for b in msg.content if getattr(b, "type", "") == "text")
-        return _parse_json(text)
-    except Exception:  # noqa
-        return None
+    # 과부하(529)·레이트리밋(429)·네트워크는 흔한 일시 오류다. 한 번 실패했다고 리포트의
+    # 결론 섹션이 통째로 비면 안 되므로: SDK 자동 재시도 → 모델 체인 강등 → 결정론 폴백.
+    client = anthropic.Anthropic(api_key=key, max_retries=3)
+    last = None
+    for model in CLAUDE_MODELS:
+        for attempt in range(2):
+            try:
+                msg = client.messages.create(
+                    model=model, max_tokens=CLAUDE_MAX_TOKENS,
+                    output_config={"effort": "medium"},
+                    system=sys or _CLAUDE_SYS,
+                    messages=[{"role": "user", "content": user}])
+                if msg.stop_reason == "max_tokens":
+                    last = "max_tokens 초과(출력 잘림)"
+                    continue
+                text = "".join(b.text for b in msg.content
+                               if getattr(b, "type", "") == "text")
+                parsed = _parse_json(text)
+                if parsed:
+                    _LAST_ERROR.pop("claude", None)
+                    return parsed
+                last = "JSON 파싱 실패"
+            except anthropic.APIStatusError as e:
+                last = f"{type(e).__name__}({e.status_code})"
+                if e.status_code < 500 and e.status_code != 429:
+                    break          # 400/401/404 는 재시도해도 같다 → 다음 모델로
+            except Exception as e:  # noqa
+                last = type(e).__name__
+            time.sleep(1.5 * (attempt + 1))
+    _LAST_ERROR["claude"] = last or "unknown"
+    return None
 
 
 def _parse_json(text: str) -> dict | None:
@@ -230,6 +284,86 @@ def _parse_json(text: str) -> dict | None:
         return None
 
 
+# ── 결정론 폴백 ────────────────────────────────────────────────────────────
+def fallback_narrative(ctx: dict) -> dict:
+    """LLM 없이 확정 수치만으로 만드는 서술. **문장을 지어내지 않고 값을 서술한다.**
+
+    존재 이유: 서술 LLM 3단이 모두 실패하면(과부하·키 만료·네트워크) 리포트에서 '매매 결론'과
+    '시나리오'가 통째로 사라진다. 점수·게이트·ATR 은 이미 API 로 확정돼 있으므로,
+    그 값만으로도 결론은 기계적으로 도출된다. 판단의 연속성을 위해 항상 이 폴백을 채운다.
+    """
+    label = ctx.get("label") or "시장"
+    total, grade = ctx.get("total"), ctx.get("grade")
+    p_up, p_down = ctx.get("p_up"), ctx.get("p_down")
+    gate = ctx.get("gate") or {}
+    atr = ctx.get("atr") or {}
+    prim = atr.get("primary") or {}
+    subs = ctx.get("subscores") or []
+    live = " (장 종료 전 스냅샷)" if ctx.get("intraday_snapshot") else ""
+
+    px = ctx.get("index_close")
+    chg = ctx.get("index_chg_pct")
+    head = f"{label} {ctx.get('trade_date')}{live}"
+    if px is not None:
+        head += f" · 지수 {px:,.2f}" + (f" ({chg:+.2f}%)" if chg is not None else "")
+    if total is not None:
+        head += f" · 총점 {total}({grade})"
+    if p_up is not None:
+        head += f" · 익일 상승확률 {p_up:.0%}"
+    weak = sorted((s for s in subs if s.get("score") is not None),
+                  key=lambda s: s["score"])[:2]
+    strong = sorted((s for s in subs if s.get("score") is not None),
+                    key=lambda s: -s["score"])[:2]
+    character = (head + ". 가장 약한 항목은 "
+                 + ", ".join(f"{s['label']} {s['score']:.0f}" for s in weak)
+                 + " / 가장 강한 항목은 "
+                 + ", ".join(f"{s['label']} {s['score']:.0f}" for s in strong)
+                 + " 이다.") if subs else head
+
+    if gate.get("new_entry_blocked"):
+        concl = (f"신규 진입 차단(등급 {grade}) — 관망·현금 유지. 권장비중 0%. "
+                 "보유분은 손절 라인 점검만.")
+    elif prim.get("qualified"):
+        d = "매수" if atr.get("direction") != "short" else "하락 대응"
+        concl = (f"{d} 자격 통과(edge {prim.get('edge', 0):+.1%}) · 권장비중 "
+                 f"{prim.get('kelly_pct', 0):.0f}% · 진입 {prim.get('entry')} / "
+                 f"손절 {atr.get('rec_stop') or prim.get('stop')} / 목표 {prim.get('target')}"
+                 + (f" · 실행 {atr.get('instrument')}" if atr.get("instrument") else ""))
+    else:
+        concl = "손익분기 승률 미달(edge≤0) — 신규 진입 보류, 관망."
+
+    # 시나리오 문구는 방향에 따라 목표/손절의 위치가 뒤집힌다(숏이면 목표가 아래).
+    up = down = ""
+    stop = atr.get("rec_stop") or prim.get("stop")
+    tgt = prim.get("target")
+    if tgt is not None and stop is not None:
+        pu = f"상승확률 {p_up:.0%}" if p_up is not None else ""
+        pd = f"하락확률 {p_down:.0%}" if p_down is not None else ""
+        if atr.get("direction") == "short":
+            up = f"반등 시 {stop} 회복이면 하락 시나리오 무효 — 숏/현금 판단 재검토. {pu}".strip()
+            down = f"하락 지속 시 1차 목표는 {tgt}({prim.get('k2')}·ATR 하방). {pd}".strip()
+        else:
+            up = f"상승 시 1차 목표는 {tgt}({prim.get('k2')}·ATR 상방). {pu}".strip()
+            down = f"하락 시 손절 {stop} 이탈 여부가 기준 — 이탈하면 판단 무효. {pd}".strip()
+    return {
+        "character": character,
+        "scenarios": {"up": up, "down": down,
+                      "trigger": "간밤 미국 증시·선물, 환율, 개장 동시호가 수급"},
+        "conclusion": concl,
+        # risks 는 비워 둔다 — 시스템 경고(warnings)는 렌더러가 '시스템 신호'로 이미 낸다.
+        # 여기에 복사하면 '실시간 리스크'와 '시스템 신호'에 같은 문장이 두 번 찍힌다.
+        "risks": [],
+        "materials": [{"tag": h.get("tag", "중립"), "text": h.get("title", "")}
+                      for h in (ctx.get("headlines") or [])[:5]],
+        "reopen_review": [
+            "간밤 미국 증시·나스닥/SOX 방향과 야간선물 확인",
+            "원달러 환율 급변 여부 확인",
+            "개장 동시호가 외국인·기관 수급 방향 확인",
+            f"전일 손절선 {atr.get('rec_stop') or prim.get('stop') or '—'} 이탈 여부 확인",
+        ],
+    }
+
+
 # ── 오케스트레이션 ─────────────────────────────────────────────────────────
 def build_narrative(ctx: dict, env: dict | None = None) -> Narrative:
     """Perplexity → Gemini → Claude 순으로 서술을 합성한다(각 단계 실패 허용)."""
@@ -247,7 +381,11 @@ def build_narrative(ctx: dict, env: dict | None = None) -> Narrative:
     trace.append("Gemini 초안 ✓" if draft else "Gemini 미실행")
 
     final = claude_synthesize(ctx, research, draft, env)
-    trace.append("Claude 합성 ✓" if final else "Claude 미실행")
+    trace.append("Claude 합성 ✓" if final
+                 else f"Claude 미실행({_LAST_ERROR.get('claude', 'no key')})")
+    if not final:
+        final = fallback_narrative(ctx)
+        trace.append("결정론 폴백 적용")
 
     n = Narrative(engine_trace=trace, sources=sources[:8])
     if final:
@@ -262,9 +400,9 @@ def build_narrative(ctx: dict, env: dict | None = None) -> Narrative:
         n.materials = mt if isinstance(mt, list) else [str(mt)]
         rr = final.get("reopen_review") or []
         n.reopen_review = rr if isinstance(rr, list) else [str(rr)]
-    elif draft:                       # Claude 실패 → Gemini 초안을 성격으로 대체
+    if not n.character and draft:     # 폴백도 비면 Gemini 초안을 성격으로
         n.character = draft
-    elif research:                    # 둘 다 실패 → 리서치 텍스트라도
+    elif not n.character and research:
         n.character = research["text"]
     return n
 
@@ -325,7 +463,11 @@ def build_preopen(ctx: dict, env: dict | None = None) -> Narrative:
     draft = gemini_draft(ctx, research, env)
     trace.append("검증 ✓" if draft else "검증 미실행")
     final = claude_synthesize(ctx, research, draft, env, sys=_PREOPEN_SYS)
-    trace.append("종합 ✓" if final else "종합 미실행")
+    trace.append("종합 ✓" if final
+                 else f"종합 미실행({_LAST_ERROR.get('claude', 'no key')})")
+    if not final:
+        final = fallback_narrative(ctx)
+        trace.append("결정론 폴백 적용")
 
     n = Narrative(engine_trace=trace, sources=sources[:8])
     if final:
@@ -337,8 +479,8 @@ def build_preopen(ctx: dict, env: dict | None = None) -> Narrative:
         n.risks = final.get("risks") or []
         n.materials = final.get("materials") or []
         n.reopen_review = final.get("reopen_review") or []
-    elif draft:
+    if not n.character and draft:
         n.character = draft
-    elif research:
+    elif not n.character and research:
         n.character = research["text"]
     return n

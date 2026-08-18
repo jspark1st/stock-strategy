@@ -80,8 +80,10 @@ Environment: Python 3.12.10, `httpx` 0.28 and `requests` 2.32 available. No virt
 docs/PLAN.md                     intent, scope, phased plan (read first)
 scripts/test_connection.py       [done] LS + Tavily connectivity check
 scripts/render_report.py         [done] 번들 JSON -> 단일 자체완결 HTML 대시보드 (사이드바+뷰, LWC 인라인)
-scripts/run_close.py             [done] 마감(종가베팅) 파이프라인: LS+네이버+Tavily+ATR+3LLM+store → 대시보드 + public/index.html
-scripts/run_preopen.py           [done] 개장 전 재확인: 전일 마감 앵커 + 간밤 리서치 → 4뷰 통합 대시보드
+scripts/run_close.py             [done] 마감(종가베팅) 파이프라인. 거래일 판정→휴장이면 무산출.
+                                 플래그: --auto(스케줄러) --dry-run(무반영) --now ISO(시각강제) --write(--now 반영)
+scripts/run_preopen.py           [done] 개장 전 재확인(앵커 신선도 검증 포함) → out/preopen_<date>.json 저장
+                                 (오후 마감 회차가 같은 날 대시보드에 4뷰로 합침)
 scripts/auto_close.sh / auto_preopen.sh  [done] 서버 cron 러너(파이프라인 → git push → Vercel)
 scripts/auto_close.bat / auto_preopen.bat / setup_schedule.bat  [done] (대안) 로컬 Windows 스케줄러
 scripts/make_sample_dashboard.py [done] 코스피/코스닥 시장레벨 데모 번들(sample_dashboard.json) 생성
@@ -98,7 +100,8 @@ src/collectors/naver.py          [done] 네이버 우회 수집기: 지수 일/�
 src/collectors/news.py           [done] Tavily 실시간 재료 + 당일 팩트체크(발행시각) → news 서브스코어
 src/collectors/llm.py            [done] 멀티 LLM(Perplexity 실시간·Gemini 계산·Claude 종합) 서술/개장전
 assets/vendor/lightweight-charts.standalone.production.js  [done] TradingView LWC v4.2.3 벤더링(인라인용, Apache-2.0)
-tests/test_scoring.py            [done] 42 boundary-value pytest cases
+tests/test_scoring.py            [done] 43 boundary-value pytest cases
+tests/test_pipeline_logic.py     [done] 23 회귀 테스트 — 2026-08-19 점검에서 고친 논리 결함들
 conftest.py                      [done] pytest root marker (puts repo root on sys.path)
 data/sample_dashboard.json       [done] 코스피+코스닥 시장레벨 데모 번들 (렌더러 기본 입력)
 data/sample_close.json           (레거시) 단일 코스피 리포트 + charts — 여전히 렌더 호환
@@ -110,12 +113,38 @@ middleware.js / api/login.js      [done] Vercel 비번 게이트(쿠키 검증·
 vercel.json / package.json / .vercelignore  [done] Vercel 정적+함수 배포 설정(framework:null)
 data/history.db                  SQLite 자가학습 DB (gitignored; 정본은 서버)
 ```
-남은 데이터 갭: 마감 동시호가(call, 15:20 스냅), 지수 거래대금(네이버 '거래량' 대용), 야간/미국선물 %, usdkrw.
+남은 데이터 갭: 마감 동시호가(call — 15:00 리포트 시점엔 **구조적으로 미발생** → 결측이 아니라
+'제외' 처리), 지수 거래대금(점수는 '거래량' 기준 — LS t1511/네이버 실시간이 당일 `value` 는 주지만
+20일 이력이 없어 비교 불가), 야간/미국선물 % (뉴스 재료로 정성 반영 중). **usdkrw 는 해결**
+(`naver.usdkrw()`).
+
+### 15:00(장중) 실행 전제 — 이 프로젝트의 가장 중요한 설계 제약
+종가베팅 주문은 **종가 단일가(15:20~15:30) 전에** 넣어야 의미가 있다 → 마감 리포트는 15:00 에 돈다.
+따라서 그 시각의 데이터는 전부 '마감 확정치'가 아니다. 파이프라인은 이걸 숨기지 않고 전 구간에 반영한다:
+- **거래일 판정**: 요일/달력 하드코딩 금지(대체공휴일·임시휴장). 독립 소스 3개를 순서대로 교차확인 →
+  ①네이버 일봉에 오늘 봉 ②네이버 실시간 지수 `localTradedAt` 날짜 ③LS t1511 전일지수 == 시계열 마지막 종가.
+  셋 다 아니면 **아무것도 만들지 않고 종료**(휴장). `run_close.resolve_session()`.
+- **수급**: 확정 일별 행이 아직 없으면 `investorDealTrendTime`(시간별 잠정) → `provisional=True`.
+  **거래일 일치 검증 필수** — 전일 수급을 오늘 것으로 쓰면 무결성 사고. `naver.market_flows()`.
+- **거래량**: '15:00까지 누적'을 종일 20일평균과 그냥 비교하면 구조적 과소평가 → 시장별 완성계수로 환산.
+  계수는 DB 자가학습(`store.volume_completion_factor`), 부트스트랩은 KODEX ETF 10분봉 실측
+  (KOSPI 0.93 / KOSDAQ 0.96, 2026-08-11~18).
+- **마감 동시호가**: 아직 일어나지 않은 이벤트 → `call_not_applicable=True` → **excluded**(가중치 재배분).
+  결측으로 두면 상시 '부분 데이터'가 되어 다른 항목 하나만 더 빠져도 총점이 통째로 미산출된다.
+- **채점**: 장중 미완성 등락률로 채점 금지. `store.grade_with_candles()` 가 **확정 일봉이 나온 뒤**에만
+  채점하고, 밀린 날짜는 전부 소급한다.
+- 리포트에는 `as_of`(기준시각)·`intraday_snapshot`·'장중 잠정' 배지가 항상 박힌다. LLM 프롬프트도
+  '종가 아님'을 명시받는다.
 
 ### 투자자 수급·지수 일봉 데이터 소스 (확정)
 - **KRX 정보데이터시스템 `getJsonData.cmd` 는 막힘** — 익명/워밍업 세션에 **HTTP 400 `LOGOUT`** 반환(pykrx 포함, 2026-08-18 한국 IP=SK브로드밴드 실측; 지오블록 아님). pykrx의 종목 OHLCV가 되는 건 실은 **네이버로 우회**하기 때문.
 - **해결 = `src/collectors/naver.py`** (httpx만, pandas/numpy 불필요): ①지수 일봉 `fchart.stock.naver.com/sise.nhn`(XML) → `CandleSeries`, ②투자자 수급 `finance.naver.com/sise/investorDealTrendDay.naver`(EUC-KR HTML, **bizdate 필수**) → `InvestorFlows`. 값은 KRX 원천 공식 수치.
 - **라이브 검증(2026-08-18)**: KOSPI 개인 +7,420·외국인 +914·기관계 −7,951·기타법인 −383 / KOSDAQ 개인 +3,905·외국인 +366·기관계 −4,176·기타법인 −95. **단위 억원**, 시장 항등식(합=0) 양시장 통과 → suffix→투자자 매핑 확정. `models.py`에 `InvestorFlows` 추가.
+- **추가 확보(2026-08-19)**: ③장중 잠정 수급 `investorDealTrendTime.naver?sosok=&bizdate=`(일별과 **동일 컬럼 구조**,
+  분 단위 갱신) → 15:00 회차의 수급 공백 해결. ④실시간 지수
+  `polling.finance.naver.com/api/realtime/domestic/index/{KOSPI|KOSDAQ}`(OHLC·누적거래량·거래대금·
+  `marketStatus`·`localTradedAt`) → 거래일 판정 + 장중 지수. ⑤원달러
+  `api.stock.naver.com/marketindex/exchange/FX_USDKRW`(`closePrice`·`fluctuationsRatio`).
 - **pykrx는 불필요**(KRX 막힘) → **제거함, numpy 1.26.4 복원**(numba/tensorflow 호환). 단 전역 파이썬에 `pandas-ta`(numpy≥2.2.6)가 있어 numba/tensorflow와 **상호모순**(내 작업과 무관한 기존 충돌) — 근본 해결은 프로젝트별 venv. 본 프로젝트는 numpy 미사용이라 무관.
 
 ### 리포트 렌더러 계약 (대시보드 셸)
@@ -166,8 +195,48 @@ Keep this section updated as work advances. Status legend: ✅ done · 🔶 part
 - **수동 실행**: `cd ~/stock_strategy && python3 scripts/run_close.py` (또는 run_preopen). **코드 수정 후**: 로컬에서 push → 서버 `cd ~/stock_strategy && git pull`.
 - **Vercel**: 프로젝트 `easystock`(prj_MVEYDzFx7LG0WddGqIQeMfsM1qSO, team_4rQsEoiwakRmCY4Ru0QJ7c1o), URL **easystock-junaitech.vercel.app**. 게이트 env **`view_password`·`auth_token`**(대시보드 설정 — MCP에 env 도구 없음). 네이티브 비번보호는 유료라 커스텀 미들웨어(middleware.js+api/login.js) 사용.
 
+- **2026-08-19 (2차) — 전면 점검: 자동화·논리정합성·데이터 신뢰도·리포트 품질·UI**
+  사용자 요청("자동 업데이트 확인 / 논리 모순·버그 점검 / 팩트 기반 점수화 검증 / 리포트 약점 보완 / UI 폴리쉬").
+  - ✅ **거래일 판정** — 공휴일에 전일 데이터를 오늘 것처럼 발행하던 위험 제거. 소스 3중 교차확인,
+    휴장이면 무산출·무배포. (요일 기반/달력 하드코딩은 대체공휴일에 반드시 틀리므로 채택 안 함)
+  - ✅ **수급 무결성** — `market_flows()` 가 거래일 일치를 검증. 확정치 없으면 시간별 잠정치
+    (`provisional`), 그것도 없으면 결측. **전일 수급 대체 사용 금지.**
+  - ✅ **동시호가 = 제외(결측 아님)** — 상시 '부분 데이터' 상태 해소, 완전성 100% 정상화.
+  - ✅ **거래량 편향 보정** — 15:00 누적 → 종일 환산(자가학습 계수 + ETF 실측 부트스트랩).
+  - ✅ **뉴스 이중 계상 제거(중요)** — "코스피 1.5% 하락 마감" 류 *국내 시황* 기사를 악재로 세면
+    이미 종가강도·시장폭·수급에 반영된 가격 움직임을 재료(0.10)에서 한 번 더 세는 순환 구조였다
+    (실측 42.6→39.3 이 이 경로). `kind`(시황|재료)·`scope`(시장|종목)로 분류해 **점수엔 재료·시장만**.
+    해외 마감 기사는 익일 선행정보라 재료로 유지.
+  - ✅ **뉴스 태깅 비관 편향 제거** — 제목+본문 통합 판정이라 부정어 하나만 있어도 악재로 뒤집혔다
+    ("반도체 톱2 강세에 코스피 +3%대↑" → 악재). **제목 기준 순(net) 카운트**로 교체.
+  - ✅ **등급 게이트가 사이징을 지배(중요)** — 등급 '위험'(신규진입 차단)인데 p_down 이 높다는 이유로
+    Half-Kelly 가 상한 25%를 찍어 "숏 25%"를 권하던 **정면 모순**. 게이트 차단 시 권장비중 0% 강제,
+    `position_scale` 을 켈리에 곱함. 게이트를 리포트·LLM 프롬프트로도 전달.
+  - ✅ **실행 가능한 지시** — 지수는 직접 팔 수 없으므로 하락 방향은 '현금/인버스 ETF'로 명시.
+  - ✅ **채점 정합성** — 장중 미완성 등락률로 채점하고 못 고치던 문제 → 확정 일봉으로만, 밀린 날짜 소급.
+    숏 방향 목표/손절 도달 판정도 대칭 반영. `p_up_raw`(캘리브레이션 전) 보존 + 스키마 마이그레이션.
+  - ✅ **LLM 내구성** — Claude 529(과부하) 시 서술 섹션이 통째로 비던 문제 → 재시도 + 모델 체인
+    (opus-5→sonnet-5) + **결정론 폴백**(확정 수치만으로 결론·시나리오 생성). `max_tokens` 4000→16000
+    (Opus 5 적응형 사고가 토큰을 먹어 JSON 이 잘릴 수 있음).
+  - ✅ **미수집을 0으로 표시하던 문제** — 프로그램 매매 '+0억'(=순매수 0이라는 거짓) → '미수집'.
+  - ✅ **cron 러너 하드닝** — flock(중복 실행 방지)·파이프라인 실패 시 배포 중단·`git pull --rebase`
+    (원격 선행 시 push 실패 방지)·로그 로테이션. `db/`·`reports/` gitignore/vercelignore 추가.
+  - ✅ **UI** — 데이터 기준 스트립(기준시각·장중여부·출처·환율), 상태 배지 3종(장중 잠정/마감 확정/
+    개장전 재검토), p_up 미산출 시 '하락 100%'로 보이던 버그 수정, ATR 손절·목표 색을 **역할이 아니라
+    진입가 대비 위치**로(숏에서 뒤집히던 문제), 사이드바 점수 칩, 리스크 중복 표시 제거,
+    모바일 hero 2열·인쇄 스타일·포커스 링·prefers-reduced-motion.
+  - ✅ 회귀 테스트 23개 추가(`tests/test_pipeline_logic.py`) — 총 66개 통과.
+
 ### 이어서 할 곳 (open items)
-1. **⚠️ 종가베팅 수급 타이밍(최우선 검증)** — 15:00 실행 시 **확정 수급은 마감 후**라 네이버가 장중 오늘치 잠정 수급을 주는지 **첫 라이브(오늘 15:00) 확인 필요**. 없으면 수급 결측(=2)→총점 미산출 위험. 대안: 실시간 수급 소스(LS t1601 매핑 재시도) 또는 시간 미세조정. 잠정치면 `provisional=True` 세팅.
-2. **SoT 분기 기록** — ATR 정규화·신호 일치도·quant 확장은 sibling `scoring-close.md`/`atr-risk-sizing.md` 대비 easystock 확장. SoT에 반영/분기 명시 필요.
-3. **남은 데이터 갭**: 마감 동시호가(call, 15:20 스냅), 지수 거래대금(네이버 '거래량' 대용), 야간/미국선물 %, usdkrw.
-4. **사용자 잔여 작업**: Vercel env 2개 설정+Redeploy(로그인 활성화). (로컬 Windows 스케줄러 `setup_schedule.bat`는 서버 cron으로 대체됨 — 불필요.)
+1. **첫 라이브 15:00 회차 확인** — 코드는 장중 경로를 모두 갖췄지만 *실제 장중* 응답으로는 아직 미검증.
+   확인할 것: ①네이버 일봉이 장중 오늘 봉을 주는가(아니면 실시간 지수 경로로 자동 폴백) ②
+   `investorDealTrendTime` 이 장중 행을 주는가 ③`out/auto_close.log` 에 '거래일/장중 스냅샷' 라인이 찍히는가.
+2. **거래량 완성계수 학습** — `intraday_volume` 표본이 8일 쌓이면 기본값(0.93/0.96)에서 학습치로 자동 전환.
+   그때 리포트의 `(기본값·표본 n/8)` 표기가 `(학습치 n=N)` 으로 바뀌는지 확인.
+3. **SoT 분기 기록** — ATR 정규화·신호 일치도·quant 확장·**게이트 우선 사이징**·**뉴스 시황 제외**는
+   sibling `scoring-close.md`/`atr-risk-sizing.md` 대비 easystock 확장. SoT에 반영/분기 명시 필요.
+4. **남은 데이터 갭**: 지수 거래대금 20일 이력(현재 거래량 대용), 야간/미국선물 % 정량치, 마감 동시호가
+   확정치(18:00 이후 재계산 회차를 추가하면 call 항목을 실제로 채울 수 있음).
+5. **방법론 주의(문서화됨)** — `edge = p_up − 1/(1+b)` 는 '익일 방향확률'을 '손익비 승률'로 간주한다.
+   목표·손절 도달 확률과는 다른 값이므로 켈리는 항상 게이트·상한 안에서만. 리포트에도 명시해 둠.
+6. **사용자 잔여 작업**: Vercel env 2개(`view_password`·`auth_token`) 설정+Redeploy(로그인 활성화).

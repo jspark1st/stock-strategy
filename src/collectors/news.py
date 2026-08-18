@@ -8,6 +8,13 @@
 팩트체크 기준: Tavily `published_date`(GMT)를 KST로 변환해 거래일과 같은 날이면 fresh.
 과거(예: 5일 전) 기사는 stale 로 표시하고 점수 계산에서 제외한다.
 
+**중복 반영(circularity) 차단 — 2026-08-19 수정.** 뉴스의 대다수는 "코스피 1.5% 하락 마감"
+같은 *시황 기사*다. 이걸 악재로 세면 이미 종가강도(0.20)·시장폭(0.20)·수급(0.25)에
+반영된 오늘의 가격 움직임을 재료(0.10)에서 **한 번 더** 세는 셈이 되어, 총점이 방향으로
+과증폭된다(실측: 코스피 42.6 → 39.3 이 이 경로였다). 그래서 각 기사를
+`kind`("시황" | "재료")로 분류하고 **점수에는 '재료'만** 넣는다. 시황 기사는 리포트에
+그대로 보여주되 점수에서 빠졌음을 표시한다.
+
 Tavily 규격(test_connection.py 실측): `POST https://api.tavily.com/search`,
 헤더 `Authorization: Bearer <key>` + JSON, 바디 `{query, max_results, topic:"news", days}`.
 응답 result 필드: title·url·content·score·published_date(RFC2822 GMT).
@@ -35,6 +42,27 @@ _POS = ["급등", "강세", "상승", "반등", "호재", "순매수", "사상 �
         "훈풍", "회복", "완화", "기대", "수주", "호실적", "돌파", "안착"]
 _CR = ["유상증자", "전환사채", "CB 발행", "신주인수권", "감자", "블록딜", "오버행"]
 
+# 시황(recap) 판정 — '오늘 *국내* 시장이 얼마 올랐다/내렸다'를 서술하는 기사.
+# 국내 지수 주체어 + 세션 서술어가 같이 나오면 시황(=이미 점수에 든 정보)으로 본다.
+#
+# 해외 증시 마감 기사는 시황으로 **보지 않는다**: 국내 지수의 종가·수급·시장폭과 중복이
+# 아니라, 익일 국내장에 대한 외생 선행정보이기 때문(SoT 의 us_futures_pct 자리를 대신함).
+_DOMESTIC_WORDS = ["코스피", "코스닥", "국내 증시", "국내증시", "국내 주식", "주식시장",
+                   "유가증권시장", "지수"]
+_MKT_WORDS = _DOMESTIC_WORDS + ["증시", "뉴욕증시", "나스닥", "다우", "S&P", "SOX", "니케이"]
+_SESSION_WORDS = ["마감", "마쳐", "출발", "개장", "장중", "종가", "상승 마감", "하락 마감",
+                  "약보합", "강보합", "혼조", "반등 마감", "시황", "휘청", "급등락"]
+# 수급 서술도 이미 flow(0.25) 서브스코어에 들어가 있다 → 재료로 이중 계상 금지.
+_FLOW_WORDS = ["외국인 순매수", "외국인 순매도", "기관 순매수", "기관 순매도",
+               "개인 순매수", "개인 순매도", "수급", "프로그램 매매"]
+
+# 시장 스코프 판정 — 지수 리포트는 '시장을 움직이는' 재료만 점수화한다.
+# 개별 종목 공시(A사 CB 발행 등)는 지수 총점의 근거가 될 수 없다(표시는 하되 점수 제외).
+_MACRO_WORDS = ["금리", "유가", "환율", "원달러", "달러", "연준", "Fed", "FOMC", "CPI",
+                "물가", "인플레", "관세", "무역", "지정학", "전쟁", "이란", "중동", "러시아",
+                "중국", "미국", "일본", "수출", "경기", "GDP", "고용", "실업", "국채",
+                "반도체", "메모리", "AI", "선물", "만기", "정책", "정부", "한은", "기준금리"]
+
 _DEFAULT_QUERIES = [
     "코스피 코스닥 증시 마감 시황",
     "국내 증시 외국인 기관 수급",
@@ -51,6 +79,13 @@ class Material:
     published_kst: datetime | None  # 발행시각(KST)
     fresh: bool                     # 거래일 기준 당일 여부(팩트체크 통과)
     source: str = ""
+    kind: str = "재료"              # "재료"(점수 반영) | "시황"(가격/수급 서술 → 점수 제외)
+    scope: str = "시장"             # "시장"(지수 점수 반영) | "종목"(개별 종목 이슈 → 제외)
+
+    @property
+    def scored(self) -> bool:
+        """점수에 반영되는가 — 당일 발행 + 시황 아님 + 시장 스코프."""
+        return self.fresh and self.kind == "재료" and self.scope == "시장"
 
     def hhmm(self) -> str:
         return self.published_kst.strftime("%m/%d %H:%M") if self.published_kst else "시각미상"
@@ -68,20 +103,34 @@ class MaterialsAssessment:
     def fresh(self) -> list[Material]:
         return [m for m in self.materials if m.fresh]
 
+    @property
+    def scored(self) -> list[Material]:
+        return [m for m in self.materials if m.scored]
+
     def fact_check_line(self) -> str:
         n_fresh = len(self.fresh)
+        n_scored = len(self.scored)
         latest = max((m.published_kst for m in self.fresh if m.published_kst), default=None)
         lt = latest.strftime("%m/%d %H:%M") if latest else "—"
         d = f"{self.as_of[:4]}-{self.as_of[4:6]}-{self.as_of[6:8]}"
-        return (f"팩트체크: {d} 기준 실시간 재료 {len(self.materials)}건 중 "
-                f"당일 검증 {n_fresh}건(최신 {lt} KST) · 점수는 당일 재료만 반영")
+        drop = n_fresh - n_scored
+        return (f"팩트체크: {d} 기준 수집 {len(self.materials)}건 → 당일 검증 {n_fresh}건"
+                f"(최신 {lt} KST) → 지수 점수 반영 {n_scored}건 "
+                f"(시황 중복·개별종목 이슈 {drop}건 제외)")
 
     def sources(self, limit: int = 8) -> list[dict]:
         """리포트 '주요 재료' 소스. 첫 항목은 팩트체크 요약(링크 없음)."""
         out = [{"title": self.fact_check_line(), "url": ""}]
         icon = {"호재": "🟢", "악재": "🔴"}
         for m in self.fresh[:limit]:
-            out.append({"title": f"{icon.get(m.tag, '⚪')} [{m.hhmm()}] {m.title}", "url": m.url})
+            if m.scored:
+                mark = ""
+            elif m.kind == "시황":
+                mark = " · 시황(가격·수급 항목과 중복 → 점수 제외)"
+            else:
+                mark = " · 개별종목(지수 점수 제외)"
+            out.append({"title": f"{icon.get(m.tag, '⚪')} [{m.hhmm()}] {m.title}{mark}",
+                        "url": m.url})
         return out
 
 
@@ -115,14 +164,54 @@ def search(query: str, api_key: str, max_results: int = 5, days: int = 2,
             c.close()
 
 
-def _tag(text: str) -> tuple[str, bool]:
-    """(태그, capital_raise). 부정 우선(보수적)."""
-    cr = any(k in text for k in _CR)
-    if cr or any(k in text for k in _NEG):
-        return "악재", cr
-    if any(k in text for k in _POS):
+def _tag(title: str, content: str = "") -> tuple[str, bool]:
+    """(태그, capital_raise). **제목 기준 순(net) 판정.**
+
+    이전 구현은 제목+본문을 합쳐 보고 '부정어가 하나라도 있으면 악재'였다. 금융 기사
+    본문에는 '하락/우려/리스크'가 거의 항상 섞여 있어서, 실측상 "반도체 톱2 강세에
+    코스피 +3%대↑" 같은 명백한 호재까지 악재로 뒤집혔다(구조적 비관 편향).
+    → 제목의 호재어/악재어 **개수 차이**로 판정하고, 제목이 중립일 때만 본문을 본다.
+    유상증자·CB 류는 그 자체로 수급 악재라 항상 악재로 고정한다.
+    """
+    cr = any(k in title or k in content for k in _CR)
+    if cr:
+        return "악재", True
+    neg = sum(1 for k in _NEG if k in title)
+    pos = sum(1 for k in _POS if k in title)
+    if neg > pos:
+        return "악재", False
+    if pos > neg:
         return "호재", False
+    if neg == 0 and pos == 0 and content:  # 제목이 무색무취일 때만 본문 참고
+        cneg = sum(1 for k in _NEG if k in content)
+        cpos = sum(1 for k in _POS if k in content)
+        if cneg > cpos:
+            return "악재", False
+        if cpos > cneg:
+            return "호재", False
     return "중립", False
+
+
+def classify_kind(title: str) -> str:
+    """'시황'(오늘 지수/수급 서술) vs '재료'(외생 이벤트). 제목만 본다.
+
+    본문(content)까지 보면 거의 모든 기사에 지수 언급이 섞여 과분류된다.
+    유상증자/CB 류는 시황어가 섞여 있어도 항상 '재료'로 남긴다(단독 -25 규칙 대상).
+    """
+    if any(k in title for k in _CR):
+        return "재료"
+    if any(k in title for k in _FLOW_WORDS):
+        return "시황"
+    has_dom = any(k in title for k in _DOMESTIC_WORDS)
+    has_sess = any(k in title for k in _SESSION_WORDS)
+    return "시황" if (has_dom and has_sess) else "재료"
+
+
+def classify_scope(title: str) -> str:
+    """'시장'(지수 총점 반영) vs '종목'(개별 이슈 — 표시만). 제목 기준."""
+    if any(k in title for k in _MKT_WORDS) or any(k in title for k in _MACRO_WORDS):
+        return "시장"
+    return "종목"
 
 
 def market_materials(as_of: str, api_key: str | None = None, queries: list[str] | None = None,
@@ -148,20 +237,24 @@ def market_materials(as_of: str, api_key: str | None = None, queries: list[str] 
                 seen.add(url)
                 pub = _parse_kst(res.get("published_date"))
                 fresh = bool(pub and pub.strftime("%Y%m%d") == as_of)
-                tag, cr = _tag(title + " " + (res.get("content", "") or ""))
+                tag, cr = _tag(title, res.get("content", "") or "")
+                kind = classify_kind(title)
+                scope = classify_scope(title)
                 if cr and fresh:
                     cr_titles.append(title)
                 mats.append(Material(title=title, url=url, tag=tag, published_kst=pub,
-                                     fresh=fresh, source=res.get("source", "") or ""))
+                                     fresh=fresh, source=res.get("source", "") or "",
+                                     kind=kind, scope=scope))
     finally:
         if own:
             c.close()
-    fresh_mats = [m for m in mats if m.fresh]
-    good = min(sum(1 for m in fresh_mats if m.tag == "호재"), 3)
-    bad = min(sum(1 for m in fresh_mats if m.tag == "악재"), 3)
-    # 정렬: fresh 먼저, 그 안에서 악재→호재→중립, 최신순
+    # 점수에는 '당일 발행 + 재료(시황 아님)'만 반영 — 가격/수급 이중 계상 차단.
+    scored_mats = [m for m in mats if m.scored]
+    good = min(sum(1 for m in scored_mats if m.tag == "호재"), 3)
+    bad = min(sum(1 for m in scored_mats if m.tag == "악재"), 3)
+    # 정렬: 점수반영 재료 → 당일 시황 → 과거. 그 안에서 악재→호재→중립, 최신순
     order = {"악재": 0, "호재": 1, "중립": 2}
-    mats.sort(key=lambda m: (not m.fresh, order.get(m.tag, 3),
+    mats.sort(key=lambda m: (not m.scored, not m.fresh, order.get(m.tag, 3),
                              -(m.published_kst.timestamp() if m.published_kst else 0)))
     return MaterialsAssessment(as_of=as_of, materials=mats, good_count=good, bad_count=bad,
                                capital_raise_titles=cr_titles)
@@ -177,9 +270,9 @@ def _demo() -> None:
     a = market_materials(as_of)
     print(a.fact_check_line())
     print(f"호재 {a.good_count} 악재 {a.bad_count} · 유상증자류(당일) {len(a.capital_raise_titles)}")
-    for m in a.materials[:12]:
+    for m in a.materials[:16]:
         flag = "당일✓" if m.fresh else "과거 "
-        print(f"  [{flag}][{m.tag}] {m.hhmm()}  {m.title[:60]}")
+        print(f"  [{flag}][{m.kind}/{m.scope}][{m.tag}] {m.hhmm()}  {m.title[:60]}")
 
 
 if __name__ == "__main__":

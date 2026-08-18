@@ -22,3 +22,7 @@ data/history.db
 .playwright-mcp/
 .claude/settings.local.json
 *.log
+
+# 서버 정본 DB / 리포트 백업 (용량·충돌 유발 — 커밋 대상 아님)
+db/
+reports/

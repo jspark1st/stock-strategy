@@ -167,6 +167,10 @@ class AtrPlan:
     structure_stop: float | None = None   # 스윙 저점/고점 기반 손절
     rec_stop: float | None = None          # 권장 손절(ATR·구조 중 타이트)
     rec_stop_basis: str = "ATR"            # 권장 손절 근거
+    # 등급 게이트 반영 결과 — 스코어링이 '신규 진입 차단'이라고 했으면 사이징도 0이어야 한다.
+    gate_blocked: bool = False
+    position_scale: float = 1.0
+    instrument: str = ""                  # 실제 체결 수단(방향별)
 
     def to_dict(self) -> dict:
         def lvl(l: AtrLevels) -> dict:
@@ -196,6 +200,9 @@ class AtrPlan:
             "structure_stop": round(self.structure_stop, 2) if self.structure_stop is not None else None,
             "rec_stop": round(self.rec_stop, 2) if self.rec_stop is not None else None,
             "rec_stop_basis": self.rec_stop_basis,
+            "gate_blocked": self.gate_blocked,
+            "position_scale": self.position_scale,
+            "instrument": self.instrument,
         }
 
 
@@ -221,9 +228,25 @@ def _levels(type_key: str, entry: float, atr14: float, p_used: float,
                      kelly_pct=kelly, qualified=edge > 0)
 
 
+# 지수 타점을 실제로 체결할 수단. 국내 개인은 지수를 직접 팔 수 없으므로
+# 하락 방향은 '인버스 ETF 또는 현금'으로 표기해야 실행 가능한 지시가 된다.
+INSTRUMENTS = {
+    "KOSPI": {"long": "KODEX 200(069500)", "short": "현금 비중 확대 또는 KODEX 인버스(114800)"},
+    "KOSDAQ": {"long": "KODEX 코스닥150(229200)",
+               "short": "현금 비중 확대 또는 KODEX 코스닥150선물인버스(251340)"},
+}
+
+
 def compute_plan(market: str, daily: CandleSeries, p_up: float | None,
-                 recent_surge: bool = False) -> AtrPlan | None:
-    """지수 일봉 + p_up 으로 ATR 매매 플랜을 만든다. p_up 없으면(총점 미산출) None."""
+                 recent_surge: bool = False, gate: dict | None = None) -> AtrPlan | None:
+    """지수 일봉 + p_up 으로 ATR 매매 플랜을 만든다. p_up 없으면(총점 미산출) None.
+
+    gate: 스코어링 등급에서 나온 진입 게이트({position_scale, new_entry_blocked, ...}).
+    **게이트가 우선한다.** 등급이 '위험'(신규 진입 차단)인데 p_down 이 높다는 이유로
+    Half-Kelly 가 상한 25%를 찍어 '숏 25%'를 권하면, 같은 리포트 안에서 스코어링 게이트와
+    사이징이 정면으로 모순된다. 게이트가 차단이면 권장비중은 0%(관망/현금)로 강제하고,
+    position_scale(예: 약세=0.5)은 켈리 비중에 곱한다.
+    """
     candles = daily.candles
     a14 = atr(candles, 14)
     if a14 is None or not candles or p_up is None:
@@ -248,6 +271,12 @@ def compute_plan(market: str, daily: CandleSeries, p_up: float | None,
     p_used = p_up if direction != "short" else (1 - p_up)
 
     variants = [_levels(k, entry, a_eff, p_used, direction) for k in TRADER_TYPES]
+    # ── 등급 게이트 적용(스코어링 결론이 사이징을 지배한다) ──
+    gate = gate or {}
+    blocked = bool(gate.get("new_entry_blocked"))
+    pscale = float(gate.get("position_scale", 1.0))
+    for v in variants:
+        v.kelly_pct = 0.0 if blocked else clamp(v.kelly_pct * pscale, 0.0, MAX_POSITION_PCT)
     primary = next(v for v in variants if v.type_key == PRIMARY_TYPE)
 
     pullback = entry - 0.5 * a_eff if direction != "short" else entry + 0.5 * a_eff
@@ -263,13 +292,19 @@ def compute_plan(market: str, daily: CandleSeries, p_up: float | None,
 
     # 구조 기반 손절(스윙 저/고점) + 권장 손절 = ATR·구조 중 더 타이트한 쪽
     # (고수 원칙: 손절은 구조에, 사이징은 변동성에. ATR이 과대하면 구조가 더 타이트해짐.)
+    # 구조 손절은 '직전 스윙'이어야 한다. 당일 봉을 포함하면 오늘 저가가 곧 스윙저점이 되어
+    # 손절이 진입가에 붙어버린다(당일 저가 근처 마감 시 흔함) → 최소 이격 미달이면 ATR 손절 사용.
+    MIN_STOP_ATR = 0.35     # 진입가에서 최소 0.35·ATR 이상 떨어져야 유효한 구조 손절
+    prior = candles[:-1] if len(candles) > 11 else candles
     if direction == "short":
-        struct = swing_high(candles, 10)
-        rec_stop = min(primary.stop, struct) if struct is not None else primary.stop
+        struct = swing_high(prior, 10)
+        usable = struct is not None and (struct - entry) >= MIN_STOP_ATR * a_eff
+        rec_stop = min(primary.stop, struct) if usable else primary.stop
     else:
-        struct = swing_low(candles, 10)
-        rec_stop = max(primary.stop, struct) if struct is not None else primary.stop
-    rec_basis = "구조(스윙)" if (struct is not None and abs(rec_stop - struct) < 1e-9
+        struct = swing_low(prior, 10)
+        usable = struct is not None and (entry - struct) >= MIN_STOP_ATR * a_eff
+        rec_stop = max(primary.stop, struct) if usable else primary.stop
+    rec_basis = "구조(스윙)" if (usable and abs(rec_stop - struct) < 1e-9
                                   and abs(rec_stop - primary.stop) > 1e-9) else "ATR"
 
     atr_pct = a14 / entry * 100 if entry else 0.0
@@ -281,13 +316,21 @@ def compute_plan(market: str, daily: CandleSeries, p_up: float | None,
                 f"손익비 1:{primary.rr:.1f} · edge {primary.edge:+.1%}")
 
     surge = recent_surge or (regime == "과열")
-    if not primary.qualified:
+    instrument = INSTRUMENTS.get(market.upper(), {}).get(
+        "short" if direction == "short" else "long", "")
+    if blocked:
+        comment = ("등급 게이트: 신규 진입 차단 — 권장비중 0%(관망/현금). "
+                   "아래 타점은 보유분 관리·역방향 참고용 수치일 뿐 신규 베팅 근거가 아니다.")
+    elif not primary.qualified:
         comment = "손익분기 승률 미달(edge≤0) — 관망/현금. ATR 타점은 참고만."
     elif direction == "short":
-        comment = "하락 우위 — 신규 매수 자제, 반등은 되돌림. (지수 기준)"
+        comment = (f"하락 우위 — 신규 매수 자제. 실행은 {instrument}. "
+                   f"권장비중 {primary.kelly_pct:.0f}%"
+                   + (f"(등급 게이트 {pscale:.0%} 반영)" if pscale != 1.0 else ""))
     else:
         comment = (f"매수 자격 통과(edge {primary.edge:+.1%}) · 권장비중 "
-                   f"{primary.kelly_pct:.0f}%(Half Kelly, 상한 {MAX_POSITION_PCT:.0f}%)")
+                   f"{primary.kelly_pct:.0f}%(Half Kelly, 상한 {MAX_POSITION_PCT:.0f}%)"
+                   + (f" · 등급 게이트 {pscale:.0%} 반영" if pscale != 1.0 else ""))
     if regime == "과열":
         comment += " · 변동성 과열 → 정규화 ATR 적용(스톱 과대 방지), 구조 손절 우선."
     elif regime == "저변동":
@@ -298,4 +341,5 @@ def compute_plan(market: str, daily: CandleSeries, p_up: float | None,
         pullback_entry=pullback, chandelier=chand, primary=primary, variants=variants,
         price_limit_warn=surge, observed=observed, comment=comment,
         atr_eff=a_eff, atr_median=a_med, vol_pct=vol_pct, regime=regime,
-        structure_stop=struct, rec_stop=rec_stop, rec_stop_basis=rec_basis)
+        structure_stop=struct, rec_stop=rec_stop, rec_stop_basis=rec_basis,
+        gate_blocked=blocked, position_scale=pscale, instrument=instrument)
