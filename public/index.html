@@ -78,7 +78,22 @@
   .basis{margin-top:8px;font-size:.79rem;color:var(--muted);line-height:1.7;
     border-left:3px solid var(--border);padding:2px 0 2px 10px}
   .basis-k{color:var(--text);opacity:.75;font-weight:700;margin-right:3px}
+  .basis-note{color:var(--muted);font-size:.92em}
   .basis b{font-weight:800}
+  /* 3단계 루프 안내 스트립 */
+  .stage-strip{margin:8px 0 4px}
+  .stage-steps{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .stage-step{font-size:.82rem;font-weight:700;color:var(--muted);padding:2px 10px;border-radius:999px;border:1px solid var(--border)}
+  .stage-step.stage-on{color:#fff;background:var(--accent);border-color:var(--accent)}
+  .stage-sep{color:var(--muted);font-weight:800}
+  .stage-note{color:var(--muted);font-size:.82rem;margin-top:5px}
+  .stage-note b{color:var(--text)}
+  /* 확정 대조 테이블 */
+  .cd-table{width:100%;border-collapse:collapse;margin-top:8px;font-variant-numeric:tabular-nums}
+  .cd-table th{text-align:left;font-size:.78rem;color:var(--muted);font-weight:700;padding:4px 8px;border-bottom:1px solid var(--border)}
+  .cd-table td{padding:5px 8px;font-size:.92rem;border-bottom:1px solid var(--border)}
+  .cd-b{color:var(--muted)} .cd-a{font-weight:800} .cd-arrow{color:var(--muted);text-align:center}
+  .ov-trans{font-size:1rem;margin:2px 0 6px} .ov-trans b{font-weight:800}
   .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:14px}
   .headline{font-size:1.06rem;font-weight:600;line-height:1.7}
   .hero{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:16px}
@@ -177,6 +192,8 @@
   .mat-ul{list-style:none;margin-left:-18px}
   .mat-ul li{display:flex;gap:8px;align-items:flex-start}
   .mtag{color:#fff;font-size:.7rem;font-weight:800;padding:1px 8px;border-radius:6px;white-space:nowrap;margin-top:3px}
+  .mtag-off{background:transparent;color:var(--muted);border:1px solid var(--border);font-weight:700}
+  .mtime{color:var(--muted);font-size:.78rem;font-variant-numeric:tabular-nums;white-space:nowrap;margin-top:3px}
   .check li{list-style:none;margin-left:-6px}
   .check li::before{content:"☐ ";color:var(--accent);font-weight:800}
   .src-ul li{font-size:.88rem}
@@ -243,8 +260,9 @@
     <section class="view" data-view="kospi-close">
     <div class="view-head">
       <div class="view-title">코스피 <span class="view-sub">· 장 마감 · 2026-08-18</span> <span class="badge badge-warn" title="종가 단일가 이전 스냅샷 — 종가·수급 확정치와 다를 수 있음">장중 잠정</span></div>
+      <div class="stage-strip"><div class="stage-steps"><span class="stage-step stage-on">① 결정</span><span class="stage-sep">›</span><span class="stage-step ">② 컨펌</span><span class="stage-sep">›</span><span class="stage-step ">③ 재평가</span></div><div class="stage-note">지금 <b>① 결정</b> · 종가베팅 주문 판단 · 다음 갱신 16:30 확정</div></div>
       <div class="muted">KOSPI 6,869.83 (<span style='color:var(--down)'>-1.55%</span>) · 원달러 1,412.3</div>
-      <div class="basis"><span class="basis-k">기준시각</span> 2026-08-18 15:00 KST · <span class="basis-k">상태</span> <b style="color:var(--neutral)">장 종료 전 스냅샷 · 종가 아님</b> · <span class="basis-k">지수 출처</span> 네이버 지수 일봉(장중 갱신) · <span class="basis-k">원달러</span> 1,412.30 <span style="color:var(--down)">-0.37%</span></div>
+      <div class="basis"><span class="basis-k">기준시각</span> 2026-08-18 15:00 KST · <span class="basis-k">상태</span> <b style="color:var(--neutral)">장 종료 전 스냅샷 · 종가 아님</b> · <span class="basis-k">지수 출처</span> 네이버 지수 일봉(장중 갱신) · <span class="basis-k">원달러</span> 1,412.30 <span style="color:var(--down)">-0.37%</span> <span class="basis-note">(원화 강세)</span></div>
     </div>
 
     <div class="card"><p class="headline">장중 7200선을 찍고 6869.83(-1.55%)까지 밀린 전형적 전강후약 장세로, 15:00 스냅샷 기준 아직 종가 확정은 아니며 동시호가에서 소폭 변동 가능하다. 외국인이 914억 순매수했지만 기관이 7951억을 쏟아내며 지수를 눌렀고, 개인 7420억이 받아낸 구조라 매수 주체의 질이 낮다. 종가 강도 36.3·시장 폭 37.4로 하락 종목이 압도적이었던 광범위 약세다.</p></div>
@@ -257,7 +275,9 @@
     </div>
     <div class="stat"><div class="donut" style="--p:23;--dc:var(--up)"><div class="inner" style="color:var(--up)">23%</div></div><div class="lbl">익일 상승 확률</div></div>
     <div class="stat"><div class="donut" style="--p:77;--dc:var(--down)"><div class="inner" style="color:var(--down)">77%</div></div><div class="lbl">익일 하락 확률</div></div>
-    </div>
+    <div class="hero-note">방향 확률은 점추정(신뢰구간 없음) · 표본 누적 시 캘리브레이션</div></div>
+    
+    
     <div class="conf-row"><span class="conf-chip">데이터 완전성 <b style="color:var(--good)">100%</b> · 결측 없음</span><span class="conf-chip">신호 일치도 <b style="color:var(--good)">100%</b></span><span class="conf-chip">가중치 재배분 <b style="color:var(--muted)">마감동시호가 제외</b></span></div>
     
   <div class="card concl">
@@ -384,7 +404,7 @@
       <div class="gauge-mark" style="left:18%"></div>
     </div>
     <div class="gauge-ends"><span>저가</span><span>고가</span></div>
-    <div class="tiles" style="margin-top:12px"><div class="tile"><div class="tile-lbl">종가 위치</div><div class="tile-val" style="color:var(--down)">18%</div><div class="tile-sub">당일 레인지 내 (0=저가·100=고가)</div></div><div class="tile"><div class="tile-lbl">세션 수익률</div><div class="tile-val" style="color:var(--down)">-3.95%</div><div class="tile-sub">시초 대비</div></div><div class="tile"><div class="tile-lbl">마지막 봉</div><div class="tile-val" style="color:var(--up)">+0.64%</div></div><div class="tile"><div class="tile-lbl">고점 타이밍</div><div class="tile-val" style="color:var(--text)">초반</div><div class="tile-sub">0% 지점</div></div></div>
+    <div class="tiles" style="margin-top:12px"><div class="tile"><div class="tile-lbl">종가 위치</div><div class="tile-val" style="color:var(--down)">18%</div><div class="tile-sub">당일 레인지 내 (0=저가·100=고가)</div></div><div class="tile"><div class="tile-lbl">세션 수익률</div><div class="tile-val" style="color:var(--down)">-3.95%</div><div class="tile-sub">ETF 프록시 시초 대비 (지수 등락률과 다름)</div></div><div class="tile"><div class="tile-lbl">마지막 봉</div><div class="tile-val" style="color:var(--up)">+0.64%</div></div><div class="tile"><div class="tile-lbl">고점 타이밍</div><div class="tile-val" style="color:var(--text)">초반</div><div class="tile-sub">0% 지점</div></div></div>
     <div class="obs muted">전강후약(고점 초반·종가위치 18%) · 종가 강도 프록시: KODEX 200/코스닥150 1시간봉</div>
   </div>
     <div class="card"><h2>투자주체 수급 <span class="badge badge-warn">잠정</span></h2><div class="flow-legend"><span class="k k-up">■</span>순매수(유입) <span class="k k-down">■</span>순매도(유출)</div>
@@ -426,7 +446,7 @@
     </div>
   </div>
     <div class="card"><h2>주의 신호</h2><div class="sub-h">실시간 리스크</div><ul class="risk-ul"><li class="risk-live">중동 긴장(미·이란 협상 만료, 홍해 선박 공격 보도)에 따른 국제유가 추가 급등 — 인플레·할인율 부담 재확대</li><li class="risk-live">미국 30년물·일본 10년물 등 글로벌 장기금리 상승세 지속 시 성장주·고밸류 종목 추가 조정</li><li class="risk-live">원달러 1412.3 수준의 원화 약세 — 달러 강세 재개 시 외국인 순매수(914억) 되돌림 위험</li><li class="risk-live">기관 -7951억의 대규모 매도와 비차익 매도 압력 지속 여부, 개인 7420억 매수의 소화 부담</li></ul><div class="sub-h">시스템 신호</div><ul><li>리포트 시점(장 종료 전)에 마감 동시호가 미발생 — 항목 제외, 가중치 재배분</li><li>장중 스냅샷 기준(데이터 기준시각 2026-08-18 15:00 KST) — 지수·거래량은 마감 확정치가 아니다. 종가베팅 판단을 장 종료 전에 내리기 위한 설계.</li></ul></div>
-    <div class="card"><h2>주요 재료</h2><div class="sub-h">주요 재료</div><ul class="mat-ul"><li><span class="mtag" style="background:var(--up)">호재</span>반도체 투자심리 지지: 앤트로픽 매출 급증, 미국 메모리주 강세, 미 상무부의 애플 중국산 메모리 구매 자제 요구 등으로 삼성전자·SK하이닉스 상대적 견조</li><li><span class="mtag" style="background:var(--up)">호재</span>해운·남북경협 테마 장중 상대강세</li><li><span class="mtag" style="background:var(--down)">악재</span>미·이란 갈등 재부각과 국제유가 급등으로 위험자산 선호 약화</li><li><span class="mtag" style="background:var(--down)">악재</span>미국·일본 장기금리 동반 상승에 따른 성장주 할인율 부담</li><li><span class="mtag" style="background:var(--down)">악재</span>미국 반도체 고율 관세 예고 및 철강·알루미늄 파생제품 관세 확대 — 수출주 심리 압박, 로봇·이차전지 급락</li></ul><div class="sub-h">출처 · 팩트체크</div><ul class="src-ul"><li class="factcheck">팩트체크: 2026-08-18 기준 수집 20건 → 당일 검증 7건(최신 08/18 22:35 KST) → 지수 점수 반영 1건 (시황 중복·개별종목 이슈 6건 제외)</li><li><a href="https://www.smartbizn.com/news/articleView.html?idxno=151481" target="_blank" rel="noreferrer">🔴 [08/18 16:20] 코스피, 6860선으로 후퇴···외국인 매수에도 기관 매도에 하락 &lt; 증권 &lt; 스마트경제 &lt; 기사본문 - 스마트비즈</a></li><li><a href="https://www.newspim.com/news/view/20260818001094" target="_blank" rel="noreferrer">🔴 [08/18 16:08] [마감시황] 코스피, 기관 1.2조 매도에 7200선→6800선 후퇴 - 뉴스핌 · 시황(가격·수급 항목과 중복 → 점수 제외)</a></li><li><a href="https://www.jabon.co.kr/news/articleView.html?idxno=6084" target="_blank" rel="noreferrer">🟢 [08/18 17:00] [마감시황] 7200 찍고 6869.83…외국인 매수 7821억서 468억으로 &lt; 국내 증시·수급 &lt; 자본시장 &lt; 기사본문 - 자본시장뉴스 · 시황(가격·수급 항목과 중복 → 점수 제외)</a></li><li><a href="https://v.daum.net/v/PBPpceTsX3?f=p" target="_blank" rel="noreferrer">🟢 [08/18 08:00] [어제장 오늘장] 7천피 재도전…외국인 수급·반도체 주목 · 시황(가격·수급 항목과 중복 → 점수 제외)</a></li><li><a href="https://www.investopedia.com/stock-market-today-dow-jones-s-and-p-500-08182026-12062140" target="_blank" rel="noreferrer">⚪ [08/18 22:35] Stock Market Today: Indexes Pull Back as Tech Shares Sink; Treasury Yields, Oil Prices Rise Further - Investopedia · 개별종목(지수 점수 제외)</a></li><li><a href="https://www.biospace.com/press-releases/ingenia-therapeutics-goes-public-on-kosdaq-to-accelerate-pipeline-of-next-generation-vascular-antibody-therapeutics" target="_blank" rel="noreferrer">⚪ [08/18 19:35] Ingenia Therapeutics Goes Public on KOSDAQ to Accelerate Pipeline of Next-Generation Vascular Antibody Therapeutics - BioSpace · 개별종목(지수 점수 제외)</a></li><li><a href="https://markets.ft.com/data/announce/detail?dockey=600-202608171508PR_NEWS_USPRX____NY27877-1" target="_blank" rel="noreferrer">⚪ [08/18 04:08] Trafalgar International Launches U.S. Public Company Platform for Financial Services and Strategic Investment - Financial Times · 개별종목(지수 점수 제외)</a></li><li><a href="https://v.daum.net/v/20260818155128511" target="_blank" rel="noreferrer">코스피, 6800선 마감…7000선 안착은 실패</a></li><li><a href="https://contents.premium.naver.com/finlit/wfpm/contents/260818154252723cd" target="_blank" rel="noreferrer">8/18(화), 장마감 브리핑</a></li><li><a href="https://kr.investing.com/news/stock-market-news/article-1598808" target="_blank" rel="noreferrer">[0818마감체크] 국내증시, 美 관세·인플레이션 우려에 하락</a></li><li><a href="https://www.ikbc.co.kr/article/view/kbc202608180049" target="_blank" rel="noreferrer">코스피, 7200피 찍고 6800선 후퇴&amp;hellip;6거래일만 하락 전환</a></li><li><a href="https://biz.newdaily.co.kr/site/data/html/2026/08/18/2026081800267.amp.html" target="_blank" rel="noreferrer">&quot;美국채금리 발작에&quot; … 코스피, -1.55% 하락전환 마감</a></li><li><a href="https://v.daum.net/v/20260818164240825" target="_blank" rel="noreferrer">코스피, 6거래일 만에 하락 마감…6800선</a></li><li><a href="https://www.yna.co.kr/view/AKR20260818123051008" target="_blank" rel="noreferrer">코스피, 6거래일만에 하락…매크로 이슈 부각에 &#x27;전강후약 ...</a></li><li><a href="https://contents.premium.naver.com/knowledgeminister/thinktank/contents/260818182148422df" target="_blank" rel="noreferrer">8월 18일, 국장 마감 분석</a></li></ul></div>
+    <div class="card"><h2>주요 재료</h2><div class="sub-h">실시간 리서치 <span class="mtag mtag-off">참고·비점수·미검증</span></div><ul class="mat-ul"><li><span class="mtag" style="background:var(--up)">호재</span>반도체 투자심리 지지: 앤트로픽 매출 급증, 미국 메모리주 강세, 미 상무부의 애플 중국산 메모리 구매 자제 요구 등으로 삼성전자·SK하이닉스 상대적 견조</li><li><span class="mtag" style="background:var(--up)">호재</span>해운·남북경협 테마 장중 상대강세</li><li><span class="mtag" style="background:var(--down)">악재</span>미·이란 갈등 재부각과 국제유가 급등으로 위험자산 선호 약화</li><li><span class="mtag" style="background:var(--down)">악재</span>미국·일본 장기금리 동반 상승에 따른 성장주 할인율 부담</li><li><span class="mtag" style="background:var(--down)">악재</span>미국 반도체 고율 관세 예고 및 철강·알루미늄 파생제품 관세 확대 — 수출주 심리 압박, 로봇·이차전지 급락</li></ul><div class="sub-h">출처 · 팩트체크</div><ul class="src-ul"><li class="factcheck">팩트체크: 2026-08-18 기준 수집 20건 → 당일 검증 7건(최신 08/18 22:35 KST) → 지수 점수 반영 1건 (시황 중복·개별종목 이슈 6건 제외)</li><li><a href="https://www.smartbizn.com/news/articleView.html?idxno=151481" target="_blank" rel="noreferrer">🔴 [08/18 16:20] 코스피, 6860선으로 후퇴···외국인 매수에도 기관 매도에 하락 &lt; 증권 &lt; 스마트경제 &lt; 기사본문 - 스마트비즈</a></li><li><a href="https://www.newspim.com/news/view/20260818001094" target="_blank" rel="noreferrer">🔴 [08/18 16:08] [마감시황] 코스피, 기관 1.2조 매도에 7200선→6800선 후퇴 - 뉴스핌 · 시황(가격·수급 항목과 중복 → 점수 제외)</a></li><li><a href="https://www.jabon.co.kr/news/articleView.html?idxno=6084" target="_blank" rel="noreferrer">🟢 [08/18 17:00] [마감시황] 7200 찍고 6869.83…외국인 매수 7821억서 468억으로 &lt; 국내 증시·수급 &lt; 자본시장 &lt; 기사본문 - 자본시장뉴스 · 시황(가격·수급 항목과 중복 → 점수 제외)</a></li><li><a href="https://v.daum.net/v/PBPpceTsX3?f=p" target="_blank" rel="noreferrer">🟢 [08/18 08:00] [어제장 오늘장] 7천피 재도전…외국인 수급·반도체 주목 · 시황(가격·수급 항목과 중복 → 점수 제외)</a></li><li><a href="https://www.investopedia.com/stock-market-today-dow-jones-s-and-p-500-08182026-12062140" target="_blank" rel="noreferrer">⚪ [08/18 22:35] Stock Market Today: Indexes Pull Back as Tech Shares Sink; Treasury Yields, Oil Prices Rise Further - Investopedia · 개별종목(지수 점수 제외)</a></li><li><a href="https://www.biospace.com/press-releases/ingenia-therapeutics-goes-public-on-kosdaq-to-accelerate-pipeline-of-next-generation-vascular-antibody-therapeutics" target="_blank" rel="noreferrer">⚪ [08/18 19:35] Ingenia Therapeutics Goes Public on KOSDAQ to Accelerate Pipeline of Next-Generation Vascular Antibody Therapeutics - BioSpace · 개별종목(지수 점수 제외)</a></li><li><a href="https://markets.ft.com/data/announce/detail?dockey=600-202608171508PR_NEWS_USPRX____NY27877-1" target="_blank" rel="noreferrer">⚪ [08/18 04:08] Trafalgar International Launches U.S. Public Company Platform for Financial Services and Strategic Investment - Financial Times · 개별종목(지수 점수 제외)</a></li><li><a href="https://v.daum.net/v/20260818155128511" target="_blank" rel="noreferrer">코스피, 6800선 마감…7000선 안착은 실패</a></li><li><a href="https://contents.premium.naver.com/finlit/wfpm/contents/260818154252723cd" target="_blank" rel="noreferrer">8/18(화), 장마감 브리핑</a></li><li><a href="https://kr.investing.com/news/stock-market-news/article-1598808" target="_blank" rel="noreferrer">[0818마감체크] 국내증시, 美 관세·인플레이션 우려에 하락</a></li><li><a href="https://www.ikbc.co.kr/article/view/kbc202608180049" target="_blank" rel="noreferrer">코스피, 7200피 찍고 6800선 후퇴&amp;hellip;6거래일만 하락 전환</a></li><li><a href="https://biz.newdaily.co.kr/site/data/html/2026/08/18/2026081800267.amp.html" target="_blank" rel="noreferrer">&quot;美국채금리 발작에&quot; … 코스피, -1.55% 하락전환 마감</a></li><li><a href="https://v.daum.net/v/20260818164240825" target="_blank" rel="noreferrer">코스피, 6거래일 만에 하락 마감…6800선</a></li><li><a href="https://www.yna.co.kr/view/AKR20260818123051008" target="_blank" rel="noreferrer">코스피, 6거래일만에 하락…매크로 이슈 부각에 &#x27;전강후약 ...</a></li><li><a href="https://contents.premium.naver.com/knowledgeminister/thinktank/contents/260818182148422df" target="_blank" rel="noreferrer">8월 18일, 국장 마감 분석</a></li></ul></div>
     
     
   <div class="card">
@@ -435,8 +455,9 @@
   </div></section><section class="view" data-view="kosdaq-close">
     <div class="view-head">
       <div class="view-title">코스닥 <span class="view-sub">· 장 마감 · 2026-08-18</span> <span class="badge badge-warn" title="종가 단일가 이전 스냅샷 — 종가·수급 확정치와 다를 수 있음">장중 잠정</span></div>
+      <div class="stage-strip"><div class="stage-steps"><span class="stage-step stage-on">① 결정</span><span class="stage-sep">›</span><span class="stage-step ">② 컨펌</span><span class="stage-sep">›</span><span class="stage-step ">③ 재평가</span></div><div class="stage-note">지금 <b>① 결정</b> · 종가베팅 주문 판단 · 다음 갱신 16:30 확정</div></div>
       <div class="muted">KOSDAQ 834.20 (<span style='color:var(--down)'>-3.52%</span>) · 원달러 1,412.3</div>
-      <div class="basis"><span class="basis-k">기준시각</span> 2026-08-18 15:00 KST · <span class="basis-k">상태</span> <b style="color:var(--neutral)">장 종료 전 스냅샷 · 종가 아님</b> · <span class="basis-k">지수 출처</span> 네이버 지수 일봉(장중 갱신) · <span class="basis-k">원달러</span> 1,412.30 <span style="color:var(--down)">-0.37%</span></div>
+      <div class="basis"><span class="basis-k">기준시각</span> 2026-08-18 15:00 KST · <span class="basis-k">상태</span> <b style="color:var(--neutral)">장 종료 전 스냅샷 · 종가 아님</b> · <span class="basis-k">지수 출처</span> 네이버 지수 일봉(장중 갱신) · <span class="basis-k">원달러</span> 1,412.30 <span style="color:var(--down)">-0.37%</span> <span class="basis-note">(원화 강세)</span></div>
     </div>
 
     <div class="card"><p class="headline">코스닥은 15:00 장중 스냅샷 기준 834.2로 -3.52% 급락한 위험 국면이다. 외국인 366억·개인 3905억 순매수에도 기관 -4176억 매도가 지수를 눌렀고, 종가 강도 9.6점·시장 폭 41.6점으로 내부 체력이 무너진 하루였다. 총점 37.4점(위험)·익일 하락확률 0.8로, 반등 재료보다 금리·유가·지정학 부담이 우위인 장세다.</p></div>
@@ -449,7 +470,9 @@
     </div>
     <div class="stat"><div class="donut" style="--p:20;--dc:var(--up)"><div class="inner" style="color:var(--up)">20%</div></div><div class="lbl">익일 상승 확률</div></div>
     <div class="stat"><div class="donut" style="--p:80;--dc:var(--down)"><div class="inner" style="color:var(--down)">80%</div></div><div class="lbl">익일 하락 확률</div></div>
-    </div>
+    <div class="hero-note">방향 확률은 점추정(신뢰구간 없음) · 표본 누적 시 캘리브레이션</div></div>
+    
+    
     <div class="conf-row"><span class="conf-chip">데이터 완전성 <b style="color:var(--good)">100%</b> · 결측 없음</span><span class="conf-chip">신호 일치도 <b style="color:var(--neutral)">59%</b></span><span class="conf-chip">가중치 재배분 <b style="color:var(--muted)">마감동시호가 제외</b></span></div>
     
   <div class="card concl">
@@ -576,7 +599,7 @@
       <div class="gauge-mark" style="left:6%"></div>
     </div>
     <div class="gauge-ends"><span>저가</span><span>고가</span></div>
-    <div class="tiles" style="margin-top:12px"><div class="tile"><div class="tile-lbl">종가 위치</div><div class="tile-val" style="color:var(--down)">6%</div><div class="tile-sub">당일 레인지 내 (0=저가·100=고가)</div></div><div class="tile"><div class="tile-lbl">세션 수익률</div><div class="tile-val" style="color:var(--down)">-4.48%</div><div class="tile-sub">시초 대비</div></div><div class="tile"><div class="tile-lbl">마지막 봉</div><div class="tile-val" style="color:var(--down)">-0.60%</div></div><div class="tile"><div class="tile-lbl">고점 타이밍</div><div class="tile-val" style="color:var(--text)">초반</div><div class="tile-sub">17% 지점</div></div></div>
+    <div class="tiles" style="margin-top:12px"><div class="tile"><div class="tile-lbl">종가 위치</div><div class="tile-val" style="color:var(--down)">6%</div><div class="tile-sub">당일 레인지 내 (0=저가·100=고가)</div></div><div class="tile"><div class="tile-lbl">세션 수익률</div><div class="tile-val" style="color:var(--down)">-4.48%</div><div class="tile-sub">ETF 프록시 시초 대비 (지수 등락률과 다름)</div></div><div class="tile"><div class="tile-lbl">마지막 봉</div><div class="tile-val" style="color:var(--down)">-0.60%</div></div><div class="tile"><div class="tile-lbl">고점 타이밍</div><div class="tile-val" style="color:var(--text)">초반</div><div class="tile-sub">17% 지점</div></div></div>
     <div class="obs muted">전강후약(고점 초반·종가위치 6%) · 종가 강도 프록시: KODEX 200/코스닥150 1시간봉</div>
   </div>
     <div class="card"><h2>투자주체 수급 <span class="badge badge-warn">잠정</span></h2><div class="flow-legend"><span class="k k-up">■</span>순매수(유입) <span class="k k-down">■</span>순매도(유출)</div>
@@ -618,7 +641,7 @@
     </div>
   </div>
     <div class="card"><h2>주의 신호</h2><div class="sub-h">실시간 리스크</div><ul class="risk-ul"><li class="risk-live">기관 순매도 -4176억이 익일에도 이어질 경우 프로그램 매도 연쇄로 변동성 확대</li><li class="risk-live">미 장기금리 추가 상승 시 코스닥 성장주 할인율 부담 직격</li><li class="risk-live">중동 갈등·홍해 선박 공격 등 지정학 헤드라인과 유가 재상승</li><li class="risk-live">원달러 1412.3 수준에서 추가 절하 시 외국인 순매수(366억)의 이탈 가능성</li><li class="risk-live">15:00 스냅샷 기준이라 마감 동시호가에서 지수·수급 수치가 바뀔 수 있음</li></ul><div class="sub-h">시스템 신호</div><ul><li>리포트 시점(장 종료 전)에 마감 동시호가 미발생 — 항목 제외, 가중치 재배분</li><li>장중 스냅샷 기준(데이터 기준시각 2026-08-18 15:00 KST) — 지수·거래량은 마감 확정치가 아니다. 종가베팅 판단을 장 종료 전에 내리기 위한 설계.</li><li>신호 일치도 59%(상·하방 혼재) — 방향 확신 완화, 익일확률 8% 수축</li></ul></div>
-    <div class="card"><h2>주요 재료</h2><div class="sub-h">주요 재료</div><ul class="mat-ul"><li><span class="mtag" style="background:var(--down)">악재</span>미 국채금리 급등과 매파적 긴축 신호로 고밸류 성장주 전반 할인율 부담 확대</li><li><span class="mtag" style="background:var(--down)">악재</span>중동 불안·홍해 선박 공격 보도에 따른 WTI·브렌트유 상승, 위험회피 심리 강화</li><li><span class="mtag" style="background:var(--down)">악재</span>기관 차익실현 매도 확대(언론 집계로도 대규모 순매도 보도)로 지수 하방 압력</li><li><span class="mtag" style="background:var(--up)">호재</span>반도체 업종은 앤트로픽 매출 급증·미 메모리주 강세 등으로 상대적 지지</li><li><span class="mtag" style="background:var(--up)">호재</span>해운주·남북경협주 상대 강세, 코스닥 신규 상장(Ingenia Therapeutics) 등 개별 모멘텀 존재</li></ul><div class="sub-h">출처 · 팩트체크</div><ul class="src-ul"><li class="factcheck">팩트체크: 2026-08-18 기준 수집 20건 → 당일 검증 7건(최신 08/18 22:35 KST) → 지수 점수 반영 1건 (시황 중복·개별종목 이슈 6건 제외)</li><li><a href="https://www.smartbizn.com/news/articleView.html?idxno=151481" target="_blank" rel="noreferrer">🔴 [08/18 16:20] 코스피, 6860선으로 후퇴···외국인 매수에도 기관 매도에 하락 &lt; 증권 &lt; 스마트경제 &lt; 기사본문 - 스마트비즈</a></li><li><a href="https://www.newspim.com/news/view/20260818001094" target="_blank" rel="noreferrer">🔴 [08/18 16:08] [마감시황] 코스피, 기관 1.2조 매도에 7200선→6800선 후퇴 - 뉴스핌 · 시황(가격·수급 항목과 중복 → 점수 제외)</a></li><li><a href="https://www.jabon.co.kr/news/articleView.html?idxno=6084" target="_blank" rel="noreferrer">🟢 [08/18 17:00] [마감시황] 7200 찍고 6869.83…외국인 매수 7821억서 468억으로 &lt; 국내 증시·수급 &lt; 자본시장 &lt; 기사본문 - 자본시장뉴스 · 시황(가격·수급 항목과 중복 → 점수 제외)</a></li><li><a href="https://v.daum.net/v/PBPpceTsX3?f=p" target="_blank" rel="noreferrer">🟢 [08/18 08:00] [어제장 오늘장] 7천피 재도전…외국인 수급·반도체 주목 · 시황(가격·수급 항목과 중복 → 점수 제외)</a></li><li><a href="https://www.investopedia.com/stock-market-today-dow-jones-s-and-p-500-08182026-12062140" target="_blank" rel="noreferrer">⚪ [08/18 22:35] Stock Market Today: Indexes Pull Back as Tech Shares Sink; Treasury Yields, Oil Prices Rise Further - Investopedia · 개별종목(지수 점수 제외)</a></li><li><a href="https://www.biospace.com/press-releases/ingenia-therapeutics-goes-public-on-kosdaq-to-accelerate-pipeline-of-next-generation-vascular-antibody-therapeutics" target="_blank" rel="noreferrer">⚪ [08/18 19:35] Ingenia Therapeutics Goes Public on KOSDAQ to Accelerate Pipeline of Next-Generation Vascular Antibody Therapeutics - BioSpace · 개별종목(지수 점수 제외)</a></li><li><a href="https://markets.ft.com/data/announce/detail?dockey=600-202608171508PR_NEWS_USPRX____NY27877-1" target="_blank" rel="noreferrer">⚪ [08/18 04:08] Trafalgar International Launches U.S. Public Company Platform for Financial Services and Strategic Investment - Financial Times · 개별종목(지수 점수 제외)</a></li><li><a href="https://biz.newdaily.co.kr/site/data/html/2026/08/18/2026081800267.amp.html" target="_blank" rel="noreferrer">&quot;美국채금리 발작에&quot; … 코스피, -1.55% 하락전환 마감</a></li><li><a href="https://www.ikbc.co.kr/article/view/kbc202608180049" target="_blank" rel="noreferrer">코스피, 7200피 찍고 6800선 후퇴&amp;hellip;6거래일만 하락 전환</a></li><li><a href="https://contents.premium.naver.com/finlit/wfpm/contents/260818154252723cd" target="_blank" rel="noreferrer">8/18(화), 장마감 브리핑</a></li><li><a href="https://contents.premium.naver.com/knowledgeminister/thinktank/contents/260818182148422df" target="_blank" rel="noreferrer">8월 18일, 국장 마감 분석</a></li><li><a href="https://m.ytn.co.kr/news_view.amp.php?version=1&amp;param=0102_202608181833107316" target="_blank" rel="noreferrer">코스피·코스닥, 엿새 만에 하락 전환...&quot;미 국채금리 영향&quot;</a></li><li><a href="https://v.daum.net/v/20260818164240825" target="_blank" rel="noreferrer">코스피, 6거래일 만에 하락 마감…6800선</a></li><li><a href="https://v.daum.net/v/20260818161729695" target="_blank" rel="noreferrer">&#x27;유가·금리&#x27; 상승 여파…코스피·코스닥 6거래일 만에 동반 ...</a></li><li><a href="https://www.yonhapnewstv.co.kr/news/AKR20260818154225S3I" target="_blank" rel="noreferrer">코스피, 1.55% 하락 마감…코스닥도 3.52%↓</a></li></ul></div>
+    <div class="card"><h2>주요 재료</h2><div class="sub-h">실시간 리서치 <span class="mtag mtag-off">참고·비점수·미검증</span></div><ul class="mat-ul"><li><span class="mtag" style="background:var(--down)">악재</span>미 국채금리 급등과 매파적 긴축 신호로 고밸류 성장주 전반 할인율 부담 확대</li><li><span class="mtag" style="background:var(--down)">악재</span>중동 불안·홍해 선박 공격 보도에 따른 WTI·브렌트유 상승, 위험회피 심리 강화</li><li><span class="mtag" style="background:var(--down)">악재</span>기관 차익실현 매도 확대(언론 집계로도 대규모 순매도 보도)로 지수 하방 압력</li><li><span class="mtag" style="background:var(--up)">호재</span>반도체 업종은 앤트로픽 매출 급증·미 메모리주 강세 등으로 상대적 지지</li><li><span class="mtag" style="background:var(--up)">호재</span>해운주·남북경협주 상대 강세, 코스닥 신규 상장(Ingenia Therapeutics) 등 개별 모멘텀 존재</li></ul><div class="sub-h">출처 · 팩트체크</div><ul class="src-ul"><li class="factcheck">팩트체크: 2026-08-18 기준 수집 20건 → 당일 검증 7건(최신 08/18 22:35 KST) → 지수 점수 반영 1건 (시황 중복·개별종목 이슈 6건 제외)</li><li><a href="https://www.smartbizn.com/news/articleView.html?idxno=151481" target="_blank" rel="noreferrer">🔴 [08/18 16:20] 코스피, 6860선으로 후퇴···외국인 매수에도 기관 매도에 하락 &lt; 증권 &lt; 스마트경제 &lt; 기사본문 - 스마트비즈</a></li><li><a href="https://www.newspim.com/news/view/20260818001094" target="_blank" rel="noreferrer">🔴 [08/18 16:08] [마감시황] 코스피, 기관 1.2조 매도에 7200선→6800선 후퇴 - 뉴스핌 · 시황(가격·수급 항목과 중복 → 점수 제외)</a></li><li><a href="https://www.jabon.co.kr/news/articleView.html?idxno=6084" target="_blank" rel="noreferrer">🟢 [08/18 17:00] [마감시황] 7200 찍고 6869.83…외국인 매수 7821억서 468억으로 &lt; 국내 증시·수급 &lt; 자본시장 &lt; 기사본문 - 자본시장뉴스 · 시황(가격·수급 항목과 중복 → 점수 제외)</a></li><li><a href="https://v.daum.net/v/PBPpceTsX3?f=p" target="_blank" rel="noreferrer">🟢 [08/18 08:00] [어제장 오늘장] 7천피 재도전…외국인 수급·반도체 주목 · 시황(가격·수급 항목과 중복 → 점수 제외)</a></li><li><a href="https://www.investopedia.com/stock-market-today-dow-jones-s-and-p-500-08182026-12062140" target="_blank" rel="noreferrer">⚪ [08/18 22:35] Stock Market Today: Indexes Pull Back as Tech Shares Sink; Treasury Yields, Oil Prices Rise Further - Investopedia · 개별종목(지수 점수 제외)</a></li><li><a href="https://www.biospace.com/press-releases/ingenia-therapeutics-goes-public-on-kosdaq-to-accelerate-pipeline-of-next-generation-vascular-antibody-therapeutics" target="_blank" rel="noreferrer">⚪ [08/18 19:35] Ingenia Therapeutics Goes Public on KOSDAQ to Accelerate Pipeline of Next-Generation Vascular Antibody Therapeutics - BioSpace · 개별종목(지수 점수 제외)</a></li><li><a href="https://markets.ft.com/data/announce/detail?dockey=600-202608171508PR_NEWS_USPRX____NY27877-1" target="_blank" rel="noreferrer">⚪ [08/18 04:08] Trafalgar International Launches U.S. Public Company Platform for Financial Services and Strategic Investment - Financial Times · 개별종목(지수 점수 제외)</a></li><li><a href="https://biz.newdaily.co.kr/site/data/html/2026/08/18/2026081800267.amp.html" target="_blank" rel="noreferrer">&quot;美국채금리 발작에&quot; … 코스피, -1.55% 하락전환 마감</a></li><li><a href="https://www.ikbc.co.kr/article/view/kbc202608180049" target="_blank" rel="noreferrer">코스피, 7200피 찍고 6800선 후퇴&amp;hellip;6거래일만 하락 전환</a></li><li><a href="https://contents.premium.naver.com/finlit/wfpm/contents/260818154252723cd" target="_blank" rel="noreferrer">8/18(화), 장마감 브리핑</a></li><li><a href="https://contents.premium.naver.com/knowledgeminister/thinktank/contents/260818182148422df" target="_blank" rel="noreferrer">8월 18일, 국장 마감 분석</a></li><li><a href="https://m.ytn.co.kr/news_view.amp.php?version=1&amp;param=0102_202608181833107316" target="_blank" rel="noreferrer">코스피·코스닥, 엿새 만에 하락 전환...&quot;미 국채금리 영향&quot;</a></li><li><a href="https://v.daum.net/v/20260818164240825" target="_blank" rel="noreferrer">코스피, 6거래일 만에 하락 마감…6800선</a></li><li><a href="https://v.daum.net/v/20260818161729695" target="_blank" rel="noreferrer">&#x27;유가·금리&#x27; 상승 여파…코스피·코스닥 6거래일 만에 동반 ...</a></li><li><a href="https://www.yonhapnewstv.co.kr/news/AKR20260818154225S3I" target="_blank" rel="noreferrer">코스피, 1.55% 하락 마감…코스닥도 3.52%↓</a></li></ul></div>
     
     
   <div class="card">
@@ -627,11 +650,12 @@
   </div></section><section class="view" data-view="kospi-preopen">
     <div class="view-head">
       <div class="view-title">코스피 <span class="view-sub">· 개장 전 · 2026-08-19</span> <span class="badge badge-info" title="전일 마감 수치를 앵커로 재검토">개장 전 재검토</span></div>
-      <div class="muted">KOSPI 6,869.83 (<span style='color:var(--down)'>-1.55%</span>) · 원달러 1,411.9</div>
-      <div class="basis"><span class="basis-k">기준시각</span> 2026-08-19 02:23 KST · <span class="basis-k">수치 앵커</span> 2026-08-18 마감</div>
+      <div class="stage-strip"><div class="stage-steps"><span class="stage-step ">① 결정</span><span class="stage-sep">›</span><span class="stage-step ">② 컨펌</span><span class="stage-sep">›</span><span class="stage-step stage-on">③ 재평가</span></div><div class="stage-note">지금 <b>③ 재평가</b> · 간밤 반영·방향 결정 · 다음 갱신 장중 15:00 결정</div></div>
+      <div class="muted">KOSPI 6,869.83 (<span style='color:var(--down)'>-1.55%</span>) · 원달러 1,413.0</div>
+      <div class="basis"><span class="basis-k">기준시각</span> 2026-08-19 06:56 KST · <span class="basis-k">수치 앵커</span> 2026-08-18 마감</div>
     </div>
 
-    <div class="card"><p class="headline">간밤 미국 3대 지수가 동반 하락 마감했고, 특히 기술주 중심의 나스닥 약세와 유가 급등발 인플레이션 우려가 부담으로 작용했습니다(간밤 확인). 전일 코스피는 종가 6869.83, -1.55%로 마감하며 총점 42.9점·위험 등급, 익일 하락확률 0.7703으로 하방 압력이 확인된 상태입니다. 원달러는 1411.9로 고환율 부담이 유지되며, 기관 -7951억 순매도를 개인 7420억이 받아내는 취약한 수급 구조입니다.</p></div>
+    <div class="card"><p class="headline">간밤 미국 증시는 하락했고 특히 나스닥과 필라델피아반도체(SOX)가 큰 폭으로 밀리며 기술주·반도체 중심 부담이 두드러졌다(간밤 확인). 미 30년물 국채금리 상승과 유가·중동 지정학 변수가 위험선호를 약화시켰다(간밤 확인). 전일 코스피는 종가 6869.83(-1.55%), 총점 42.9로 위험 등급이며 익일 하락 확률 80%로 하방 우위 구도가 이어진다.</p></div>
 
     <div class="card hero">
     <div class="stat">
@@ -639,15 +663,17 @@
       <div class="lbl">전일 마감 총점 / 100</div>
       <div class="grade" style="color:var(--caution)">위험</div>
     </div>
-    <div class="stat"><div class="donut" style="--p:23;--dc:var(--up)"><div class="inner" style="color:var(--up)">23%</div></div><div class="lbl">오늘 상승 확률</div></div>
-    <div class="stat"><div class="donut" style="--p:77;--dc:var(--down)"><div class="inner" style="color:var(--down)">77%</div></div><div class="lbl">오늘 하락 확률</div></div>
-    </div>
+    <div class="stat"><div class="donut" style="--p:20;--dc:var(--up)"><div class="inner" style="color:var(--up)">20%</div></div><div class="lbl">오늘 상승 확률</div></div>
+    <div class="stat"><div class="donut" style="--p:80;--dc:var(--down)"><div class="inner" style="color:var(--down)">80%</div></div><div class="lbl">오늘 하락 확률</div></div>
+    <div class="hero-note">방향 확률은 점추정(신뢰구간 없음) · 표본 누적 시 캘리브레이션</div></div>
+    
+    <div class="card"><h2>간밤 재평가 <span class="pill pill-ghost">미국장·환율 정량 반영</span></h2><div class="ov-trans">전일 마감 익일확률 <b>23%</b> <span class="cd-arrow">→</span> 간밤 재평가 <b style="color:var(--down)">20%</b><span class="muted"> (-2.97%p)</span></div><div class="note muted">간밤 블렌드 -2.10% → 방향 부정적(지수 -5.2%·환율 +0.3%, 합 -4.9% 유계)</div><table class="cd-table"><thead><tr><th>간밤 지표</th><th>등락</th><th>비중</th></tr></thead><tbody><tr><td>필라델피아반도체</td><td style="color:var(--down);font-weight:800">-4.98%</td><td class="cd-b">가중 30%</td></tr><tr><td>나스닥</td><td style="color:var(--down);font-weight:800">-1.33%</td><td class="cd-b">가중 30%</td></tr><tr><td>S&amp;P500</td><td style="color:var(--down);font-weight:800">-0.69%</td><td class="cd-b">가중 25%</td></tr><tr><td>다우</td><td style="color:var(--down);font-weight:800">-0.22%</td><td class="cd-b">가중 15%</td></tr><tr><td>원달러(원화 강세)</td><td style="color:var(--down);font-weight:800">-0.32%</td><td class="cd-b">—</td></tr></tbody></table><div class="note muted">총점·구조는 전일 마감 앵커, 방향확률만 간밤 반영(유계 보정).</div></div>
     
     
   <div class="card concl">
     <div class="concl-badge" style="background:var(--caution)">신규 진입 차단</div>
     <div class="concl-body">
-      <div class="concl-text">전일 판단 유지 — 총점 42.9(위험)·하락확률 0.7703과 간밤 미국 약세가 일치하므로 신규진입 차단·비중배수 0.0, 현금 비중 확대(또는 인버스 헤지) 기조를 그대로 이어갑니다.</div>
+      <div class="concl-text">전일 판단 유지 — 신규진입 차단·종가베팅 불가 구간으로 현금 비중 확대(또는 KODEX 인버스 114800) 방어 스탠스 지속.</div>
       <div class="concl-gate">신규 진입 <b>차단</b> · 후보 최대 <b>0</b>종목 · 종가베팅 <b>불가</b> · 실행 수단 <b>현금 비중 확대 또는 KODEX 인버스(114800)</b></div>
     </div>
   </div>
@@ -677,34 +703,35 @@
     <div class="scen">
       <div class="scen-card scen-up">
         <div class="scen-h" style="color:var(--up)">▲ 상승 시나리오</div>
-        <div>미국 낙폭 자체가 대형 급락은 아니었던 만큼 갭다운 후 낙폭 축소 시도가 나올 수 있습니다. 전일 외국인이 914억 순매수로 방어했던 흐름이 이어지고 시초가 급락분을 반도체 대형주가 되돌린다면 기술적 반등 구간이 형성될 수 있으나, 등급게이트상 신규진입 차단·비중배수 0.0이므로 반등은 리스크 축소 기회로만 활용합니다.</div></div>
+        <div>간밤 낙폭이 대형 지수보다 반도체·성장주에 집중돼 있어, 원화 강세(원달러 1413.0, -0.32%)와 외국인 수급(전일 +914억)이 완충 역할을 하면 낙폭이 제한되며 소폭 갭다운 후 반발 시도 가능. 다만 신규진입 차단·비중배수 0.0 구간이라 반등은 관망 대상.</div></div>
       <div class="scen-card scen-down">
         <div class="scen-h" style="color:var(--down)">▼ 하락 시나리오</div>
-        <div>미국 기술주 약세가 국내 반도체·성장주로 그대로 전이되며 갭다운 출발 후 기관 매도(전일 -7951억)가 연장되는 경우입니다. 원달러 1411.9 수준의 고환율이 추가로 밀리면 외국인 매수 전환도 되돌려질 수 있어, ATR 기준 short 진입 6869.83 / 손절 7319.62 / 목표 5970.25 (손익비 1:2.0, edge 0.437) 경로가 유효해집니다.</div></div>
+        <div>SOX 급락과 미 금리 상승이 국내 반도체 대형주로 전이되면 하방 갭 확대. ATR상 short 진입 6869.83·손절 7319.62·목표 5970.25(손익비 1:2.0) 구도에서 지수 추가 하락 압력 지속.</div></div>
       <div class="scen-card scen-trig">
         <div class="scen-h" style="color:var(--accent)">◆ 핵심 트리거</div>
-        <div>개장 직후 반도체 대형주의 시초가 갭 폭과 갭 메우기 여부, 그리고 원달러 1411.9 대비 방향(간밤 확인 필요)이 오늘 방향을 가르는 핵심 변수입니다.</div></div>
+        <div>개장 반도체 대형주의 시초 방향과 외국인 순매매 전환 여부, 미 국채금리·유가 추가 반응.</div></div>
     </div>
   </div>
     
     
     
     
-    <div class="card"><h2>주의 신호</h2><div class="sub-h">실시간 리스크</div><ul class="risk-ul"><li class="risk-live">미국 기술주 약세 전이에 따른 국내 반도체·대형 성장주 변동성 확대</li><li class="risk-live">유가 급등발 인플레이션 우려 재부각 시 금리민감·성장주 동반 조정</li><li class="risk-live">원달러 1411.9 수준에서 추가 상승 시 외국인 수급 반전 위험</li><li class="risk-live">기관 -7951억 순매도 연장 및 개인 7420억 매수분의 손절 출회로 인한 낙폭 확대</li></ul><div class="sub-h">시스템 신호</div><ul><li>개장 전 재검토 — 수치 앵커는 2026-08-18 마감 리포트다(오늘 값 아님). 간밤 변화는 시나리오/서술 참조. 장중 갭 확인 후 대응.</li><li>앵커가 된 마감 리포트는 2026-08-18 15:00 KST 스냅샷 기준이었다 — 실제 종가와 다를 수 있으니 오늘 시가 대응 시 재확인.</li></ul></div>
-    <div class="card"><h2>주요 재료</h2><div class="sub-h">주요 재료</div><ul class="mat-ul"><li><span class="mtag" style="background:var(--down)">악재</span>간밤 미국 다우·S&amp;P500·나스닥 3대 지수 동반 하락 마감(간밤 확인)</li><li><span class="mtag" style="background:var(--down)">악재</span>기술주 중심 나스닥 약세로 국내 반도체·성장주 심리 부담(간밤 확인)</li><li><span class="mtag" style="background:var(--down)">악재</span>유가 급등에 따른 인플레이션 우려 재부각(간밤 확인)</li><li><span class="mtag" style="background:var(--up)">호재</span>미국 지수 낙폭이 대형 급락 수준은 아니어서 갭다운 충격은 제한적일 가능성(간밤 확인)</li></ul><div class="sub-h">출처 · 팩트체크</div><ul class="src-ul"><li><a href="https://www.indexergo.com/series/?frq=D&amp;codeId=231" target="_blank" rel="noreferrer">미국증시 통합 분석 차트(2026-08-18 확인)</a></li><li><a href="https://contents.premium.naver.com/stockgosu/jujalnam/contents/260818070312629jz" target="_blank" rel="noreferrer">08월18일 오전시황 - 네이버 프리미엄콘텐츠</a></li><li><a href="https://vittarthi.com/markets/us" target="_blank" rel="noreferrer">US Stock Market Today Aug 18, 2026</a></li><li><a href="https://www.seoul.co.kr/news/economy/2026/08/18/20260818500007" target="_blank" rel="noreferrer">[서울데이터랩] 미국 증시, 주요 지수 일제히 하락 마감 ...</a></li><li><a href="https://finance.naver.com/world/" target="_blank" rel="noreferrer">해외주식 - 네이버 금융 - NAVER</a></li><li><a href="https://contents.premium.naver.com/mizumap/axe/contents/260818111006044ly" target="_blank" rel="noreferrer">(8/18) 미국증시 마감시황 - 유가 급등에 따른 인플레이션 우려로 ...</a></li><li><a href="https://wakewallst.tistory.com/18" target="_blank" rel="noreferrer">8월 18일 미국 증시, 한국 개인투자자들은 왜 국내를 떠나 ...</a></li><li><a href="https://datacenter.hankyung.com/major-indices" target="_blank" rel="noreferrer">해외지수 - 데이터센터 - 한국경제</a></li></ul></div>
+    <div class="card"><h2>주의 신호</h2><div class="sub-h">실시간 리스크</div><ul class="risk-ul"><li class="risk-live">미 국채금리 추가 상승 시 성장주·반도체 밸류 부담 확대(간밤 확인)</li><li class="risk-live">유가 급등·중동 지정학 리스크 재확대에 따른 위험회피 강화(간밤 확인)</li><li class="risk-live">SOX 약세 연장 시 국내 반도체 대형주가 지수 방향을 좌우하는 변동성</li><li class="risk-live">기관 대량 순매도(-7951억) 지속 시 개인 매수(+7420억)만으로 지지 한계</li></ul><div class="sub-h">시스템 신호</div><ul><li>개장 전 재검토 — 총점·구조는 2026-08-18 마감 앵커, **방향확률은 간밤 미국장·환율로 재평가**했다. 장중 갭 확인 후 대응.</li><li>간밤 재평가: 익일확률 23%→20% · 간밤 블렌드 -2.10% → 방향 부정적(지수 -5.2%·환율 +0.3%, 합 -4.9% 유계)</li><li>앵커가 된 마감 리포트는 2026-08-18 15:00 KST 스냅샷 기준이었다 — 실제 종가와 다를 수 있으니 오늘 시가 대응 시 재확인.</li></ul></div>
+    <div class="card"><h2>주요 재료</h2><div class="sub-h">실시간 리서치 <span class="mtag mtag-off">참고·비점수·미검증</span></div><ul class="mat-ul"><li><span class="mtag" style="background:var(--down)">악재</span>간밤 나스닥·필라델피아반도체(SOX) 큰 폭 하락으로 기술주·반도체 압박(간밤 확인)</li><li><span class="mtag" style="background:var(--down)">악재</span>미 30년물 국채금리 상승이 뉴욕증시 약세 핵심 배경으로 보도(간밤 확인)</li><li><span class="mtag" style="background:var(--down)">악재</span>유가 급등·중동 불확실성 확대로 위험자산 선호 약화(간밤 확인)</li><li><span class="mtag" style="background:var(--up)">호재</span>원달러 1413.0(-0.32%) 원화 강세, 외국인 전일 +914억 순매수로 낙폭 완충 여지</li></ul><div class="sub-h">출처 · 팩트체크</div><ul class="src-ul"><li><a href="https://biz.chosun.com/international/international_economy/2026/08/19/UDRCJOLCRZFBLGYG5XRB64KDMI/?outputType=amp" target="_blank" rel="noreferrer">뉴욕증시, 채권 금리 상승에 부담… 3대 지수 하락 출발 - 조선비즈</a></li><li><a href="https://kr.investing.com/markets/united-states" target="_blank" rel="noreferrer">미국 주식 시장 | 미국 금융 시장</a></li><li><a href="https://m.finance.daum.net/global/quotes/US.COMP" target="_blank" rel="noreferrer">미국 나스닥 종합 - 다음 금융</a></li><li><a href="https://ko.tradingeconomics.com/united-states/stock-market" target="_blank" rel="noreferrer">미국 주식 시장 지수 - 가격 - 차트 - 지난 데이터 - 뉴스</a></li><li><a href="https://kr.investing.com/equities/united-states" target="_blank" rel="noreferrer">미국 주식 시장</a></li><li><a href="https://finance.naver.com/world/" target="_blank" rel="noreferrer">해외주식 - 네이버 금융 - NAVER</a></li><li><a href="https://m.finance.daum.net/global" target="_blank" rel="noreferrer">해외증시 - 다음 금융</a></li><li><a href="https://www.tradingkey.com/kr/markets/stocks" target="_blank" rel="noreferrer">미국 주식 시장 동향: 업데이트된 데이터 분석 및 실시간 시세</a></li></ul></div>
     
     
   <div class="card">
     <h2>장중 확인 체크리스트</h2>
-    <ul class="check"><li>시초가 갭다운 폭과 개장 30분 내 갭 메우기 여부 확인</li><li>외국인 수급이 전일 914억 순매수 기조를 유지하는지, 기관 -7951억 매도가 연장되는지 점검</li><li>반도체 대형주 및 지수 대비 상대강도, 시장 폭(상승/하락 종목 비율) 개선 여부 확인</li><li>원달러 1411.9 대비 방향과 장중 변동성 체크</li><li>장 초반 프로그램 매매 방향과 거래대금 회복 여부(전일 거래대금 점수 41.0) 확인</li></ul>
+    <ul class="check"><li>시초 반도체 대형주 방향 및 SOX 연동 강도 확인</li><li>외국인 순매매가 매수 유지되는지 매도 전환되는지 점검</li><li>미 국채금리·유가 장중 추가 흐름 모니터링</li><li>원달러 실시간 방향(급등 시 외국인 수급 부담) 확인</li><li>6869.83 하회 지속 여부와 기관 매도 강도 체크</li></ul>
   </div></section><section class="view" data-view="kosdaq-preopen">
     <div class="view-head">
       <div class="view-title">코스닥 <span class="view-sub">· 개장 전 · 2026-08-19</span> <span class="badge badge-info" title="전일 마감 수치를 앵커로 재검토">개장 전 재검토</span></div>
-      <div class="muted">KOSDAQ 834.20 (<span style='color:var(--down)'>-3.52%</span>) · 원달러 1,411.9</div>
-      <div class="basis"><span class="basis-k">기준시각</span> 2026-08-19 02:23 KST · <span class="basis-k">수치 앵커</span> 2026-08-18 마감</div>
+      <div class="stage-strip"><div class="stage-steps"><span class="stage-step ">① 결정</span><span class="stage-sep">›</span><span class="stage-step ">② 컨펌</span><span class="stage-sep">›</span><span class="stage-step stage-on">③ 재평가</span></div><div class="stage-note">지금 <b>③ 재평가</b> · 간밤 반영·방향 결정 · 다음 갱신 장중 15:00 결정</div></div>
+      <div class="muted">KOSDAQ 834.20 (<span style='color:var(--down)'>-3.52%</span>) · 원달러 1,413.0</div>
+      <div class="basis"><span class="basis-k">기준시각</span> 2026-08-19 06:56 KST · <span class="basis-k">수치 앵커</span> 2026-08-18 마감</div>
     </div>
 
-    <div class="card"><p class="headline">간밤 미국 증시는 다우 소폭 강세, S&amp;P500·나스닥 하락의 혼조로 마감했고 SOX 반도체 업종은 약세를 보였습니다(간밤 확인). 전일 코스닥은 종가 834.2, -3.52%로 급락하며 총점 37.4점·위험 등급, 익일 하락 확률 0.8이 산출된 상태입니다. 미국 기술주 조정이 성장주 비중이 큰 코스닥에 추가 부담으로 얹히는 국면입니다.</p></div>
+    <div class="card"><p class="headline">간밤 미국 증시는 3대 지수 동반 하락(나스닥 -1.33%, S&amp;P500 -0.69%, 다우 -0.22%, 간밤 확인)으로 마감했고, 특히 필라델피아 반도체지수(SOX)가 -4.98%로 급락했다. 반도체·성장주 비중이 높은 코스닥에 부담이 직결되는 흐름이며, 원달러는 원화 강세(-0.32%, 간밤 확인)로 소폭 우호적이나 지수 방향성을 상쇄하기엔 역부족이다. 블렌드 -2.77%로 방향 부정적, 익일 하락확률 80%(전일 마감 확정)와 정합적이다.</p></div>
 
     <div class="card hero">
     <div class="stat">
@@ -714,13 +741,15 @@
     </div>
     <div class="stat"><div class="donut" style="--p:20;--dc:var(--up)"><div class="inner" style="color:var(--up)">20%</div></div><div class="lbl">오늘 상승 확률</div></div>
     <div class="stat"><div class="donut" style="--p:80;--dc:var(--down)"><div class="inner" style="color:var(--down)">80%</div></div><div class="lbl">오늘 하락 확률</div></div>
-    </div>
+    <div class="hero-note">방향 확률은 점추정(신뢰구간 없음) · 표본 누적 시 캘리브레이션</div></div>
+    
+    <div class="card"><h2>간밤 재평가 <span class="pill pill-ghost">미국장·환율 정량 반영</span></h2><div class="ov-trans">전일 마감 익일확률 <b>20%</b> <span class="cd-arrow">→</span> 간밤 재평가 <b style="color:var(--up)">20%</b><span class="muted"> (+0.00%p)</span></div><div class="note muted">간밤 블렌드 -2.77% → 방향 부정적(지수 -6.9%·환율 +0.3%, 합 -6.6% 유계)</div><table class="cd-table"><thead><tr><th>간밤 지표</th><th>등락</th><th>비중</th></tr></thead><tbody><tr><td>필라델피아반도체</td><td style="color:var(--down);font-weight:800">-4.98%</td><td class="cd-b">가중 45%</td></tr><tr><td>나스닥</td><td style="color:var(--down);font-weight:800">-1.33%</td><td class="cd-b">가중 30%</td></tr><tr><td>S&amp;P500</td><td style="color:var(--down);font-weight:800">-0.69%</td><td class="cd-b">가중 15%</td></tr><tr><td>다우</td><td style="color:var(--down);font-weight:800">-0.22%</td><td class="cd-b">가중 10%</td></tr><tr><td>원달러(원화 강세)</td><td style="color:var(--down);font-weight:800">-0.32%</td><td class="cd-b">—</td></tr></tbody></table><div class="note muted">총점·구조는 전일 마감 앵커, 방향확률만 간밤 반영(유계 보정).</div></div>
     
     
   <div class="card concl">
     <div class="concl-badge" style="background:var(--caution)">신규 진입 차단</div>
     <div class="concl-body">
-      <div class="concl-text">전일 판단 유지 — 신규진입 차단·비중배수 0.0·종가베팅 불가 원칙을 그대로 적용하고, 현금 비중 확대 또는 KODEX 코스닥150선물인버스(251340)로 하방 대응합니다.</div>
+      <div class="concl-text">전일 판단(등급 위험·신규진입 차단·현금/인버스) 유지 — 추격 매도보다 현금 비중 확대로 방어, ATR short 타점은 반등 실패 확인 후 대응.</div>
       <div class="concl-gate">신규 진입 <b>차단</b> · 후보 최대 <b>0</b>종목 · 종가베팅 <b>불가</b> · 실행 수단 <b>현금 비중 확대 또는 KODEX 코스닥150선물인버스(251340)</b></div>
     </div>
   </div>
@@ -750,26 +779,26 @@
     <div class="scen">
       <div class="scen-card scen-up">
         <div class="scen-h" style="color:var(--up)">▲ 상승 시나리오</div>
-        <div>미국 다우 강세와 저가 매수세가 유입되며 갭 없이 보합권 출발할 경우, 전일 개인 순매수 3905억 원의 연장선에서 반발 매수 시도가 나올 수 있습니다. 다만 종가 강도 9.6, 시장 폭 41.6의 취약한 내부 구조상 반등은 기술적 되돌림 이상으로 보기 어렵고, 830~850선 회복 여부가 1차 확인 포인트입니다.</div></div>
+        <div>미국 낙폭이 야간 선물·아시아장에서 진정되고 원화 강세가 외국인 순매수를 자극할 경우 갭다운 후 반등을 시도할 수 있으나, 종가강도 9.6·시장폭 41.6의 취약한 내부지표상 반등 지속 가능성은 제한적이다.</div></div>
       <div class="scen-card scen-down">
         <div class="scen-h" style="color:var(--down)">▼ 하락 시나리오</div>
-        <div>SOX 약세가 국내 반도체·AI 성장주로 전이되면 갭다운 출발 후 낙폭 확대 가능성이 큽니다. 전일 기관 -4176억 원의 대량 순매도가 이어질 경우 ATR 기준 목표선 740.8 방향으로의 추세 하락이 열리며, 개인 매수만으로는 지지가 어려운 구간입니다.</div></div>
+        <div>SOX -4.98% 급락(간밤 확인)이 국내 반도체·대형 성장주에 그대로 전이되며 갭다운 출발, 기관 -4176억 매도 지속 시 낙폭 확대. 진입 834.2·손절 880.9·목표 740.8의 short 타점(전일 확정)이 유효한 국면.</div></div>
       <div class="scen-card scen-trig">
         <div class="scen-h" style="color:var(--accent)">◆ 핵심 트리거</div>
-        <div>개장 초 반도체 대형주 흐름과 기관 수급 방향, 그리고 원달러 환율(전일 1411.9) 추가 상승 여부가 핵심 변수입니다.</div></div>
+        <div>개장 직후 반도체 대형주 시초가 흐름과 외국인 수급 방향(간밤 원화 강세가 순매수로 이어지는지), 야간 선물·환율 재확인.</div></div>
     </div>
   </div>
     
     
     
     
-    <div class="card"><h2>주의 신호</h2><div class="sub-h">실시간 리스크</div><ul class="risk-ul"><li class="risk-live">반도체·AI 대형주 동반 약세 확대 시 코스닥 지수 낙폭 가속</li><li class="risk-live">기관 순매도(전일 -4176억) 지속에 따른 수급 공백</li><li class="risk-live">원달러 1411.9 대비 추가 상승 시 외국인 이탈 위험</li><li class="risk-live">지수 하락 국면에서 개별 테마주 쏠림·변동성 급증</li></ul><div class="sub-h">시스템 신호</div><ul><li>개장 전 재검토 — 수치 앵커는 2026-08-18 마감 리포트다(오늘 값 아님). 간밤 변화는 시나리오/서술 참조. 장중 갭 확인 후 대응.</li><li>앵커가 된 마감 리포트는 2026-08-18 15:00 KST 스냅샷 기준이었다 — 실제 종가와 다를 수 있으니 오늘 시가 대응 시 재확인.</li></ul></div>
-    <div class="card"><h2>주요 재료</h2><div class="sub-h">주요 재료</div><ul class="mat-ul"><li><span class="mtag" style="background:var(--down)">악재</span>간밤 나스닥·S&amp;P500 하락, SOX 반도체 업종 약세(간밤 확인)</li><li><span class="mtag" style="background:var(--down)">악재</span>전일 코스닥 -3.52% 급락, 총점 37.4·위험 등급, 익일 하락 확률 0.8</li><li><span class="mtag" style="background:var(--down)">악재</span>전일 기관 -4176억 원 대량 순매도, 종가 강도 9.6으로 마감 취약</li><li><span class="mtag" style="background:var(--up)">호재</span>다우 소폭 상승 등 미국 전통주 방어력 유지(간밤 확인)</li><li><span class="mtag" style="background:var(--up)">호재</span>외국인 366억 원 순매수, 기술·퀀트 항목 63.4로 상대적 양호</li></ul><div class="sub-h">출처 · 팩트체크</div><ul class="src-ul"><li><a href="https://www.chaincatcher.com/ko/article/2198688" target="_blank" rel="noreferrer">다우존스 지수가 소폭 상승했으며, S&amp;P 500과 나스닥은 모두 하락했습니다 - ChainCatcher</a></li><li><a href="https://www.indexergo.com/series/?frq=D&amp;codeId=231" target="_blank" rel="noreferrer">미국증시 통합 분석 차트(2026-08-18 확인)</a></li><li><a href="https://datacenter.hankyung.com/major-indices" target="_blank" rel="noreferrer">해외지수 - 데이터센터 - 한국경제</a></li><li><a href="https://kr.investing.com/markets/united-states" target="_blank" rel="noreferrer">미국 주식 시장 | 미국 금융 시장</a></li><li><a href="https://ko.tradingeconomics.com/united-states/stock-market" target="_blank" rel="noreferrer">미국 주식 시장 지수 - 가격 - 차트 - 지난 데이터 - 뉴스</a></li><li><a href="https://us.kabutan.jp/" target="_blank" rel="noreferrer">米国株式・アメリカ株式情報/ 決算情報トップ - 株探(かぶたん)</a></li><li><a href="https://m.finance.daum.net/global/quotes/US.SP500" target="_blank" rel="noreferrer">미국 S&amp;P 500 - 다음 금융</a></li><li><a href="https://m.finance.daum.net/global/quotes/US.COMP" target="_blank" rel="noreferrer">미국 나스닥 종합 - 다음 금융</a></li></ul></div>
+    <div class="card"><h2>주의 신호</h2><div class="sub-h">실시간 리스크</div><ul class="risk-ul"><li class="risk-live">반도체주 변동성 확대 및 SOX 약세 전이</li><li class="risk-live">기관 대규모 매도(-4176억) 지속 여부</li><li class="risk-live">갭 하락 후 반등 실패로 낙폭 재확대</li><li class="risk-live">유가·금리 재상승 등 미국발 악재 추가 유입</li></ul><div class="sub-h">시스템 신호</div><ul><li>개장 전 재검토 — 총점·구조는 2026-08-18 마감 앵커, **방향확률은 간밤 미국장·환율로 재평가**했다. 장중 갭 확인 후 대응.</li><li>간밤 재평가: 익일확률 20%→20% · 간밤 블렌드 -2.77% → 방향 부정적(지수 -6.9%·환율 +0.3%, 합 -6.6% 유계)</li><li>앵커가 된 마감 리포트는 2026-08-18 15:00 KST 스냅샷 기준이었다 — 실제 종가와 다를 수 있으니 오늘 시가 대응 시 재확인.</li></ul></div>
+    <div class="card"><h2>주요 재료</h2><div class="sub-h">실시간 리서치 <span class="mtag mtag-off">참고·비점수·미검증</span></div><ul class="mat-ul"><li><span class="mtag" style="background:var(--down)">악재</span>필라델피아 반도체지수 -4.98% 급락, 국내 반도체·성장주 직접 부담(간밤 확인)</li><li><span class="mtag" style="background:var(--down)">악재</span>미국 3대 지수 동반 하락(나스닥 -1.33%·S&amp;P500 -0.69%·다우 -0.22%, 간밤 확인)</li><li><span class="mtag" style="background:var(--down)">악재</span>전일 코스닥 종가 834.2(-3.52%), 총점 37.4 위험등급·하락확률 80%</li><li><span class="mtag" style="background:var(--up)">호재</span>원달러 1413.0 원화 강세(-0.32%, 간밤 확인) — 외국인 수급에 제한적 우호</li></ul><div class="sub-h">출처 · 팩트체크</div><ul class="src-ul"><li><a href="https://youniverse.tistory.com/271" target="_blank" rel="noreferrer">2026년 08월 18일 미국증시 마감현황: 유가·금리 부담에도 ...</a></li><li><a href="https://www.indexergo.com/series/?frq=D&amp;codeId=231" target="_blank" rel="noreferrer">미국증시 통합 분석 차트(2026-08-18 확인)</a></li><li><a href="https://www.seoul.co.kr/news/economy/2026/08/18/20260818500007" target="_blank" rel="noreferrer">[서울데이터랩] 미국 증시, 주요 지수 일제히 하락 마감…반도체주는 강세</a></li><li><a href="https://finance.naver.com/world/" target="_blank" rel="noreferrer">해외주식 - 네이버 금융 - NAVER</a></li><li><a href="https://ko.tradingeconomics.com/united-states/stock-market" target="_blank" rel="noreferrer">미국 주식 시장 지수 - 가격 - 차트 - 지난 데이터 - 뉴스</a></li><li><a href="https://contents.premium.naver.com/jusikdante/danteodong/contents/260818083852504ql" target="_blank" rel="noreferrer">2026년 8월 18일 (화) 장 전 브리핑</a></li><li><a href="https://wakewallst.tistory.com/18" target="_blank" rel="noreferrer">8월 18일 미국 증시, 한국 개인투자자들은 왜 국내를 떠나 ...</a></li><li><a href="https://contents.premium.naver.com/mizumap/axe/contents/260818111006044ly" target="_blank" rel="noreferrer">(8/18) 미국증시 마감시황 - 유가 급등에 따른 인플레이션 우려로 ...</a></li></ul></div>
     
     
   <div class="card">
     <h2>장중 확인 체크리스트</h2>
-    <ul class="check"><li>개장 직후 갭 방향과 첫 30분 거래대금이 전일 수준(항목점수 36.4) 대비 회복되는지</li><li>반도체·AI 대형주 등락률과 코스닥150 선물 흐름의 동조 여부</li><li>기관 수급이 순매도 지속인지, 개인 순매수 일변도인지 오전 중 점검</li><li>원달러 환율이 전일 1411.9 대비 상승·하락 어느 쪽인지</li><li>지수가 진입 기준 834.2 아래에서 유지되는지, 손절 기준 880.9 방향 반등 시도 여부</li></ul>
+    <ul class="check"><li>개장 직후 반도체 대형주 시초가 및 갭 규모 확인</li><li>외국인 수급 방향 — 원화 강세가 순매수로 이어지는지 점검</li><li>기관 매도 지속 여부(-4176억 흐름 연장 확인)</li><li>갭다운 후 반등 시도 시 830선 지지·회복 여부</li><li>야간 선물·환율 최종 수치 확인 후 short 타점 유효성 재점검</li></ul>
   </div></section>
     <p class="disc">투자 판단의 참고 자료이며 투자 권유가 아님.</p>
   </main>
