@@ -254,6 +254,30 @@ Keep this section updated as work advances. Status legend: ✅ done · 🔶 part
   대조 + 3관점 교차판정). Workflow 도구는 **명시 opt-in("워크플로 돌려줘"/ultracode) 시에만** 실행. 위 함정
   체크리스트를 코드에 박아 둠 — 점검 재현이 필요하면 여기부터.
 
+- **2026-08-19 (3차) — evaluation.md 반영 + 3단계 루프 UI/파이프라인**
+  외부 평가(guide_docs/source/evaluation.md)의 지적 + 사용자 요청("LS 우선 소싱·LLM 분업 점검·
+  UI가 결정→컨펌→재평가 흐름대로") 반영. 개장 전(t1601 0)에 검증 가능한 범위 전부 처리·테스트(77개).
+  - ✅ **외국인 연속일수 버그** — `foreign_streak` 실제 N일 반환("3일" 하드코딩 제거, 평가 지적).
+  - ✅ **LLM 모델명 .env 변수화** — `perplexity_model`·`gemini_model`·`claude_model`(콤마 폴백 체인)
+    + `llm.resolve_models()`. 기본값 opus-4-8→sonnet-4-6.
+  - ✅ **재료 파이프 일치** — 화면 '주요 재료'=팩트체크(Tavily·점수 반영, 호재/악재 개수가 서브스코어와
+    일치) / LLM 재료는 '참고·비점수·미검증'으로 분리(`news.to_report`·렌더 `build_materials`). 평가 #32.
+  - ✅ **표기 정합 4종** — p_down 정수%·점추정 명시 / ATR 목표 단기현실성 경고+1·ATR 중간목표 /
+    세션수익률 'ETF 프록시' 라벨 / 환율 원화 강세·약세 방향(오독 차단, facts_block 에도 주입).
+  - ✅ **3단계 루프 UI** — 뷰 상단 단계 스트립(①결정 15:00 →②컨펌 16:30 →③재평가 08:00, 현재 강조
+    +다음 갱신). `render.build_stage_strip`.
+  - ✅ **컨펌 diff** — 15:00 잠정 스냅샷(`out/provisional_<date>.json`) 저장 → 16:30 확정 회차가 대조,
+    총점·수급·종가·등급 변화 카드(`render.build_confirm_diff`, `run_close._confirm_diff`).
+  - ✅ **마감 후 확정 재계산 회차** — `auto_final.sh`(cron 16:30). run_close 는 16시 이후 `intraday=False`
+    확정경로로 15:00 잠정본을 덮어씀. 동시호가는 수집기 없어 항상 '제외' 통일.
+  - ✅ **개장 전 정량 재채점(복사 탈피)** — `naver.world_indices()`(다우·나스닥·S&P·**SOX**, 실측) +
+    `src/overnight.py`(유계 보정: SOX·나스닥 가중, 코스닥이 SOX 민감도↑, 환율 반영, ±0.12 상한).
+    run_preopen 이 전일 마감 p_up 을 간밤으로 재평가(총점/구조는 앵커 유지). `render.build_overnight`.
+  - ✅ **LS 수급 이관 하네스** — `ls.investor_raw`(t1601) + `match_investor_suffixes`(네이버 확정 대조
+    실증 역매핑, 추측 금지) + `probe_investor_map.py`(auto_final 에 비파괴 편입). **확정 전까지 네이버 유지.**
+  - 🔶 **LS-first 점검 결과** — 이미 LS 우선(t1102/t8410/t8412/t1511). 네이버로 남은 지수 일봉(t8419
+    0행)·투자자 수급(t1601 매핑 미확정)은 LS 미해결분과 정확히 일치. api_id URL=ETF 그룹(t1901/t1903)이었음.
+
 ### 이어서 할 곳 (open items)
 1. **첫 라이브 15:00 회차 확인** — 코드는 장중 경로를 모두 갖췄지만 *실제 장중* 응답으로는 아직 미검증.
    확인할 것: ①네이버 일봉이 장중 오늘 봉을 주는가(아니면 실시간 지수 경로로 자동 폴백) ②
@@ -262,8 +286,15 @@ Keep this section updated as work advances. Status legend: ✅ done · 🔶 part
    그때 리포트의 `(기본값·표본 n/8)` 표기가 `(학습치 n=N)` 으로 바뀌는지 확인.
 3. **SoT 분기 기록** — ATR 정규화·신호 일치도·quant 확장·**게이트 우선 사이징**·**뉴스 시황 제외**는
    sibling `scoring-close.md`/`atr-risk-sizing.md` 대비 easystock 확장. SoT에 반영/분기 명시 필요.
-4. **남은 데이터 갭**: 지수 거래대금 20일 이력(현재 거래량 대용), 야간/미국선물 % 정량치, 마감 동시호가
-   확정치(18:00 이후 재계산 회차를 추가하면 call 항목을 실제로 채울 수 있음).
+4. **남은 데이터 갭**: 지수 거래대금 20일 이력(현재 거래량 대용), **야간선물** % 정량치(미국 지수 마감은
+   `naver.world_indices()` 로 개장전 재평가에 반영됨 — 선물은 아직 서술만), 마감 동시호가 확정치.
+7. **t1601 suffix 확정(개장 후)** — 오늘 16:30 `auto_final.sh` 가 `probe_investor_map.py` 를 돌려
+   `.ls_investor_map.json` 을 만든다. `out/auto_final.log` 의 `conf=…`·`map=…` 확인 후, conf≥0.95면
+   수급 소스를 네이버→LS 로 옮길지 결정(현재는 하네스만, 소비는 미연결).
+8. **간밤 보정 계수 검증/캘리브레이션** — `overnight.py` 의 K_MARKET·가중치는 초기 추정. 개장전 재평가
+   p_up 을 당일 실측과 채점(store)해 계수를 사후 보정하면 더 정밀. 지금은 유계·투명 고정값.
+9. **첫 16:30 확정 회차 확인** — 컨펌 diff(`provisional_<date>.json` → confirm_diff)가 실제로 15:00 대비
+   변화를 렌더하는지, `auto_final.log` 에서 확인.
 5. **방법론 주의(문서화됨)** — `edge = p_up − 1/(1+b)` 는 '익일 방향확률'을 '손익비 승률'로 간주한다.
    목표·손절 도달 확률과는 다른 값이므로 켈리는 항상 게이트·상한 안에서만. 리포트에도 명시해 둠.
 6. **사용자 잔여 작업**: Vercel env 2개(`view_password`·`auth_token`) 설정+Redeploy(로그인 활성화).

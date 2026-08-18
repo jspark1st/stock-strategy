@@ -147,6 +147,14 @@ def facts_block(ctx: dict) -> str:
             f"손절 {p.get('stop')} · 목표 {p.get('target')} · 손익비 1:{p.get('rr')} · "
             f"edge {p.get('edge')} · 권장비중 {p.get('kelly_pct')}%"
             + (f" · 실행수단 {atr.get('instrument')}" if atr.get("instrument") else ""))
+    ov = m.get("overnight") or {}
+    if ov.get("drivers"):
+        drv = " · ".join(f"{d['name']} {d['chg_pct']:+.2f}%" for d in ov["drivers"])
+        line = f"[간밤 미국장/환율] {drv}"
+        if ov.get("anchor_p_up") is not None and ov.get("p_up") is not None:
+            line += (f" → 방향확률 재평가 {ov['anchor_p_up']*100:.0f}%→{ov['p_up']*100:.0f}%"
+                     f"({ov.get('note', '')})")
+        lines.append(line)
     if m.get("warnings"):
         lines.append("[주의] " + " / ".join(m["warnings"][:4]))
     heads = m.get("headlines") or []

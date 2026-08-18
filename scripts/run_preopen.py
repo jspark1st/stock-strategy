@@ -30,7 +30,7 @@ try:
 except Exception:
     pass
 
-from src import remote
+from src import overnight, remote
 from src.collectors import llm, naver
 from src.collectors.ls import load_env
 from render_report import render
@@ -69,29 +69,42 @@ def _mk_of(rep: dict) -> str:
 
 
 def build_preopen(close_rep: dict, today: str, env: dict, anchor_date: str,
-                  stale_note: str | None, as_of: str, fx: dict | None) -> dict:
+                  stale_note: str | None, as_of: str, fx: dict | None,
+                  world: dict | None = None) -> dict:
     mk = _mk_of(close_rep)
     market_ko = close_rep.get("label", "코스피")
     ms = dict(close_rep.get("market", {}))
     if fx:
         ms["usdkrw"] = fx.get("price")
+
+    # ── 간밤 정량 재평가: 전일 마감 p_up 을 간밤 미국장·환율로 보정(총점/구조는 앵커 유지) ──
+    anchor_p_up = close_rep.get("p_up")
+    fx_chg = (fx or {}).get("chg_pct")
+    tilt_info = overnight.overnight_tilt(world or {}, fx_chg, mk.upper())
+    p_up = overnight.apply_to_p_up(anchor_p_up, tilt_info["tilt"])
+    p_down = round(1 - p_up, 4) if p_up is not None else None
+    ov = {**tilt_info, "anchor_p_up": anchor_p_up, "p_up": p_up,
+          "world": world or {}, "usdkrw_chg": fx_chg}
+
     ctx = {
         "label": market_ko, "trade_date": today,
         "index_close": ms.get(f"{mk}_close"), "index_chg_pct": ms.get(f"{mk}_chg_pct"),
-        "usdkrw": ms.get("usdkrw"),
+        "usdkrw": ms.get("usdkrw"), "usdkrw_chg": fx_chg,
         "total": close_rep.get("total"), "grade": close_rep.get("grade"),
-        "p_up": close_rep.get("p_up"), "p_down": close_rep.get("p_down"),
+        "p_up": p_up, "p_down": p_down,
         "subscores": close_rep.get("subscores", []), "flows": close_rep.get("flows", {}),
         "atr": close_rep.get("atr"), "gate": close_rep.get("gate"),
-        "warnings": [], "headlines": [],
+        "warnings": [], "headlines": [], "overnight": ov,
         "as_of": f"앵커 {anchor_date} 마감 / 재검토 {as_of}",
         "intraday_snapshot": False,
     }
     narrative = llm.build_preopen(ctx, env).to_dict()
     warnings = [
-        f"개장 전 재검토 — 수치 앵커는 {anchor_date} 마감 리포트다(오늘 값 아님). "
-        "간밤 변화는 시나리오/서술 참조. 장중 갭 확인 후 대응.",
+        f"개장 전 재검토 — 총점·구조는 {anchor_date} 마감 앵커, **방향확률은 간밤 미국장·환율로 "
+        "재평가**했다. 장중 갭 확인 후 대응.",
     ]
+    if tilt_info["tilt"]:
+        warnings.append(f"간밤 재평가: 익일확률 {anchor_p_up:.0%}→{p_up:.0%} · {tilt_info['note']}")
     if stale_note:
         warnings.insert(0, stale_note)
     if close_rep.get("intraday_snapshot"):
@@ -103,9 +116,9 @@ def build_preopen(close_rep: dict, today: str, env: dict, anchor_date: str,
         "report_type": "preopen", "trade_date": today, "anchor_date": anchor_date,
         "as_of": as_of,
         "total": close_rep.get("total"), "grade": close_rep.get("grade"),
-        "p_up": close_rep.get("p_up"), "p_down": close_rep.get("p_down"),
+        "p_up": p_up, "p_down": p_down, "p_up_anchor": anchor_p_up,
         "market": ms, "atr": close_rep.get("atr"), "gate": close_rep.get("gate"),
-        "narrative": narrative,
+        "narrative": narrative, "overnight": ov,
         "sources": narrative.get("sources", []),
         "warnings": warnings,
         "data_completeness": None, "signal_agreement": None,
@@ -153,10 +166,14 @@ def main() -> int:
     fx = naver.usdkrw()
     if fx:
         print(f"원달러: {fx['price']:,.2f} ({fx['chg_pct']:+.2f}%)")
+    world = naver.world_indices()
+    if world:
+        print("간밤 미국장: " + " · ".join(
+            f"{v['name']} {v['chg_pct']:+.2f}%" for v in world.values()))
 
     preopen_reports = []
     for cr in close_reports:
-        prep = build_preopen(cr, today, env, anchor_date, stale_note, as_of, fx)
+        prep = build_preopen(cr, today, env, anchor_date, stale_note, as_of, fx, world)
         preopen_reports.append(prep)
         n = prep["narrative"]
         print(f"[{prep['label']} 개장 전] {' / '.join(n.get('engine_trace', []))}")

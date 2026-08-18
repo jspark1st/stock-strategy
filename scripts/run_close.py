@@ -71,6 +71,52 @@ def _iso(ymd: str) -> str:
     return f"{ymd[:4]}-{ymd[4:6]}-{ymd[6:8]}"
 
 
+# ── 컨펌 diff: 15:00 잠정 → 16:30 확정 변화 추적 ─────────────────────────────
+def _snapshot(rep: dict, mk: str) -> dict:
+    """리포트에서 컨펌 비교용 핵심 수치만 추린다."""
+    m = rep.get("market", {}) or {}
+    fl = rep.get("flows", {}) or {}
+    return {"total": rep.get("total"), "p_up": rep.get("p_up"), "grade": rep.get("grade"),
+            "close": m.get(f"{mk}_close"), "chg_pct": m.get(f"{mk}_chg_pct"),
+            "foreign_net": fl.get("foreign_net"), "inst_net": fl.get("inst_net")}
+
+
+def _prov_path(trade_ymd: str) -> Path:
+    return ROOT / "out" / f"provisional_{trade_ymd}.json"
+
+
+def _load_provisional(trade_ymd: str) -> dict:
+    f = _prov_path(trade_ymd)
+    if not f.exists():
+        return {}
+    try:
+        return json.loads(f.read_text(encoding="utf-8"))
+    except Exception:  # noqa
+        return {}
+
+
+def _confirm_diff(before: dict, after: dict) -> list[dict]:
+    """잠정→확정 변화 항목만(값이 실제로 바뀐 것). 렌더러가 배지로 표시."""
+    labels = [("total", "총점", 1), ("p_up", "익일상승", 1), ("close", "종가", 2),
+              ("chg_pct", "등락률", 2), ("foreign_net", "외국인", 0), ("inst_net", "기관", 0)]
+    out = []
+    for key, ko, dp in labels:
+        b, a = before.get(key), after.get(key)
+        if b is None or a is None:
+            continue
+        if key == "p_up":
+            b, a = b * 100, a * 100  # %p 로
+        if abs(a - b) < (10 ** -dp) / 2:
+            continue
+        out.append({"label": ko, "before": round(b, dp), "after": round(a, dp),
+                    "delta": round(a - b, dp),
+                    "unit": {"익일상승": "%", "등락률": "%", "외국인": "억", "기관": "억"}.get(ko, "")})
+    grade_b, grade_a = before.get("grade"), after.get("grade")
+    if grade_b and grade_a and grade_b != grade_a:
+        out.append({"label": "등급", "before": grade_b, "after": grade_a, "delta": None, "unit": ""})
+    return out
+
+
 def _now() -> str:
     return datetime.now(KST).isoformat(timespec="seconds")
 
@@ -220,7 +266,7 @@ def _llm_ctx(cfg, rep, atr_dict, materials, session: Session) -> dict:
 
 def build_report(cfg: dict, ls, client, conn, env, session_of: dict,
                  materials=None, fx=None, now: datetime | None = None,
-                 dry_run: bool = False) -> dict:
+                 dry_run: bool = False, prov: dict | None = None) -> dict:
     market = cfg["market"]
     now = now or datetime.now(KST)
     session, snap = session_of[market]
@@ -385,6 +431,12 @@ def build_report(cfg: dict, ls, client, conn, env, session_of: dict,
         except Exception:  # noqa
             pass
 
+    # ── 컨펌 diff: 마감 확정(16:30) 회차면 같은 날 15:00 잠정본 대비 변화를 붙인다 ──
+    if not session.intraday and prov and cfg["id"] in prov:
+        diff = _confirm_diff(prov[cfg["id"]], _snapshot(rep, cfg["mk"]))
+        if diff:
+            rep["confirm_diff"] = {"items": diff, "prov_as_of": prov.get("_as_of", "15:00 잠정")}
+
     rep["_summary"] = (result.total, rep.get("grade"), rep.get("p_up"),
                        result.missing_keys, result.excluded_keys)
     return rep
@@ -489,9 +541,12 @@ def main() -> int:
         except Exception as e:  # noqa
             print(f"⚠ Tavily 재료 수집 실패({type(e).__name__}) — 재료 중립 처리")
 
+        # 마감 확정 회차(어느 시장이든 확정)면 15:00 잠정 스냅샷을 불러 컨펌 diff 대조.
+        any_intraday = any(session_of[c["market"]][0].intraday for c in live)
+        prov = {} if any_intraday else _load_provisional(trade_ymd)
         for cfg in live:
             rep = build_report(cfg, ls, client, conn, env, session_of,
-                               materials, fx, now, dry_run)
+                               materials, fx, now, dry_run, prov=prov)
             reports.append(rep)
             t, g, p, miss, excl = rep.pop("_summary")
             tp = f"{t}" if t is not None else "미산출"
@@ -522,6 +577,16 @@ def main() -> int:
               "as_of": now.strftime("%Y-%m-%d %H:%M KST")}
     out_dir = ROOT / "out"
     out_dir.mkdir(exist_ok=True)
+
+    # 15:00 잠정 회차면 스냅샷 저장 → 16:30 확정 회차가 이걸 불러 컨펌 diff 를 만든다.
+    if any_intraday and not dry_run:
+        snap = {"_as_of": bundle["as_of"]}
+        for rep in reports:
+            mk = "kosdaq" if "kosdaq" in (rep.get("id") or "") else "kospi"
+            snap[rep["id"]] = _snapshot(rep, mk)
+        _prov_path(trade_ymd).write_text(
+            json.dumps(snap, ensure_ascii=False, indent=2), encoding="utf-8")
+
     out_path = out_dir / f"report_{trade_date}.html"
     html = render(bundle)
     out_path.write_text(html, encoding="utf-8")

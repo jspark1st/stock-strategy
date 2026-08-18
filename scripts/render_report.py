@@ -620,6 +620,91 @@ def _status_badge(r: dict) -> str:
     return '<span class="badge badge-ok">마감 확정</span>'
 
 
+def _stage_of(r: dict) -> int:
+    """이 뷰가 사용자 루프의 어느 단계인가. 1=결정(장중잠정) 2=컨펌(마감확정) 3=재평가(개장전)."""
+    if r.get("report_type") == "preopen":
+        return 3
+    if r.get("intraday_snapshot"):
+        return 1
+    return 2
+
+
+_STAGES = [(1, "결정", "종가베팅 주문 판단", "16:30 확정"),
+           (2, "컨펌", "확정치로 결과 확인", "내일 08:00 재평가"),
+           (3, "재평가", "간밤 반영·방향 결정", "장중 15:00 결정")]
+
+
+def build_stage_strip(r: dict) -> str:
+    """3단계 루프(결정→컨펌→재평가) 안내 스트립. 현재 단계 강조 + 다음 갱신 안내."""
+    cur = _stage_of(r)
+    steps = ""
+    for i, (n, name, _desc, _nxt) in enumerate(_STAGES):
+        on = "stage-on" if n == cur else ""
+        sep = '<span class="stage-sep">›</span>' if i else ""
+        steps += f'{sep}<span class="stage-step {on}">{["①","②","③"][i]} {name}</span>'
+    _, cname, cdesc, cnext = _STAGES[cur - 1]
+    return (f'<div class="stage-strip"><div class="stage-steps">{steps}</div>'
+            f'<div class="stage-note">지금 <b>{["①","②","③"][cur-1]} {cname}</b> · {esc(cdesc)}'
+            f' · 다음 갱신 {esc(cnext)}</div></div>')
+
+
+def build_confirm_diff(r: dict) -> str:
+    """마감 확정(②컨펌) 뷰에서 15:00 잠정 대비 변화 카드. 사용자의 '컨펌'을 실제 대조로."""
+    cd = r.get("confirm_diff") or {}
+    items = cd.get("items") or []
+    if not items:
+        return ""
+    rows = ""
+    for it in items:
+        lab, b, a = esc(it["label"]), it.get("before"), it.get("after")
+        unit = esc(it.get("unit", ""))
+        delta = it.get("delta")
+        if delta is None:  # 등급 등 비수치
+            rows += (f'<tr><td>{lab}</td><td class="cd-b">{esc(str(b))}</td>'
+                     f'<td class="cd-arrow">→</td><td class="cd-a">{esc(str(a))}</td>'
+                     f'<td></td></tr>')
+        else:
+            col = dir_color(delta)
+            sign = signed(delta)
+            rows += (f'<tr><td>{lab}</td><td class="cd-b">{fmt(b,2)}{unit}</td>'
+                     f'<td class="cd-arrow">→</td><td class="cd-a">{fmt(a,2)}{unit}</td>'
+                     f'<td style="color:{col}">{sign}{unit}</td></tr>')
+    return (f'<div class="card confirm-diff"><h2>확정 대조 '
+            f'<span class="pill pill-ghost">{esc(cd.get("prov_as_of","15:00 잠정"))} → 마감 확정</span></h2>'
+            f'<div class="note muted">주문 시점(장중 잠정) 판단이 확정치로 어떻게 바뀌었는지</div>'
+            f'<table class="cd-table"><thead><tr><th>항목</th><th>잠정</th><th></th>'
+            f'<th>확정</th><th>변화</th></tr></thead><tbody>{rows}</tbody></table></div>')
+
+
+def build_overnight(r: dict) -> str:
+    """개장 전 간밤 재평가 카드 — 미국장/환율 실측 + 방향확률 앵커→재평가 전이."""
+    ov = r.get("overnight") or {}
+    drivers = ov.get("drivers") or []
+    if not drivers:
+        return ""
+    rows = ""
+    for d in drivers:
+        chg = d.get("chg_pct")
+        wt = d.get("weight")
+        wtxt = f'<td class="cd-b">가중 {wt:.0%}</td>' if wt is not None else '<td class="cd-b">—</td>'
+        rows += (f'<tr><td>{esc(d.get("name",""))}</td>'
+                 f'<td style="color:{dir_color(chg)};font-weight:800">{signed(chg)}%</td>{wtxt}</tr>')
+    ap, pp = ov.get("anchor_p_up"), ov.get("p_up")
+    trans = ""
+    if ap is not None and pp is not None:
+        trans = (f'<div class="ov-trans">전일 마감 익일확률 <b>{ap*100:.0f}%</b> '
+                 f'<span class="cd-arrow">→</span> 간밤 재평가 '
+                 f'<b style="color:{dir_color(pp-ap)}">{pp*100:.0f}%</b>'
+                 f'<span class="muted"> ({signed((pp-ap)*100)}%p)</span></div>')
+    note = esc(ov.get("note", ""))
+    return (f'<div class="card"><h2>간밤 재평가 '
+            f'<span class="pill pill-ghost">미국장·환율 정량 반영</span></h2>'
+            f'{trans}<div class="note muted">{note}</div>'
+            f'<table class="cd-table"><thead><tr><th>간밤 지표</th><th>등락</th><th>비중</th>'
+            f'</tr></thead><tbody>{rows}</tbody></table>'
+            f'<div class="note muted">총점·구조는 전일 마감 앵커, 방향확률만 간밤 반영(유계 보정).</div></div>')
+
+
 def render_report_view(r: dict, date: str) -> str:
     group = esc(r.get("group", "장 마감"))
     label = esc(r.get("label", "코스피"))
@@ -631,6 +716,7 @@ def render_report_view(r: dict, date: str) -> str:
     return f"""
     <div class="view-head">
       <div class="view-title">{label} <span class="view-sub">· {group} · {view_date}</span> {_status_badge(r)}</div>
+      {build_stage_strip(r)}
       <div class="muted">{build_market_line(r.get('market', {}))}</div>
       {build_basis(r)}
     </div>
@@ -638,6 +724,8 @@ def render_report_view(r: dict, date: str) -> str:
     {headline_html}
 
     <div class="card hero">{build_hero(r)}</div>
+    {build_confirm_diff(r)}
+    {build_overnight(r)}
     {build_confidence(r)}
     {build_conclusion(r)}
     {build_atr_plan(r)}
@@ -859,6 +947,20 @@ TEMPLATE = r"""<!doctype html>
   .basis-k{color:var(--text);opacity:.75;font-weight:700;margin-right:3px}
   .basis-note{color:var(--muted);font-size:.92em}
   .basis b{font-weight:800}
+  /* 3단계 루프 안내 스트립 */
+  .stage-strip{margin:8px 0 4px}
+  .stage-steps{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .stage-step{font-size:.82rem;font-weight:700;color:var(--muted);padding:2px 10px;border-radius:999px;border:1px solid var(--border)}
+  .stage-step.stage-on{color:#fff;background:var(--accent);border-color:var(--accent)}
+  .stage-sep{color:var(--muted);font-weight:800}
+  .stage-note{color:var(--muted);font-size:.82rem;margin-top:5px}
+  .stage-note b{color:var(--text)}
+  /* 확정 대조 테이블 */
+  .cd-table{width:100%;border-collapse:collapse;margin-top:8px;font-variant-numeric:tabular-nums}
+  .cd-table th{text-align:left;font-size:.78rem;color:var(--muted);font-weight:700;padding:4px 8px;border-bottom:1px solid var(--border)}
+  .cd-table td{padding:5px 8px;font-size:.92rem;border-bottom:1px solid var(--border)}
+  .cd-b{color:var(--muted)} .cd-a{font-weight:800} .cd-arrow{color:var(--muted);text-align:center}
+  .ov-trans{font-size:1rem;margin:2px 0 6px} .ov-trans b{font-weight:800}
   .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:14px}
   .headline{font-size:1.06rem;font-weight:600;line-height:1.7}
   .hero{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:16px}

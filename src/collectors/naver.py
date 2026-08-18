@@ -241,6 +241,38 @@ def index_quote(market: str, client: httpx.Client | None = None) -> dict | None:
             c.close()
 
 
+WORLD_RT = "https://polling.finance.naver.com/api/realtime/worldstock/index/{code}"
+# 개장 전 재평가에 쓰는 간밤 미국 지수. SOX(반도체)는 한국 증시 선행성이 커 별도로 본다.
+WORLD_CODES = [(".DJI", "다우"), (".IXIC", "나스닥"), (".INX", "S&P500"),
+               (".SOX", "필라델피아반도체")]
+
+
+def world_indices(client: httpx.Client | None = None) -> dict:
+    """간밤(전일 미국장) 주요 지수 스냅샷 → {code: {name, close, chg_pct, as_of}}.
+
+    개장 전 재평가(run_preopen)에서 방향을 정량 보정하는 데 쓴다. localTradedAt 로 신선도
+    확인(간밤 값이 맞는지). 실패한 지수는 빠지고, 전체 실패면 빈 dict(호출부가 폴백)."""
+    own = client is None
+    c = client or _client()
+    out: dict = {}
+    try:
+        for code, name in WORLD_CODES:
+            try:
+                r = c.get(WORLD_RT.format(code=code),
+                          headers={"Referer": "https://finance.naver.com/world/"})
+                r.raise_for_status()
+                d = (r.json().get("datas") or [{}])[0]
+                out[code] = {"name": name, "close": _num(d.get("closePrice")),
+                             "chg_pct": _num(d.get("fluctuationsRatio")),
+                             "as_of": str(d.get("localTradedAt") or "")[:16]}
+            except Exception:  # noqa — 개별 지수 실패는 건너뛴다
+                continue
+        return out
+    finally:
+        if own:
+            c.close()
+
+
 def usdkrw(client: httpx.Client | None = None) -> dict | None:
     """원달러 환율 스냅샷(하나은행 고시). {'price','chg_pct','as_of'} 또는 None."""
     own = client is None
