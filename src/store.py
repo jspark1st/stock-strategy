@@ -85,6 +85,26 @@ CREATE TABLE IF NOT EXISTS snapshots (
   render_hash   TEXT,
   created_at    TEXT
 );
+
+-- Paper trading(evaluation2 P1-8, L1): 실주문 없이 가상 체결·비용·슬리피지 기록.
+-- 진입은 게이트 통과 시, 청산은 다음날 청산규칙 실측으로 채운다(백테스트 루프).
+CREATE TABLE IF NOT EXISTS paper_trades (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  market       TEXT NOT NULL,
+  trade_date   TEXT NOT NULL,
+  direction    TEXT,
+  instrument   TEXT,
+  entry_price  REAL,
+  exit_price   REAL,
+  exit_rule    TEXT,
+  gross_pct    REAL,
+  cost_pct     REAL,
+  net_pct      REAL,
+  state        TEXT,          -- OPEN / CLOSED
+  created_at   TEXT,
+  closed_at    TEXT,
+  UNIQUE(market, trade_date)
+);
 """
 
 # 15:00 시점 '누적/종일' 비율 부트스트랩 — KODEX 200 / 코스닥150 10분봉 5거래일
@@ -341,6 +361,53 @@ def save_snapshot(conn: sqlite3.Connection, report_id: str, market: str, market_
          json.dumps(model, ensure_ascii=False), json.dumps(risk, ensure_ascii=False),
          render_hash, created_at))
     conn.commit()
+
+
+def record_paper_entry(conn: sqlite3.Connection, market: str, trade_date: str,
+                       direction: str, instrument: str, entry_price: float,
+                       created_at: str) -> None:
+    """Paper 진입 기록(L1) — 게이트 통과 시. 청산은 record_paper_exit 로 다음날 채움."""
+    conn.execute(
+        "INSERT OR IGNORE INTO paper_trades(market,trade_date,direction,instrument,"
+        "entry_price,state,created_at) VALUES(?,?,?,?,?, 'OPEN', ?)",
+        (market, trade_date, direction, instrument, entry_price, created_at))
+    conn.commit()
+
+
+def record_paper_exit(conn: sqlite3.Connection, market: str, trade_date: str,
+                      exit_price: float, exit_rule: str, cost_pct: float,
+                      closed_at: str) -> dict | None:
+    """Paper 청산 기록(L1) — 다음날 청산규칙 실측가로. gross/net(비용차감) 산출."""
+    row = conn.execute(
+        "SELECT id, direction, entry_price FROM paper_trades "
+        "WHERE market=? AND trade_date=? AND state='OPEN'", (market, trade_date)).fetchone()
+    if not row or not row["entry_price"]:
+        return None
+    ep = row["entry_price"]
+    gross = (exit_price / ep - 1.0) * 100
+    if row["direction"] == "short":
+        gross = -gross
+    net = gross - cost_pct
+    conn.execute(
+        "UPDATE paper_trades SET exit_price=?, exit_rule=?, gross_pct=?, cost_pct=?, "
+        "net_pct=?, state='CLOSED', closed_at=? WHERE id=?",
+        (exit_price, exit_rule, round(gross, 3), cost_pct, round(net, 3), closed_at, row["id"]))
+    conn.commit()
+    return {"gross_pct": round(gross, 3), "net_pct": round(net, 3)}
+
+
+def paper_summary(conn: sqlite3.Connection, market: str) -> dict:
+    """Paper 성적 요약(비용차감 순수익 기준)."""
+    rows = conn.execute(
+        "SELECT net_pct FROM paper_trades WHERE market=? AND state='CLOSED' AND net_pct IS NOT NULL",
+        (market,)).fetchall()
+    nets = [r["net_pct"] for r in rows]
+    if not nets:
+        return {"n": 0, "win_rate": None, "avg_net_pct": None, "cum_net_pct": None}
+    wins = sum(1 for x in nets if x > 0)
+    return {"n": len(nets), "win_rate": round(wins / len(nets), 3),
+            "avg_net_pct": round(sum(nets) / len(nets), 3),
+            "cum_net_pct": round(sum(nets), 3)}
 
 
 def calibration_shift(conn: sqlite3.Connection, market: str,

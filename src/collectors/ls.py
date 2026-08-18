@@ -316,6 +316,23 @@ class LSClient:
             lower_limit=_f(d.get("dnlmtprice")),
         )
 
+    def etf_quote(self, shcode: str) -> dict:
+        """ETF 현재가/NAV/괴리율/스프레드 (t1901). 장전엔 nav·spread 가 0(장중 갱신).
+
+        지수 포인트 ATR 을 ETF 주문가로 바로 쓰면 안 되므로(추적오차·괴리·스프레드),
+        실행 엔진(execution.py)이 이 스냅샷으로 ETF 기준 주문 카드를 만든다."""
+        d = self.call_tr("/stock/etf", "t1901", {"shcode": shcode}).get("t1901OutBlock", {})
+        price = _f(d.get("price"))
+        nav = _f(d.get("nav"))
+        offer = _f(d.get("offerho1"))
+        bid = _f(d.get("bidho1"))
+        disparity = _f(d.get("kasis")) or ((price - nav) / nav * 100 if nav else 0.0)
+        return {"shcode": shcode, "name": d.get("hname", ""), "price": price, "nav": nav,
+                "disparity_pct": round(disparity, 3),
+                "spread": round(offer - bid, 2) if (offer and bid) else None,
+                "offer": offer or None, "bid": bid or None,
+                "volume": _f(d.get("volume")), "value": _f(d.get("value"))}
+
     def investor_raw(self, market: str = "1", gubun: str = "0") -> dict:
         """t1601 투자자별매매종합 **원시** 응답 → {블록명: {suffix: net}}.
 

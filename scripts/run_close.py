@@ -40,7 +40,7 @@ try:
 except Exception:
     pass
 
-from src import atr, config, quant, remote, store, strategy
+from src import atr, config, execution, quant, remote, store, strategy
 from src.collectors import llm, naver, news
 from src.collectors.ls import LSClient, LSError, load_env
 from src.models import (
@@ -61,9 +61,9 @@ FINAL_AFTER_HHMM = 1600
 # etf: 지수 시간봉 프록시(t8412는 종목 전용) — KODEX 200 / KODEX 코스닥150
 MARKETS = [
     {"id": "kospi-close", "label": "코스피", "market": "KOSPI",
-     "upcode": "001", "mk": "kospi", "etf": "069500"},
+     "upcode": "001", "mk": "kospi", "etf": "069500", "etf_inv": "114800"},
     {"id": "kosdaq-close", "label": "코스닥", "market": "KOSDAQ",
-     "upcode": "301", "mk": "kosdaq", "etf": "229200"},
+     "upcode": "301", "mk": "kosdaq", "etf": "229200", "etf_inv": "251340"},
 ]
 
 
@@ -408,6 +408,23 @@ def build_report(cfg: dict, ls, client, conn, env, session_of: dict,
     plan = atr.compute_plan(market, daily_series, rep.get("p_up"), gate=rep.get("gate"))
     atr_dict = plan.to_dict() if plan else None
     rep["atr"] = atr_dict
+
+    # ── 상품(ETF) 실행 엔진(P1-7): 지수 ATR 레벨 → ETF 가격 변환 + 괴리/스프레드 경고 ──
+    rep["order_card"] = None
+    if ls is not None and plan is not None and plan.direction in ("long", "short"):
+        try:
+            etf_code = cfg.get("etf_inv") if plan.direction == "short" else cfg.get("etf")
+            eq = ls.etf_quote(etf_code)
+            es = ls.daily_candles(etf_code, sdate=candles[0].date,
+                                  edate=session.trade_ymd, period="D")
+            bt = execution.beta_tracking([c.close for c in es.candles], closes)
+            idx_levels = {"entry": plan.entry,
+                          "stop": plan.rec_stop or plan.primary.stop,
+                          "target": plan.primary.target}
+            rep["order_card"] = execution.order_card(
+                market, plan.direction, eq, bt, last.close, idx_levels, config.load())
+        except Exception:  # noqa — 실행 카드 실패가 리포트를 막지 않는다
+            rep["order_card"] = None
 
     # ── 서술(3-LLM) ──
     ctx = _llm_ctx(cfg, rep, atr_dict, materials, session)
