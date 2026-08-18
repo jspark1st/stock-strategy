@@ -392,6 +392,26 @@ def score_close(inputs: CloseInputs) -> ScoreResult:
     data_completeness = round(min(core_present / denom, 1.0), 2)
     p_down = 1 - p_up
 
+    # ── 항목별 기여도 (P1-10): 중립(50) 대비 총점·확률 기여. 총점기여 합 = total-50 ──
+    slope = p_up * (1 - p_up) / 10.0   # sigmoid 국소 기울기(Δp_up per Δtotal)
+    contributions = []
+    for k in present:
+        tc = eff[k] * (subs[k].score - 50.0)
+        contributions.append({
+            "key": k, "label": subs[k].label, "score": round(subs[k].score, 1),
+            "weight_eff": round(eff[k], 3), "total_contrib": round(tc, 1),
+            "p_up_contrib_pp": round(-tc * slope * 100, 1),  # 하락기여 부호로: 총점↓ → 상승확률↓
+        })
+    contributions.sort(key=lambda c: abs(c["total_contrib"]), reverse=True)
+
+    # ── 선택 입력 충족 (P0-1): 보조 데이터(프로그램 수급 등). 필수(코어)와 분리 표기 ──
+    optional_detail = {"program_net": bool(inputs.flow and inputs.flow.program_net is not None)}
+    optional_completeness = round(
+        sum(1 for v in optional_detail.values() if v) / max(len(optional_detail), 1), 2)
+
+    # ── 신뢰도 (P0-4): 데이터 완전성 × 신호 일치도. 표본 보정은 파이프라인(store)에서 곱함 ──
+    confidence_base = round(data_completeness * signal_agreement, 2)
+
     grade, gate = grade_and_gate(total)
 
     return ScoreResult(
@@ -412,6 +432,10 @@ def score_close(inputs: CloseInputs) -> ScoreResult:
         market=market,
         data_completeness=data_completeness,
         signal_agreement=signal_agreement,
+        optional_completeness=optional_completeness,
+        optional_detail=optional_detail,
+        contributions=contributions,
+        confidence=confidence_base,
         as_of=inputs.as_of,
         intraday_snapshot=inputs.intraday_snapshot,
     )

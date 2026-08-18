@@ -40,7 +40,7 @@ try:
 except Exception:
     pass
 
-from src import atr, quant, remote, store
+from src import atr, config, quant, remote, store, strategy
 from src.collectors import llm, naver, news
 from src.collectors.ls import LSClient, LSError, load_env
 from src.models import (
@@ -416,6 +416,19 @@ def build_report(cfg: dict, ls, client, conn, env, session_of: dict,
             rep.setdefault("sources", []).append(s)
 
     rep["accuracy"] = acc
+
+    # ── 신뢰도 확정(표본 보정) + 진입 게이트 + 버전 각인 (evaluation2/3) ──
+    cfg = config.load()
+    rep["versions"] = config.versions(cfg)
+    base_conf = rep.get("confidence")
+    n = (acc or {}).get("n") or 0
+    min_sample = cfg["risk"]["min_calibration_sample"]
+    if base_conf is not None:
+        sample_factor = 0.5 + 0.5 * min(1.0, n / min_sample)  # 표본 없으면 신뢰도 절반
+        rep["confidence"] = round(base_conf * sample_factor, 2)
+        rep["confidence_sample_n"] = n
+    rep["entry"] = strategy.entry_decision(rep, cfg)
+
     for g in graded:
         rep.setdefault("warnings", []).append(
             f"{g['trade_date']} 예측 채점(실측일 {g['outcome_date']}): "
@@ -431,11 +444,15 @@ def build_report(cfg: dict, ls, client, conn, env, session_of: dict,
         except Exception:  # noqa
             pass
 
-    # ── 컨펌 diff: 마감 확정(16:30) 회차면 같은 날 15:00 잠정본 대비 변화를 붙인다 ──
+    # ── 컨펌 diff + 행동 판정: 마감 확정(16:30) 회차면 15:00 잠정본 대비 변화·행동 ──
     if not session.intraday and prov and cfg["id"] in prov:
-        diff = _confirm_diff(prov[cfg["id"]], _snapshot(rep, cfg["mk"]))
-        if diff:
-            rep["confirm_diff"] = {"items": diff, "prov_as_of": prov.get("_as_of", "15:00 잠정")}
+        before = prov[cfg["id"]]
+        diff = _confirm_diff(before, _snapshot(rep, cfg["mk"]))
+        prov_pu, conf_pu = before.get("p_up"), rep.get("p_up")
+        direction = strategy.direction_of(prov_pu)
+        action = strategy.confirm_action(prov_pu, conf_pu, direction, config.load())
+        rep["confirm_diff"] = {"items": diff, "prov_as_of": prov.get("_as_of", "15:00 잠정"),
+                               "action": action}
 
     rep["_summary"] = (result.total, rep.get("grade"), rep.get("p_up"),
                        result.missing_keys, result.excluded_keys)

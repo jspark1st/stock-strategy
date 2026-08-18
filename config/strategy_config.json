@@ -1,0 +1,49 @@
+{
+  "strategy_version": "v1.0.0",
+  "risk_policy_version": "risk-2026-08-19",
+  "data_version": "data-2026-08-19",
+
+  "entry": {
+    "signal_at": "15:00",
+    "order_submit_window": "15:20~15:28",
+    "min_required_completeness": 1.0,
+    "min_optional_completeness": 0.4,
+    "max_data_staleness_min": 3,
+    "min_prob": 0.60
+  },
+
+  "confirm": {
+    "hold_max_prob_drop_pp": 10,
+    "reduce_prob_drop_pp": 20,
+    "reversal_is_thesis_break": true
+  },
+
+  "overnight": {
+    "block_on_event_risk": true,
+    "confirm_weak_below": 0.90,
+    "confirm_break_below": 0.75
+  },
+
+  "exit": {
+    "baseline": "next_open_0905",
+    "time_stop": "10:00"
+  },
+
+  "risk": {
+    "max_position_multiplier": 0.25,
+    "block_on_provisional_data": false,
+    "min_calibration_sample": 250,
+    "min_confidence": 0.5,
+    "daily_max_loss_pct": 1.0,
+    "single_order_max_exposure_pct": 5.0,
+    "max_daily_orders": 2,
+    "consecutive_loss_stop": 3
+  },
+
+  "costs_bp": {
+    "etf_fee": 1.5,
+    "tax": 0,
+    "spread": 5,
+    "slippage": 5
+  }
+}

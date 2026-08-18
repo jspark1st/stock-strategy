@@ -75,3 +75,13 @@ def apply_to_p_up(anchor_p_up: float | None, tilt: float) -> float | None:
     if anchor_p_up is None:
         return None
     return round(_clip(anchor_p_up + tilt, PUP_LO, PUP_HI), 4)
+
+
+def confirmation_multiplier(tilt: float, direction: str) -> float:
+    """야간 컨펌 **배수**(evaluation3) — 포지션 방향 대비 간밤이 전제를 확인/약화하는 정도.
+
+    long 포지션: 간밤 우호(tilt>0)면 >1, 악화(tilt<0)면 <1. short 는 반대.
+    `p_final = p_close × multiplier` 식으로 쓰되, 검증 전엔 '확률'이 아니라 '야간 컨펌 점수'로만
+    노출한다(과신 방지). 배수는 [0.70, 1.15] 로 유계."""
+    signed = tilt if direction != "short" else -tilt
+    return round(_clip(1.0 + signed * 2.0, 0.70, 1.15), 3)  # tilt ±0.12 → 배수 ±0.24 유계

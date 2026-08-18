@@ -309,8 +309,12 @@ class ScoreResult:
     flows: dict
     market: dict
     direction_hint: float | None = None  # 데이터 부족 시 present 항목 가중평균
-    data_completeness: float | None = None  # 코어 데이터 present 비중(0~1) — 신뢰도
+    data_completeness: float | None = None  # 필수(코어) 데이터 present 비중(0~1) — 신뢰도
     signal_agreement: float | None = None    # 항목 신호 일치도(0~1) — 낮을수록 방향 확신 완화
+    optional_completeness: float | None = None  # 선택(보조) 데이터 충족률(0~1)
+    optional_detail: dict = field(default_factory=dict)  # {선택필드: present bool}
+    contributions: list = field(default_factory=list)    # 항목별 총점·확률 기여(설명력)
+    confidence: float | None = None          # 신뢰도(완전성×일치도, 표본 보정은 파이프라인)
     as_of: str | None = None                 # 데이터 기준시각(장중 스냅샷 투명화)
     intraday_snapshot: bool = False          # 장중(마감 전) 스냅샷 기반 여부
 
@@ -346,6 +350,10 @@ class ScoreResult:
             "sources": sources or [],
             "data_completeness": self.data_completeness,
             "signal_agreement": self.signal_agreement,
+            "optional_completeness": self.optional_completeness,
+            "optional_detail": self.optional_detail,
+            "contributions": self.contributions,
+            "confidence": self.confidence,
             "missing_keys": self.missing_keys,
             "excluded_keys": self.excluded_keys,
             "as_of": self.as_of,

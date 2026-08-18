@@ -174,10 +174,16 @@ def _conf_color(v, hi=0.95, mid=0.8) -> str:
 
 
 def build_confidence(r: dict) -> str:
-    """신뢰도 칩 — 데이터 완전성 + 신호 일치도(결측·엇갈린 신호 투명화)."""
+    """데이터 상태 4지표(필수/선택 충족·확정성·신뢰도) + 신호 일치도.
+
+    evaluation2 P0-1: 단일 '완전성 100%'가 프로그램 미수집 등과 모순돼 보이던 문제 →
+    필수(코어)와 선택(보조)을 분리하고, 확정성·신뢰도를 별도 칩으로.
+    """
     dc = r.get("data_completeness")
     sa = r.get("signal_agreement")
-    if dc is None and sa is None:
+    oc = r.get("optional_completeness")
+    conf = r.get("confidence")
+    if dc is None and sa is None and conf is None:
         return ""
     ko = {"close": "종가강도", "breadth": "시장폭", "flow": "수급", "amt": "거래대금",
           "call": "마감동시호가", "news": "재료", "quant": "기술·퀀트"}
@@ -185,8 +191,23 @@ def build_confidence(r: dict) -> str:
     if dc is not None:
         miss = [ko.get(k, k) for k in (r.get("missing_keys") or [])]
         note = f" · 결측 {', '.join(miss)}" if miss else " · 결측 없음"
-        chips.append(f'<span class="conf-chip">데이터 완전성 '
+        chips.append(f'<span class="conf-chip">필수 입력 '
                      f'<b style="color:{_conf_color(dc)}">{dc*100:.0f}%</b>{note}</span>')
+    if oc is not None:
+        od = r.get("optional_detail") or {}
+        onote = "프로그램수급 " + ("수집" if od.get("program_net") else "미수집")
+        onote += " · 야간선물 미연동 · 미국선물 미연동"
+        chips.append(f'<span class="conf-chip">선택 입력 '
+                     f'<b style="color:var(--muted)">{oc*100:.0f}%</b> · {onote}</span>')
+    # 확정성
+    defin = "장중 잠정" if r.get("intraday_snapshot") else "마감 확정"
+    dcol = "var(--neutral)" if r.get("intraday_snapshot") else "var(--good)"
+    chips.append(f'<span class="conf-chip">데이터 확정성 <b style="color:{dcol}">{defin}</b></span>')
+    if conf is not None:
+        nn = r.get("confidence_sample_n")
+        nnote = f" · 표본 {nn}" if nn is not None else ""
+        chips.append(f'<span class="conf-chip">신뢰도 '
+                     f'<b style="color:{_conf_color(conf, 0.7, 0.4)}">{conf:.2f}</b>{nnote}</span>')
     if sa is not None:
         chips.append(f'<span class="conf-chip">신호 일치도 '
                      f'<b style="color:{_conf_color(sa, 0.8, 0.5)}">{sa*100:.0f}%</b></span>')
@@ -195,6 +216,61 @@ def build_confidence(r: dict) -> str:
         chips.append(f'<span class="conf-chip">가중치 재배분 '
                      f'<b style="color:var(--muted)">{", ".join(excl)} 제외</b></span>')
     return f'<div class="conf-row">{"".join(chips)}</div>'
+
+
+def build_contributions(r: dict) -> str:
+    """항목별 기여도(P1-10) — 왜 이 총점/확률인지. 중립(50) 대비 총점·하락확률 기여."""
+    contribs = r.get("contributions") or []
+    if not contribs:
+        return ""
+    rows = ""
+    for c in contribs:
+        tc, pp = c.get("total_contrib", 0), c.get("p_up_contrib_pp", 0)
+        rows += (f'<tr><td>{esc(c.get("label",""))}</td>'
+                 f'<td style="text-align:right">{fmt(c.get("score"),1)}</td>'
+                 f'<td style="text-align:right">{c.get("weight_eff",0)*100:.1f}%</td>'
+                 f'<td style="text-align:right;color:{dir_color(-tc)}">{signed(tc)}점</td>'
+                 f'<td style="text-align:right;color:{dir_color(-pp)}">{signed(pp)}%p</td></tr>')
+    return (f'<div class="card"><h2>판정 기여도 <span class="pill pill-ghost">중립 50 대비</span></h2>'
+            f'<div class="note muted">각 항목이 총점과 하락확률을 얼마나 밀었는지(하락확률 기여 = 근사)</div>'
+            f'<table class="cd-table"><thead><tr><th>항목</th><th style="text-align:right">점수</th>'
+            f'<th style="text-align:right">가중</th><th style="text-align:right">총점기여</th>'
+            f'<th style="text-align:right">하락확률기여</th></tr></thead><tbody>{rows}</tbody></table></div>')
+
+
+def build_entry_gate(r: dict) -> str:
+    """종가 진입 게이트(evaluation3) — 진입 허용/차단 조건 체크리스트."""
+    e = r.get("entry") or {}
+    checks = e.get("checks") or []
+    if not checks:
+        return ""
+    allow = e.get("allow")
+    rows = "".join(
+        f'<li><span class="chk-{"ok" if c["ok"] else "no"}">{"✓" if c["ok"] else "✕"}</span> '
+        f'{esc(c["name"])} <span class="muted">· {esc(str(c.get("detail","")))}</span></li>'
+        for c in checks)
+    verdict = ('<span class="badge badge-ok">진입 허용</span>' if allow
+               else '<span class="badge badge-warn">진입 차단</span>')
+    return (f'<div class="card"><h2>종가 진입 게이트 {verdict}</h2>'
+            f'<div class="note muted">전부 충족일 때만 진입(총점이 아니라 조건 조합)</div>'
+            f'<ul class="gate-ul">{rows}</ul></div>')
+
+
+def build_preopen_state(r: dict) -> str:
+    """개장 전 08:50 최종 상태(evaluation3) — HOLD_FULL/REDUCE/EXIT_OPEN/NO_TRADE."""
+    st = r.get("preopen_state") or {}
+    if not st.get("state"):
+        return ""
+    scol = {"HOLD_FULL": "var(--good)", "REDUCE": "var(--neutral)",
+            "EXIT_OPEN": "var(--down)", "NO_TRADE": "var(--muted)"}.get(st["state"], "var(--muted)")
+    ov = r.get("overnight") or {}
+    cm = ov.get("confirm_mult")
+    cmtxt = f' · 야간 컨펌 배수 {cm:.2f}' if cm is not None else ''
+    return (f'<div class="card"><h2>개장 전 최종 결정 '
+            f'<span class="pill" style="background:{scol}">{esc(st["state"])}</span></h2>'
+            f'<div class="ov-trans"><b>{esc(st.get("action",""))}</b>'
+            f'<span class="muted"> — {esc(st.get("reason",""))}{cmtxt}</span></div>'
+            f'<div class="note muted">전날 종가 진입분에 대한 개장 행동. 위험등급 신규진입은 계속 차단.</div></div>')
 
 
 def build_conclusion(r: dict) -> str:
@@ -669,11 +745,19 @@ def build_confirm_diff(r: dict) -> str:
             rows += (f'<tr><td>{lab}</td><td class="cd-b">{fmt(b,2)}{unit}</td>'
                      f'<td class="cd-arrow">→</td><td class="cd-a">{fmt(a,2)}{unit}</td>'
                      f'<td style="color:{col}">{sign}{unit}</td></tr>')
+    act = cd.get("action") or {}
+    act_html = ""
+    if act.get("action"):
+        acol = {"HOLD": "var(--good)", "REDUCE": "var(--neutral)",
+                "EXIT_QUEUE": "var(--down)"}.get(act["action"], "var(--muted)")
+        act_html = (f'<div class="ov-trans" style="margin-top:8px">확정 컨펌 행동: '
+                    f'<span class="pill" style="background:{acol}">{esc(act["action"])}</span> '
+                    f'<span class="muted">{esc(act.get("reason",""))}</span></div>')
     return (f'<div class="card confirm-diff"><h2>확정 대조 '
             f'<span class="pill pill-ghost">{esc(cd.get("prov_as_of","15:00 잠정"))} → 마감 확정</span></h2>'
             f'<div class="note muted">주문 시점(장중 잠정) 판단이 확정치로 어떻게 바뀌었는지</div>'
             f'<table class="cd-table"><thead><tr><th>항목</th><th>잠정</th><th></th>'
-            f'<th>확정</th><th>변화</th></tr></thead><tbody>{rows}</tbody></table></div>')
+            f'<th>확정</th><th>변화</th></tr></thead><tbody>{rows}</tbody></table>{act_html}</div>')
 
 
 def build_overnight(r: dict) -> str:
@@ -726,11 +810,14 @@ def render_report_view(r: dict, date: str) -> str:
     <div class="card hero">{build_hero(r)}</div>
     {build_confirm_diff(r)}
     {build_overnight(r)}
+    {build_preopen_state(r)}
     {build_confidence(r)}
     {build_conclusion(r)}
+    {build_entry_gate(r)}
     {build_atr_plan(r)}
     {build_scenarios(r)}
     {build_bars(r)}
+    {build_contributions(r)}
     {build_intraday(r)}
     {build_flows(r)}
     {build_index_chart(r)}
@@ -961,6 +1048,8 @@ TEMPLATE = r"""<!doctype html>
   .cd-table td{padding:5px 8px;font-size:.92rem;border-bottom:1px solid var(--border)}
   .cd-b{color:var(--muted)} .cd-a{font-weight:800} .cd-arrow{color:var(--muted);text-align:center}
   .ov-trans{font-size:1rem;margin:2px 0 6px} .ov-trans b{font-weight:800}
+  .gate-ul{list-style:none;margin-left:-24px} .gate-ul li{padding:3px 0;font-size:.92rem}
+  .chk-ok{color:var(--good);font-weight:800;margin-right:4px} .chk-no{color:var(--down);font-weight:800;margin-right:4px}
   .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:14px}
   .headline{font-size:1.06rem;font-weight:600;line-height:1.7}
   .hero{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:16px}

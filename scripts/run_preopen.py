@@ -30,7 +30,7 @@ try:
 except Exception:
     pass
 
-from src import overnight, remote
+from src import config, overnight, remote, strategy
 from src.collectors import llm, naver
 from src.collectors.ls import load_env
 from render_report import render
@@ -83,8 +83,19 @@ def build_preopen(close_rep: dict, today: str, env: dict, anchor_date: str,
     tilt_info = overnight.overnight_tilt(world or {}, fx_chg, mk.upper())
     p_up = overnight.apply_to_p_up(anchor_p_up, tilt_info["tilt"])
     p_down = round(1 - p_up, 4) if p_up is not None else None
+
+    # ── 08:50 최종 상태(evaluation3): 야간 컨펌 배수 → HOLD_FULL/REDUCE/EXIT_OPEN/NO_TRADE ──
+    cfg = config.load()
+    direction = strategy.direction_of(anchor_p_up)
+    confirm_mult = (overnight.confirmation_multiplier(tilt_info["tilt"], direction)
+                    if tilt_info.get("drivers") else None)
+    gate = close_rep.get("gate") or {}
+    entered = close_rep.get("entry", {}).get("allow", not gate.get("new_entry_blocked", False))
+    event_lock = close_rep.get("event_lock", False)
+    state = strategy.preopen_state(entered, direction, confirm_mult, cfg, event_lock)
     ov = {**tilt_info, "anchor_p_up": anchor_p_up, "p_up": p_up,
-          "world": world or {}, "usdkrw_chg": fx_chg}
+          "world": world or {}, "usdkrw_chg": fx_chg,
+          "confirm_mult": confirm_mult, "direction": direction}
 
     ctx = {
         "label": market_ko, "trade_date": today,
@@ -118,7 +129,7 @@ def build_preopen(close_rep: dict, today: str, env: dict, anchor_date: str,
         "total": close_rep.get("total"), "grade": close_rep.get("grade"),
         "p_up": p_up, "p_down": p_down, "p_up_anchor": anchor_p_up,
         "market": ms, "atr": close_rep.get("atr"), "gate": close_rep.get("gate"),
-        "narrative": narrative, "overnight": ov,
+        "narrative": narrative, "overnight": ov, "preopen_state": state,
         "sources": narrative.get("sources", []),
         "warnings": warnings,
         "data_completeness": None, "signal_agreement": None,
