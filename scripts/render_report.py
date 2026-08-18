@@ -256,6 +256,45 @@ def build_entry_gate(r: dict) -> str:
             f'<ul class="gate-ul">{rows}</ul></div>')
 
 
+def build_performance(r: dict) -> str:
+    """확률 검증 성과(P0-5) — 다중 window·calibration·AUC·연속오판. 표본 적으면 '축적 중'."""
+    p = r.get("performance") or {}
+    if not p or not p.get("windows"):
+        return ""
+    min_sample = 250
+    wins = p["windows"]
+    wr = ""
+    for w in ("20", "60", "120", "250"):
+        d = wins.get(w) or {}
+        n = d.get("n", 0)
+        hr = f"{d['hit_rate']*100:.0f}%" if d.get("hit_rate") is not None else "—"
+        br = f"{d['brier']:.3f}" if d.get("brier") is not None else "—"
+        wr += (f'<tr><td>{w}일</td><td style="text-align:right">{n}</td>'
+               f'<td style="text-align:right">{hr}</td><td style="text-align:right">{br}</td></tr>')
+    bins = p.get("calibration_bins") or []
+    bin_html = ""
+    for b in bins:
+        bin_html += (f'<tr><td>{esc(b["range"])}</td><td style="text-align:right">{b["n"]}</td>'
+                     f'<td style="text-align:right">{b["pred"]*100:.0f}%</td>'
+                     f'<td style="text-align:right">{b["actual_up"]*100:.0f}%</td></tr>')
+    cal = (f'<div class="sub-h">캘리브레이션(예측 vs 실제 상승률)</div>'
+           f'<table class="cd-table"><thead><tr><th>구간</th><th style="text-align:right">n</th>'
+           f'<th style="text-align:right">예측</th><th style="text-align:right">실제</th></tr></thead>'
+           f'<tbody>{bin_html}</tbody></table>') if bins else ""
+    ntot = p.get("n_total", 0)
+    status = (f'<span class="badge badge-warn">검증 표본 축적 중 {ntot}/{min_sample}</span>'
+              if ntot < min_sample else f'<span class="badge badge-ok">표본 {ntot}</span>')
+    auc = p.get("roc_auc")
+    extra = (f'ROC-AUC {auc} · ' if auc is not None else '') + \
+            f'최대 연속 오판 {p.get("max_consecutive_wrong", 0)}회'
+    return (f'<div class="card"><h2>모델 검증 성과 {status}</h2>'
+            f'<div class="note muted">확률이 역사적으로 무엇을 의미하는지 — 표본 부족 시 수치는 참고만</div>'
+            f'<table class="cd-table"><thead><tr><th>기간</th><th style="text-align:right">표본</th>'
+            f'<th style="text-align:right">적중률</th><th style="text-align:right">Brier</th>'
+            f'</tr></thead><tbody>{wr}</tbody></table>{cal}'
+            f'<div class="note muted" style="margin-top:6px">{esc(extra)}</div></div>')
+
+
 def build_preopen_state(r: dict) -> str:
     """개장 전 08:50 최종 상태(evaluation3) — HOLD_FULL/REDUCE/EXIT_OPEN/NO_TRADE."""
     st = r.get("preopen_state") or {}
@@ -818,6 +857,7 @@ def render_report_view(r: dict, date: str) -> str:
     {build_scenarios(r)}
     {build_bars(r)}
     {build_contributions(r)}
+    {build_performance(r)}
     {build_intraday(r)}
     {build_flows(r)}
     {build_index_chart(r)}

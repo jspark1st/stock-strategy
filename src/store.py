@@ -66,6 +66,25 @@ CREATE TABLE IF NOT EXISTS intraday_volume (
   final_vol    REAL,
   PRIMARY KEY (market, trade_date)
 );
+
+-- 불변 리포트 스냅샷(evaluation2 P0-3): 산출 당시 입력·출력·판정·렌더해시·버전을
+-- report_id 로 묶어 변경 불가하게 남긴다 → 익일 결과와 대조해 모델을 객관적으로 개선.
+CREATE TABLE IF NOT EXISTS snapshots (
+  report_id     TEXT PRIMARY KEY,
+  market        TEXT,
+  market_date   TEXT,
+  stage         TEXT,
+  as_of         TEXT,
+  strategy_version TEXT,
+  risk_policy_version TEXT,
+  data_version  TEXT,
+  raw_json      TEXT,
+  feature_json  TEXT,
+  model_json    TEXT,
+  risk_json     TEXT,
+  render_hash   TEXT,
+  created_at    TEXT
+);
 """
 
 # 15:00 시점 '누적/종일' 비율 부트스트랩 — KODEX 200 / 코스닥150 10분봉 5거래일
@@ -250,6 +269,78 @@ def accuracy(conn: sqlite3.Connection, market: str, report_type: str = "close",
         "realized_up_rate": round(real_rate, 3) if real_rate is not None else None,
         "calibration_bias": round(bias, 3) if bias is not None else None,
     }
+
+
+def performance(conn: sqlite3.Connection, market: str, report_type: str = "close") -> dict:
+    """확률 검증 성과(evaluation2 P0-5) — 다중 window·calibration bins·연속오판·AUC.
+
+    표본이 적으면 각 지표는 `축적 중`(n 함께). 수치를 강요하지 않고 검증 상태를 함께 낸다.
+    """
+    cur = conn.execute(
+        "SELECT trade_date, p_up, realized_up, correct, brier FROM daily "
+        "WHERE market=? AND report_type=? AND graded_at IS NOT NULL "
+        "ORDER BY trade_date DESC", (market, report_type))
+    rows = cur.fetchall()
+    all_n = len(rows)
+
+    def _win(w: int) -> dict:
+        rs = rows[:w]
+        n = len(rs)
+        if n == 0:
+            return {"n": 0, "hit_rate": None, "brier": None}
+        hits = sum(r["correct"] for r in rs if r["correct"] is not None)
+        briers = [r["brier"] for r in rs if r["brier"] is not None]
+        return {"n": n, "hit_rate": round(hits / n, 3),
+                "brier": round(sum(briers) / len(briers), 4) if briers else None}
+
+    # calibration bins: p_up 구간별 실제 상승빈도(70% 예측이 실제 70%인가)
+    bins = []
+    for lo in (0.2, 0.3, 0.4, 0.5, 0.6, 0.7):
+        hi = round(lo + 0.1, 1)
+        seg = [r for r in rows if r["p_up"] is not None and lo <= r["p_up"] < hi
+               and r["realized_up"] is not None]
+        if seg:
+            bins.append({"range": f"{int(lo*100)}~{int(hi*100)}%", "n": len(seg),
+                         "pred": round(sum(r["p_up"] for r in seg) / len(seg), 3),
+                         "actual_up": round(sum(r["realized_up"] for r in seg) / len(seg), 3)})
+
+    # 최대 연속 오판
+    max_wrong = cur_wrong = 0
+    for r in reversed(rows):  # 시간순
+        if r["correct"] == 0:
+            cur_wrong += 1
+            max_wrong = max(max_wrong, cur_wrong)
+        elif r["correct"] == 1:
+            cur_wrong = 0
+
+    # ROC-AUC(방향 분류력): P(상승일 p_up > 하락일 p_up), Mann-Whitney
+    ups = [r["p_up"] for r in rows if r["realized_up"] == 1 and r["p_up"] is not None]
+    dns = [r["p_up"] for r in rows if r["realized_up"] == 0 and r["p_up"] is not None]
+    auc = None
+    if ups and dns:
+        wins = sum((1 if u > d else 0.5 if u == d else 0) for u in ups for d in dns)
+        auc = round(wins / (len(ups) * len(dns)), 3)
+
+    return {"n_total": all_n,
+            "windows": {"20": _win(20), "60": _win(60), "120": _win(120), "250": _win(250)},
+            "calibration_bins": bins, "max_consecutive_wrong": max_wrong, "roc_auc": auc}
+
+
+def save_snapshot(conn: sqlite3.Connection, report_id: str, market: str, market_date: str,
+                  stage: str, as_of: str, versions: dict, raw, feature, model, risk,
+                  render_hash: str, created_at: str) -> None:
+    """불변 스냅샷 저장(P0-3). 같은 report_id 재실행이면 덮어쓴다(회차별 report_id 분리 권장)."""
+    conn.execute(
+        "INSERT OR REPLACE INTO snapshots(report_id,market,market_date,stage,as_of,"
+        "strategy_version,risk_policy_version,data_version,raw_json,feature_json,"
+        "model_json,risk_json,render_hash,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        (report_id, market, market_date, stage, as_of,
+         versions.get("strategy_version"), versions.get("risk_policy_version"),
+         versions.get("data_version"),
+         json.dumps(raw, ensure_ascii=False), json.dumps(feature, ensure_ascii=False),
+         json.dumps(model, ensure_ascii=False), json.dumps(risk, ensure_ascii=False),
+         render_hash, created_at))
+    conn.commit()
 
 
 def calibration_shift(conn: sqlite3.Connection, market: str,

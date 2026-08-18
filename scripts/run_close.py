@@ -373,6 +373,7 @@ def build_report(cfg: dict, ls, client, conn, env, session_of: dict,
     # ── 자가학습: 확정 일봉으로만 소급 채점 (장중 미완성치로 채점 금지) ──
     graded, acc = [], None
     calib = 0.0
+    perf = None
     if conn is not None and not dry_run:
         try:
             store.backfill_final_volume(conn, market, candles, session.pending_dates)
@@ -389,6 +390,10 @@ def build_report(cfg: dict, ls, client, conn, env, session_of: dict,
             graded = []
         acc = store.accuracy(conn, market, "close")
         calib = store.calibration_shift(conn, market, "close")
+        try:
+            perf = store.performance(conn, market, "close")
+        except Exception:  # noqa
+            perf = None
 
     # 캘리브레이션 보정 p_up (자가학습 피드백). 원본은 p_up_raw 로 보존.
     rep["p_up_raw"] = rep.get("p_up")
@@ -416,6 +421,7 @@ def build_report(cfg: dict, ls, client, conn, env, session_of: dict,
             rep.setdefault("sources", []).append(s)
 
     rep["accuracy"] = acc
+    rep["performance"] = perf
 
     # ── 신뢰도 확정(표본 보정) + 진입 게이트 + 버전 각인 (evaluation2/3) ──
     cfg = config.load()
@@ -437,11 +443,29 @@ def build_report(cfg: dict, ls, client, conn, env, session_of: dict,
     if ls_warn:
         rep["warnings"] = [ls_warn] + rep.get("warnings", [])
 
-    # ── 예측 기록(오늘) ──
+    # ── 예측 기록(오늘) + 불변 스냅샷(P0-3) ──
     if conn is not None and not dry_run:
         try:
             store.record_prediction(conn, rep, created_at=_now(), report_type="close")
         except Exception:  # noqa
+            pass
+        try:
+            import hashlib
+            stage = "close_intraday" if session.intraday else "close_final"
+            rid = f"{market}_{session.trade_ymd}_{stage}_{config.versions()['strategy_version']}"
+            model_out = {"total": rep.get("total"), "p_up": rep.get("p_up"),
+                         "p_down": rep.get("p_down"), "grade": rep.get("grade"),
+                         "contributions": rep.get("contributions")}
+            risk_dec = {"gate": rep.get("gate"), "entry": rep.get("entry"),
+                        "confidence": rep.get("confidence")}
+            rhash = hashlib.sha256(
+                json.dumps(model_out, sort_keys=True, ensure_ascii=False).encode()).hexdigest()[:16]
+            store.save_snapshot(conn, rid, market, session.trade_ymd, stage, as_of,
+                                config.versions(), {"flows": rep.get("flows"),
+                                                    "market": rep.get("market")},
+                                {"subscores": rep.get("subscores")}, model_out, risk_dec,
+                                rhash, _now())
+        except Exception:  # noqa — 스냅샷 실패가 리포트를 막지 않는다
             pass
 
     # ── 컨펌 diff + 행동 판정: 마감 확정(16:30) 회차면 15:00 잠정본 대비 변화·행동 ──
