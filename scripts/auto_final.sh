@@ -40,6 +40,11 @@ if [ $RC -ne 0 ]; then
   exit $RC
 fi
 
+# t1601 suffix 실증 확정(비파괴 진단): 마감 후엔 t1601 이 확정 수급이라 네이버와 대조 가능.
+# .ls_investor_map.json 만 갱신할 뿐 점수/배포엔 영향 없음 → 실패해도 이번 회차를 막지 않는다.
+"$PY" scripts/probe_investor_map.py >> "$LOG" 2>&1 || \
+  echo "[$(date '+%F %T')] (참고) t1601 매핑 프로브 실패 — 무시하고 진행" >> "$LOG"
+
 git add public/index.html
 if git diff --cached --quiet; then
   echo "[$(date '+%F %T')] 변경 없음 — 배포 생략" >> "$LOG"

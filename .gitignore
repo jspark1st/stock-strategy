@@ -15,6 +15,9 @@ out/
 # LS 접근토큰 캐시 (시크릿 — 절대 커밋 금지)
 data/.ls_token.json
 
+# t1601 suffix→투자자 실증 매핑(프로브 산출 파생 상태 — 서버에서 생성)
+data/.ls_investor_map.json
+
 # 로컬 DB 캐시 (정본은 원격 Proxmox 서버 — 커밋 안 함)
 data/history.db
 
