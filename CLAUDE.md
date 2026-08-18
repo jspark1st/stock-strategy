@@ -80,24 +80,37 @@ Environment: Python 3.12.10, `httpx` 0.28 and `requests` 2.32 available. No virt
 docs/PLAN.md                     intent, scope, phased plan (read first)
 scripts/test_connection.py       [done] LS + Tavily connectivity check
 scripts/render_report.py         [done] 번들 JSON -> 단일 자체완결 HTML 대시보드 (사이드바+뷰, LWC 인라인)
-scripts/run_close.py             [done] 마감 파이프라인: LS 시장폭 + 네이버 수급·지수 → score_close → 실데이터 대시보드
+scripts/run_close.py             [done] 마감(종가베팅) 파이프라인: LS+네이버+Tavily+ATR+3LLM+store → 대시보드 + public/index.html
+scripts/run_preopen.py           [done] 개장 전 재확인: 전일 마감 앵커 + 간밤 리서치 → 4뷰 통합 대시보드
+scripts/auto_close.sh / auto_preopen.sh  [done] 서버 cron 러너(파이프라인 → git push → Vercel)
+scripts/auto_close.bat / auto_preopen.bat / setup_schedule.bat  [done] (대안) 로컬 Windows 스케줄러
 scripts/make_sample_dashboard.py [done] 코스피/코스닥 시장레벨 데모 번들(sample_dashboard.json) 생성
 scripts/make_sample_charts.py    [done] (레거시) 단일 리포트용 OHLC → sample_close.json charts 주입
 scripts/probe_ls.py              [done] LS TR 응답 스펙 실측 프로브 (read-only)
 src/models.py                    [done] input/output + collector dataclasses (pure)
-src/scoring.py                   [done] pure-function scoring engine
+src/scoring.py                   [done] pure-function scoring engine (+신호 일치도·데이터 완전성)
+src/quant.py                     [done] 기술·퀀트 확장 서브스코어(0.15) + 마감 1시간봉 분석
+src/atr.py                       [done] ATR 매매 타점(정규화 ATR·변동성 국면·구조 손절·Kelly)
+src/store.py                     [done] SQLite 자가학습(예측→익일채점→캘리브레이션)
+src/remote.py                    [done] 원격 서버 DB/리포트 scp 동기화(서버선 자동 degrade)
 src/collectors/ls.py             [🔶] LS client: token cache + throttle + MTF candles + quote
-src/collectors/naver.py          [done] 네이버 우회 수집기: 지수 일봉 + 투자자 수급(외국인/기관/개인, 억원)
-src/collectors/news.py           [done] Tavily 실시간 재료 + 당일 팩트체크(발행시각) → news 서브스코어 + 주요 재료
+src/collectors/naver.py          [done] 네이버 우회 수집기: 지수 일/주/월봉 + 투자자 수급(억원)
+src/collectors/news.py           [done] Tavily 실시간 재료 + 당일 팩트체크(발행시각) → news 서브스코어
+src/collectors/llm.py            [done] 멀티 LLM(Perplexity 실시간·Gemini 계산·Claude 종합) 서술/개장전
 assets/vendor/lightweight-charts.standalone.production.js  [done] TradingView LWC v4.2.3 벤더링(인라인용, Apache-2.0)
 tests/test_scoring.py            [done] 42 boundary-value pytest cases
 conftest.py                      [done] pytest root marker (puts repo root on sys.path)
 data/sample_dashboard.json       [done] 코스피+코스닥 시장레벨 데모 번들 (렌더러 기본 입력)
 data/sample_close.json           (레거시) 단일 코스피 리포트 + charts — 여전히 렌더 호환
 data/.ls_token.json              LS token cache (gitignored — secret)
-out/report_<date>.html           generated reports (gitignored)
+out/report_<date>.html           generated reports (gitignored) + bundle_<date>.json
+public/index.html                [done] Vercel 배포 대상(최신 대시보드, 파이프라인이 갱신·커밋)
+public/login.html                [done] easystock 비밀번호 로그인 폼
+middleware.js / api/login.js      [done] Vercel 비번 게이트(쿠키 검증·fail-closed) + 로그인 API
+vercel.json / package.json / .vercelignore  [done] Vercel 정적+함수 배포 설정(framework:null)
+data/history.db                  SQLite 자가학습 DB (gitignored; 정본은 서버)
 ```
-Planned (not yet created): `src/collectors/news.py` (Tavily 재료), 마감 동시호가 소스, usdkrw 소스.
+남은 데이터 갭: 마감 동시호가(call, 15:20 스냅), 지수 거래대금(네이버 '거래량' 대용), 야간/미국선물 %, usdkrw.
 
 ### 투자자 수급·지수 일봉 데이터 소스 (확정)
 - **KRX 정보데이터시스템 `getJsonData.cmd` 는 막힘** — 익명/워밍업 세션에 **HTTP 400 `LOGOUT`** 반환(pykrx 포함, 2026-08-18 한국 IP=SK브로드밴드 실측; 지오블록 아님). pykrx의 종목 OHLCV가 되는 건 실은 **네이버로 우회**하기 때문.
@@ -135,14 +148,26 @@ Keep this section updated as work advances. Status legend: ✅ done · 🔶 part
   - ✅ **실시간 재료 + 팩트체크** (`src/collectors/news.py`) — Tavily 뉴스 검색 → **발행시각(published_date, KST) 기준 당일 재료만 fresh 로 팩트체크**, 검증된 재료에서만 호재/악재 집계 → news 서브스코어. 리포트 '주요 재료'에 팩트체크 요약 + 당일 헤드라인(태그·시각·링크). 라이브(2026-08-18): 20건 중 당일 7건, 호재0/악재3 → 코스피 총점 42.6→**39.3**(벤치마크 38.0 근접).
   - ✅ **UI 조정(사용자)** — 사이드바에서 **전략(단타/스윙/장기) 숨김**, **개장 전을 코스피/코스닥으로 분리**(placeholder). 항목별 점수에 **재배분 가중치 표기**(예: 20%→22.2%) 추가. 당분간 초점 = 코스피/코스닥 × (장 마감·개장 전).
 
-### Current blocker / handoff
-- **마감 파이프라인 E2E + 실시간 재료 팩트체크 완성.** `python scripts/run_close.py` → 오늘 실데이터 코스피/코스닥 마감 대시보드. LS(시장폭)+네이버(수급·지수)+Tavily(재료·팩트체크)+scoring+렌더 라이브 검증.
+- **2026-08-19 — 대확장 (easystock by junaitech): ATR·멀티LLM·자가학습·MTF·배포·서버 자동화**
+  - ✅ **퀀트 확장** (`src/quant.py`) — 6팩터에 **기술·퀀트(0.15) 확장 서브스코어** 추가(RSI·MACD·볼린저·OBV·추세정렬 + ETF 60분봉 전강후약). `test_weights_sum_to_one`→`test_core_weights_sum_to_one`(코어6=1.0, quant는 확장). **마감 1시간봉 분석** 공개(`intraday_analysis`).
+  - ✅ **ATR 매매 타점** (`src/atr.py`, SoT `atr-risk-sizing.md` 미러) — 진입/손절/목표/손익비/edge/Half-Kelly/Chandelier. **초고수 보강**: winsorized 정규화 ATR(스파이크 억제)·변동성 국면 백분위·**구조(스윙) 손절**(ATR·구조 중 타이트한 쪽 권장). §7 예시 검증.
+  - ✅ **멀티 LLM 서술** (`src/collectors/llm.py`) — **실시간=Perplexity · 계산=Gemini · 종합=Claude(claude-opus-5, 공식 anthropic SDK)**. `build_narrative`(마감)/`build_preopen`(개장전). 대원칙 강제: 수치는 API값만, 뉴스 수치 본문 금지(부득이 시 '(언론 집계)').
+  - ✅ **자가학습 DB** (`src/store.py` SQLite + `src/remote.py` scp) — 예측 기록→익일 실측 채점(Brier·정오·ATR도달)→**캘리브레이션 보정**(p_up 피드백). 정본 DB는 서버.
+  - ✅ **렌더러 대개편** — 반응형·앱대비 트레이더 UI(다크 기본·한국 색관례). 신규: 매매결론·ATR플랜·**익일 시나리오**·마감 1시간봉·**실시간 주의신호**·주요재료·**자가학습 정확도**·신뢰도 칩(완전성·신호일치도)·개장전 체크리스트·**일/주/월/1시간봉 토글 차트**. 서술 엔진 노출 제거(영업비밀).
+  - ✅ **개장 전 파이프라인** (`scripts/run_preopen.py`) — 전일 마감 앵커 + 간밤(미국장·선물·환율) 리서치 → 재확인 뷰. 4뷰(마감+개장전 ×코스피/코스닥) 통합 대시보드.
+  - ✅ **비평 반영** — 신호 일치도(엇갈린 신호 과신 완화)·데이터 완전성 지표·팩트체크 라벨·뉴스 수치 규율.
+  - ✅ **배포** — GitHub Public `jspark1st/stock-strategy` + **Vercel `easystock`**(team junaitech). 커스텀 비번 게이트(fail-closed).
+  - ✅ **서버 자동화** — 아래 "서버 운영" 참조.
 
-- **로드맵(사용자 요청, 벤치마크 정렬 — 우선순위 협의 필요)**:
-  1. **장 마감 시간봉(MTF) 반영 + 퀀트 점수** — 마감 즈음 60/240분봉으로 모멘텀·추세정렬·변동성 등 퀀트 팩터를 추가해 정확도↑. LS `minute_candles`/`multi_timeframe`(t8412, 1~240분) 활용. **스코어링 모델 확장 → SoT(sibling `scoring-close.md`)에 반영/분기 필요. 어떤 팩터를 넣을지 협의.**
-  2. **벤치마크 서술 섹션** — 오늘의 시장 성격(섹터·주도주·애널 코멘트), 익일 시나리오(상승/하락/트리거), 한 줄 결론. 검색 결과의 **LLM 합성 필요 여부 결정**(Claude API 호출 도입 vs 헤드라인 나열).
-  3. **아침 점수 채점(정확도 루프)** — 전일/개장전 예측 대비 실측 채점 저장·표시. 예측 이력 저장소 필요.
-  4. **개장 전 플로우** — 코스피/코스닥 개장 전 리포트(placeholder 채우기): 야간선물·미국장·전일 재료 기반.
-  5. **Vercel 배포** — 리포트를 공유 URL로. **공개/보호 범위 확인 필요**(개인 도구·투자권유 아님).
+### 서버 운영 (인수인계 — 이제 작업/실행은 이 서버에서)
+- **서버**: `ssh KS5F-PROXMOX-VM2` = `ssh -i C:/keys/anyang-private-key-openssh.pem -p 4159 jspark1st@1.241.52.6`. Ubuntu·**KST**·**한국 IP(SK BB)**로 네이버/KRX 정상. python3.12(deps는 `pip --user`: httpx·anthropic. venv 아님 — python3.12-venv 미설치, sudo 필요).
+- **코드 위치**: `~/stock_strategy` (git in-place, remote fetch=https·push=git@github deploy key `~/.ssh/easystock_deploy`). **DB**: `~/stock_strategy/data/history.db` → 심볼릭 → `~/stock_strategy/db/history.db`(정본, 누적). **`.env`는 서버에 사용자가 배치**(9키). 로컬 `remote.py`는 서버에 key 없어 자동으로 local-only degrade.
+- **cron**(평일): `0 15 * * 1-5` 마감(종가베팅 15:00 KST) `auto_close.sh` · `0 8 * * 1-5` 개장전 재확인 08:00 `auto_preopen.sh`. 각 스크립트: 파이프라인(--auto) → `public/index.html` 변경 시만 git push → **Vercel 자동배포**. 로그: `out/auto_*.log`. `auto_update=false`(.env)면 예약 건너뜀(비용 절약).
+- **수동 실행**: `cd ~/stock_strategy && python3 scripts/run_close.py` (또는 run_preopen). **코드 수정 후**: 로컬에서 push → 서버 `cd ~/stock_strategy && git pull`.
+- **Vercel**: 프로젝트 `easystock`(prj_MVEYDzFx7LG0WddGqIQeMfsM1qSO, team_4rQsEoiwakRmCY4Ru0QJ7c1o), URL **easystock-junaitech.vercel.app**. 게이트 env **`view_password`·`auth_token`**(대시보드 설정 — MCP에 env 도구 없음). 네이티브 비번보호는 유료라 커스텀 미들웨어(middleware.js+api/login.js) 사용.
 
-- **남은 데이터 갭(정직하게 결측/중립 처리 중)**: 마감 동시호가(call, 장중 15:20 스냅 필요), 지수 거래대금(현재 네이버 '거래량' 비율 대용), 야간/미국선물 %, usdkrw.
+### 이어서 할 곳 (open items)
+1. **⚠️ 종가베팅 수급 타이밍(최우선 검증)** — 15:00 실행 시 **확정 수급은 마감 후**라 네이버가 장중 오늘치 잠정 수급을 주는지 **첫 라이브(오늘 15:00) 확인 필요**. 없으면 수급 결측(=2)→총점 미산출 위험. 대안: 실시간 수급 소스(LS t1601 매핑 재시도) 또는 시간 미세조정. 잠정치면 `provisional=True` 세팅.
+2. **SoT 분기 기록** — ATR 정규화·신호 일치도·quant 확장은 sibling `scoring-close.md`/`atr-risk-sizing.md` 대비 easystock 확장. SoT에 반영/분기 명시 필요.
+3. **남은 데이터 갭**: 마감 동시호가(call, 15:20 스냅), 지수 거래대금(네이버 '거래량' 대용), 야간/미국선물 %, usdkrw.
+4. **사용자 잔여 작업**: Vercel env 2개 설정+Redeploy(로그인 활성화). (로컬 Windows 스케줄러 `setup_schedule.bat`는 서버 cron으로 대체됨 — 불필요.)
