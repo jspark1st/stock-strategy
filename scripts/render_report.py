@@ -118,6 +118,30 @@ DIR_LABEL = {"long": ("매수 우위", "var(--up)"), "short": ("매도/현금", 
              "watch": ("관망", "var(--neutral)")}
 
 
+def _conf_color(v, hi=0.95, mid=0.8) -> str:
+    return "var(--good)" if v >= hi else ("var(--neutral)" if v >= mid else "var(--caution)")
+
+
+def build_confidence(r: dict) -> str:
+    """신뢰도 칩 — 데이터 완전성 + 신호 일치도(결측·엇갈린 신호 투명화)."""
+    dc = r.get("data_completeness")
+    sa = r.get("signal_agreement")
+    if dc is None and sa is None:
+        return ""
+    chips = []
+    if dc is not None:
+        ko = {"close": "종가강도", "breadth": "시장폭", "flow": "수급", "amt": "거래대금",
+              "call": "마감동시호가", "news": "재료"}
+        miss = [ko.get(k, k) for k in (r.get("missing_keys") or [])]
+        note = f" · 결측 {', '.join(miss)}" if miss else ""
+        chips.append(f'<span class="conf-chip">데이터 완전성 '
+                     f'<b style="color:{_conf_color(dc)}">{dc*100:.0f}%</b>{note}</span>')
+    if sa is not None:
+        chips.append(f'<span class="conf-chip">신호 일치도 '
+                     f'<b style="color:{_conf_color(sa, 0.8, 0.5)}">{sa*100:.0f}%</b></span>')
+    return f'<div class="conf-row">{"".join(chips)}</div>'
+
+
 def build_conclusion(r: dict) -> str:
     """매매 결론 스트립 — 방향 배지 + 한 줄 결론."""
     nar = r.get("narrative", {}) or {}
@@ -149,19 +173,26 @@ def build_atr_plan(r: dict) -> str:
     edge_col = "var(--up)" if (edge or 0) > 0 else "var(--down)"
     kelly = p.get("kelly_pct") or 0
     qual = "진입 자격 ✓" if p.get("qualified") else "진입 부적합(edge≤0)"
+    rec_stop = atr.get("rec_stop")
+    stop_sub = (f"권장 {fmt(rec_stop,2)}·{esc(atr.get('rec_stop_basis',''))}"
+                if rec_stop is not None else "")
     tiles = "".join([
         _tile("진입가", fmt(p.get("entry"), 2)),
-        _tile("손절가", fmt(p.get("stop"), 2), "var(--down)"),
+        _tile("손절가", fmt(p.get("stop"), 2), "var(--down)", stop_sub),
         _tile("목표가", fmt(p.get("target"), 2), "var(--up)"),
         _tile("손익비", f"1 : {fmt(p.get('rr'),1)}", "var(--accent)"),
         _tile("edge", signed(edge, 3) if edge is not None else "—", edge_col,
               f"손익분기 {fmt(p.get('p_breakeven'),2)}"),
         _tile("권장비중", f"{kelly:.0f}%", "var(--accent)", "Half-Kelly · 상한 25%"),
     ])
-    # 보조 정보
+    # 보조 정보 (초고수 보강: 원본 vs 정규화 ATR, 변동성 국면, 구조 손절)
     extra = []
-    if atr.get("atr14") is not None:
-        extra.append(f"ATR14 {fmt(atr.get('atr14'),2)}")
+    if atr.get("atr14") is not None and atr.get("atr_eff") is not None:
+        extra.append(f"ATR14 원본 {fmt(atr.get('atr14'),2)} → 적용(정규화) {fmt(atr.get('atr_eff'),2)}")
+    if atr.get("vol_pct") is not None:
+        extra.append(f"변동성 국면 {atr['vol_pct']*100:.0f}%")
+    if atr.get("structure_stop") is not None:
+        extra.append(f"구조 손절(스윙) {fmt(atr.get('structure_stop'),2)}")
     if atr.get("pullback_entry") is not None:
         extra.append(f"눌림 참고 {fmt(atr.get('pullback_entry'),2)}")
     if atr.get("chandelier") is not None:
@@ -173,12 +204,15 @@ def build_atr_plan(r: dict) -> str:
                  f"<td>{fmt(v.get('target'),2)}</td><td>1:{fmt(v.get('rr'),1)}</td>"
                  f"<td style='color:{'var(--up)' if (v.get('edge') or 0)>0 else 'var(--down)'}'>"
                  f"{signed(v.get('edge'),3)}</td><td>{v.get('kelly_pct',0):.0f}%</td></tr>")
-    warn = ('<div class="atr-warn">⚠ 최근 급등락 — ATR 과대 가능, 전고점·매물대 기준 병행</div>'
+    warn = ('<div class="atr-warn">⚠ 변동성 과열 — 정규화 ATR 적용(스톱 과대 방지), 구조 손절 우선</div>'
             if atr.get("price_limit_warn") else "")
+    regime = atr.get("regime")
+    regime_pill = (f'<span class="pill pill-ghost">변동성 {esc(regime)}</span>'
+                   if regime and regime != "정상" else "")
     return f"""
   <div class="card">
     <h2>ATR 매매 플랜 <span class="pill" style="background:{dcol}">{dlabel}</span>
-      <span class="pill pill-ghost">{qual}</span></h2>
+      <span class="pill pill-ghost">{qual}</span>{regime_pill}</h2>
     <div class="tiles">{tiles}</div>
     <div class="atr-extra">{' · '.join(extra)}</div>
     {warn}
@@ -267,15 +301,15 @@ def build_intraday(r: dict) -> str:
     ])
     return f"""
   <div class="card">
-    <h2>마감 시간봉 분석 <span class="pill" style="background:{col}">{esc(iv.get('verdict'))}</span>
-      <span class="pill pill-ghost">{esc(iv.get('timeframe','60분봉'))} · {iv.get('n_bars','')}봉</span></h2>
+    <h2>마감 1시간봉 분석 <span class="pill" style="background:{col}">{esc(iv.get('verdict'))}</span>
+      <span class="pill pill-ghost">1시간봉 · {iv.get('n_bars','')}개</span></h2>
     <div class="gauge" title="종가 위치 {cp*100:.0f}%">
       <div class="gauge-fill" style="width:{max(0,min(100,cp*100)):.0f}%;background:{col}"></div>
       <div class="gauge-mark" style="left:{max(0,min(100,cp*100)):.0f}%"></div>
     </div>
     <div class="gauge-ends"><span>저가</span><span>고가</span></div>
     <div class="tiles" style="margin-top:12px">{tiles}</div>
-    <div class="obs muted">{esc(iv.get('label',''))} · 종가 강도 프록시: KODEX 200/코스닥150 시간봉</div>
+    <div class="obs muted">{esc(iv.get('label',''))} · 종가 강도 프록시: KODEX 200/코스닥150 1시간봉</div>
   </div>"""
 
 
@@ -308,7 +342,7 @@ def build_flows(r: dict) -> str:
     return f'<div class="card"><h2>투자주체 수급 {prov_badge}</h2>{legend}{"".join(rows)}</div>'
 
 
-_TF_LABEL = [("D", "일봉"), ("W", "주봉"), ("M", "월봉"), ("H", "시간봉")]
+_TF_LABEL = [("D", "일봉"), ("W", "주봉"), ("M", "월봉"), ("H", "1시간봉")]
 
 
 def build_index_chart(r: dict) -> str:
@@ -448,6 +482,7 @@ def render_report_view(r: dict, date: str) -> str:
     <div class="card"><p class="headline">{esc(headline)}</p></div>
 
     <div class="card hero">{build_hero(r)}</div>
+    {build_confidence(r)}
     {build_conclusion(r)}
     {build_atr_plan(r)}
     {build_scenarios(r)}
@@ -651,6 +686,11 @@ TEMPLATE = r"""<!doctype html>
     background:conic-gradient(var(--dc) calc(var(--p)*1%), var(--surface2) 0);display:grid;place-items:center}
   .donut .inner{width:86px;height:86px;border-radius:50%;background:var(--surface);display:grid;place-items:center;font-weight:800;font-size:1.3rem;font-variant-numeric:tabular-nums}
 
+  /* 신뢰도 칩 */
+  .conf-row{display:flex;gap:10px;flex-wrap:wrap;margin:-6px 0 14px}
+  .conf-chip{background:var(--surface);border:1px solid var(--border);border-radius:999px;
+    padding:6px 14px;font-size:.82rem;color:var(--muted)}
+
   /* 매매 결론 */
   .concl{display:flex;align-items:center;gap:14px;border-left:4px solid var(--accent)}
   .concl-badge{color:#fff;font-weight:800;padding:8px 14px;border-radius:10px;white-space:nowrap;font-size:.95rem}
@@ -807,7 +847,7 @@ TEMPLATE = r"""<!doctype html>
     borderDownColor:t.down, wickUpColor:t.up, wickDownColor:t.down, priceLineVisible:false }; }
 
   var sel={};  // 뷰별 선택된 타임프레임 기억(테마 토글 시 유지)
-  function tfLabel(t){ return {D:'일',W:'주',M:'월',H:'시간'}[t]||''; }
+  function tfLabel(t){ return {D:'일',W:'주',M:'월',H:'1시간'}[t]||''; }
 
   function buildView(id){
     var sec=document.querySelector('.view[data-view="'+id+'"]'); if(!sec) return;

@@ -177,7 +177,8 @@ def score_news(inp: NewsInput) -> SubScore:
 
     nf = f"{inp.night_futures_pct:+.2f}%" if inp.night_futures_pct is not None else "—"
     us = f"{inp.us_futures_pct:+.2f}%" if inp.us_futures_pct is not None else "—"
-    observed = f"호재 {inp.good_count} 악재 {inp.bad_count} · 야간선물 {nf} · 미국선물 {us}"
+    observed = (f"당일 발행 팩트체크 기준 호재 {inp.good_count}·악재 {inp.bad_count} "
+                f"· 야간선물 {nf} · 미국선물 {us}")
     if inp.capital_raise_disclosure:
         comment = "마감 후 유상증자/CB 공시 — 익일 갭하락 위험"
     elif inp.good_count > inp.bad_count:
@@ -332,7 +333,24 @@ def score_close(inputs: CloseInputs) -> ScoreResult:
         p_up = 0.5 + (p_up - 0.5) * 0.7
         reason = "익일 새벽 대형 이벤트" if inputs.flags.major_overnight_event else "익일 옵션·선물 만기"
         warnings.append(f"{reason} — 익일확률 50%쪽으로 30% 수축")
+
+    # ── 신호 일치도(agreement) → 엇갈린 신호 과신 방지 (SoT 확장) ──
+    # 상방(>55)·하방(<45)으로 갈린 가중치가 둘 다 크면 방향 확신을 완화(0.5로 수축).
+    eff = {k: WEIGHTS[k] / base_present for k in present}
+    bull_w = sum(eff[k] for k in present if subs[k].score > 55)
+    bear_w = sum(eff[k] for k in present if subs[k].score < 45)
+    disagree = min(min(bull_w, bear_w) / 0.35, 1.0)
+    signal_agreement = round(1 - disagree, 2)
+    if min(bull_w, bear_w) > 0.05:
+        shrink = 0.20 * disagree
+        p_up = 0.5 + (p_up - 0.5) * (1 - shrink)
+        warnings.append(
+            f"신호 일치도 {signal_agreement:.0%}(상·하방 혼재) — 방향 확신 완화, "
+            f"익일확률 {shrink:.0%} 수축")
+
     p_up = clamp(p_up, PROB_CLIP_LO, PROB_CLIP_HI)
+    # 코어 6항목 데이터 완전성(present 비중) — 신뢰도 지표
+    data_completeness = round(min(sum(WEIGHTS[k] for k in present if k != "quant"), 1.0), 2)
     p_down = 1 - p_up
 
     grade, gate = grade_and_gate(total)
@@ -353,4 +371,6 @@ def score_close(inputs: CloseInputs) -> ScoreResult:
         warnings=warnings,
         flows=flows,
         market=market,
+        data_completeness=data_completeness,
+        signal_agreement=signal_agreement,
     )

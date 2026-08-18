@@ -101,7 +101,7 @@ def _index_charts(market: str, client, daily_series, intraday) -> dict:
         etf_last = intraday.candles[-1].close
         idx_last = daily_series.candles[-1].close if daily_series.candles else etf_last
         scale = (idx_last / etf_last) if etf_last else 1.0
-        frames["H"] = _frame(intraday, "시간봉", intraday=True, scale=scale)
+        frames["H"] = _frame(intraday, "1시간봉", intraday=True, scale=scale)
     return {"name": market, "frames": frames, "default": "D"}
 
 

@@ -63,6 +63,69 @@ def atr(candles: list, n: int = 14) -> float | None:
     return a
 
 
+# ── 초고수 보강: ATR 단순평균의 스파이크 과대 문제 해결 ──────────────────────
+# (easystock 확장 — SoT atr-risk-sizing.md §8 '급등락 후 ATR 과대' 경고의 정량적 해법.
+#  분기 기록은 CLAUDE.md. 정본을 대체하지 않고 '적용 ATR'을 별도 산출해 병기한다.)
+
+def median(xs: list[float]) -> float:
+    s = sorted(xs)
+    n = len(s)
+    if n == 0:
+        return 0.0
+    m = n // 2
+    return s[m] if n % 2 else (s[m - 1] + s[m]) / 2
+
+
+def _atr_series(candles: list, n: int = 14) -> list[float]:
+    """각 시점의 Wilder ATR(n) 시계열(변동성 국면 백분위 계산용)."""
+    trs = true_ranges(candles)
+    if len(trs) < n:
+        return []
+    out = [sum(trs[:n]) / n]
+    for i in range(n, len(trs)):
+        out.append((out[-1] * (n - 1) + trs[i]) / n)
+    return out
+
+
+def robust_atr(candles: list, n: int = 14, cap_mult: float = 3.0) -> dict | None:
+    """정규화 ATR — True Range 를 median 의 cap_mult 배로 winsorize 해 스파이크 억제.
+
+    반환: {raw(Wilder), median, winsor(적용), regime_pct(0~1), regime(라벨)}.
+    winsor: 각 TR 을 min(TR, cap_mult×median) 로 클리핑 후 Wilder 평활 → 급등락 한 방이
+    14봉 평균을 지배하지 못함. 평상시엔 raw≈winsor(무영향).
+    """
+    trs = true_ranges(candles)
+    if len(trs) < n + 1:
+        return None
+    raw = atr(candles, n)
+    med = median(trs[-max(n, 20):])
+    cap = cap_mult * med if med else float("inf")
+    capped = [min(t, cap) for t in trs]
+    w = sum(capped[:n]) / n
+    for i in range(n, len(capped)):
+        w = (w * (n - 1) + capped[i]) / n
+    winsor = w
+    # 변동성 국면: 현재 ATR 이 최근 60개 ATR 분포에서 몇 %인지
+    series = _atr_series(candles, n)[-60:]
+    if series:
+        cur = series[-1]
+        pct = sum(1 for x in series if x <= cur) / len(series)
+    else:
+        pct = 0.5
+    regime = "과열" if pct >= 0.80 else ("저변동" if pct <= 0.20 else "정상")
+    return {"raw": raw, "median": med, "winsor": winsor, "regime_pct": pct, "regime": regime}
+
+
+def swing_low(candles: list, k: int = 10) -> float | None:
+    seg = candles[-k:]
+    return min(c.low for c in seg) if seg else None
+
+
+def swing_high(candles: list, k: int = 10) -> float | None:
+    seg = candles[-k:]
+    return max(c.high for c in seg) if seg else None
+
+
 @dataclass
 class AtrLevels:
     """한 트레이더 유형의 타점 세트. 롱 기준(direction='long'이면 그대로, 'short'면 대칭)."""
@@ -96,6 +159,14 @@ class AtrPlan:
     price_limit_warn: bool = False
     observed: str = ""
     comment: str = ""
+    # 초고수 보강: 정규화 ATR·변동성 국면·구조 손절
+    atr_eff: float = 0.0            # 적용(정규화/winsorized) ATR
+    atr_median: float | None = None
+    vol_pct: float | None = None    # 변동성 국면 백분위(0~1)
+    regime: str = "정상"            # 과열 | 정상 | 저변동
+    structure_stop: float | None = None   # 스윙 저점/고점 기반 손절
+    rec_stop: float | None = None          # 권장 손절(ATR·구조 중 타이트)
+    rec_stop_basis: str = "ATR"            # 권장 손절 근거
 
     def to_dict(self) -> dict:
         def lvl(l: AtrLevels) -> dict:
@@ -118,6 +189,13 @@ class AtrPlan:
             "variants": [lvl(v) for v in self.variants],
             "price_limit_warn": self.price_limit_warn,
             "observed": self.observed, "comment": self.comment,
+            "atr_eff": round(self.atr_eff, 2),
+            "atr_median": round(self.atr_median, 2) if self.atr_median is not None else None,
+            "vol_pct": round(self.vol_pct, 2) if self.vol_pct is not None else None,
+            "regime": self.regime,
+            "structure_stop": round(self.structure_stop, 2) if self.structure_stop is not None else None,
+            "rec_stop": round(self.rec_stop, 2) if self.rec_stop is not None else None,
+            "rec_stop_basis": self.rec_stop_basis,
         }
 
 
@@ -153,6 +231,13 @@ def compute_plan(market: str, daily: CandleSeries, p_up: float | None,
     a22 = atr(candles, 22)
     entry = candles[-1].close
 
+    # 초고수 보강: 정규화 ATR(스파이크 억제) + 변동성 국면. 타점 산출엔 a_eff 사용.
+    rob = robust_atr(candles, 14)
+    a_eff = rob["winsor"] if rob else a14
+    a_med = rob["median"] if rob else None
+    vol_pct = rob["regime_pct"] if rob else None
+    regime = rob["regime"] if rob else "정상"
+
     # 방향: p_up 기준. >0.55 롱, <0.45 숏 판단(관망), 사이면 롱-약(관망 성향).
     if p_up >= 0.55:
         direction = "long"
@@ -162,11 +247,10 @@ def compute_plan(market: str, daily: CandleSeries, p_up: float | None,
         direction = "watch"
     p_used = p_up if direction != "short" else (1 - p_up)
 
-    variants = [_levels(k, entry, a14, p_used, direction) for k in TRADER_TYPES]
+    variants = [_levels(k, entry, a_eff, p_used, direction) for k in TRADER_TYPES]
     primary = next(v for v in variants if v.type_key == PRIMARY_TYPE)
 
-    # 눌림 매수 참고가(롱) / 되돌림 매도 참고가(숏)
-    pullback = entry - 0.5 * a14 if direction != "short" else entry + 0.5 * a14
+    pullback = entry - 0.5 * a_eff if direction != "short" else entry + 0.5 * a_eff
 
     # Chandelier 트레일링(롱=22일고-3·ATR22, 숏=22일저+3·ATR22)
     chand = None
@@ -177,11 +261,26 @@ def compute_plan(market: str, daily: CandleSeries, p_up: float | None,
         else:
             chand = max(c.high for c in seg) - CHANDELIER_MULT * a22
 
+    # 구조 기반 손절(스윙 저/고점) + 권장 손절 = ATR·구조 중 더 타이트한 쪽
+    # (고수 원칙: 손절은 구조에, 사이징은 변동성에. ATR이 과대하면 구조가 더 타이트해짐.)
+    if direction == "short":
+        struct = swing_high(candles, 10)
+        rec_stop = min(primary.stop, struct) if struct is not None else primary.stop
+    else:
+        struct = swing_low(candles, 10)
+        rec_stop = max(primary.stop, struct) if struct is not None else primary.stop
+    rec_basis = "구조(스윙)" if (struct is not None and abs(rec_stop - struct) < 1e-9
+                                  and abs(rec_stop - primary.stop) > 1e-9) else "ATR"
+
     atr_pct = a14 / entry * 100 if entry else 0.0
-    observed = (f"ATR14 {a14:.2f}({atr_pct:.2f}%) · 진입 {entry:.2f} · "
-                f"손절 {primary.stop:.2f} · 목표 {primary.target:.2f} · "
+    eff_pct = a_eff / entry * 100 if entry else 0.0
+    regime_txt = f" · 변동성 {regime}({(vol_pct or 0)*100:.0f}%)" if rob else ""
+    observed = (f"ATR14 원본 {a14:.2f}({atr_pct:.2f}%)→적용 {a_eff:.2f}({eff_pct:.2f}%)"
+                f"{regime_txt} · 진입 {entry:.2f} · 손절 {primary.stop:.2f}"
+                f"(권장 {rec_stop:.2f}·{rec_basis}) · 목표 {primary.target:.2f} · "
                 f"손익비 1:{primary.rr:.1f} · edge {primary.edge:+.1%}")
 
+    surge = recent_surge or (regime == "과열")
     if not primary.qualified:
         comment = "손익분기 승률 미달(edge≤0) — 관망/현금. ATR 타점은 참고만."
     elif direction == "short":
@@ -189,8 +288,14 @@ def compute_plan(market: str, daily: CandleSeries, p_up: float | None,
     else:
         comment = (f"매수 자격 통과(edge {primary.edge:+.1%}) · 권장비중 "
                    f"{primary.kelly_pct:.0f}%(Half Kelly, 상한 {MAX_POSITION_PCT:.0f}%)")
+    if regime == "과열":
+        comment += " · 변동성 과열 → 정규화 ATR 적용(스톱 과대 방지), 구조 손절 우선."
+    elif regime == "저변동":
+        comment += " · 저변동 → ATR 타이트, whipsaw 유의(배수 상향 고려)."
 
     return AtrPlan(
         market=market, direction=direction, atr14=a14, atr22=a22, entry=entry,
         pullback_entry=pullback, chandelier=chand, primary=primary, variants=variants,
-        price_limit_warn=recent_surge, observed=observed, comment=comment)
+        price_limit_warn=surge, observed=observed, comment=comment,
+        atr_eff=a_eff, atr_median=a_med, vol_pct=vol_pct, regime=regime,
+        structure_stop=struct, rec_stop=rec_stop, rec_stop_basis=rec_basis)

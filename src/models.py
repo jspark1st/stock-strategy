@@ -291,6 +291,8 @@ class ScoreResult:
     flows: dict
     market: dict
     direction_hint: float | None = None  # 데이터 부족 시 present 항목 가중평균
+    data_completeness: float | None = None  # 코어 데이터 present 비중(0~1) — 신뢰도
+    signal_agreement: float | None = None    # 항목 신호 일치도(0~1) — 낮을수록 방향 확신 완화
 
     def headline(self) -> str:
         if not self.data_sufficient:
@@ -322,4 +324,7 @@ class ScoreResult:
             "candidates": candidates or [],
             "warnings": self.warnings,
             "sources": sources or [],
+            "data_completeness": self.data_completeness,
+            "signal_agreement": self.signal_agreement,
+            "missing_keys": self.missing_keys,
         }
