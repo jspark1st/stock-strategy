@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="ko" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>market-mood-dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root, [data-theme="light"] {
+      --text-xs: clamp(0.75rem, 0.7rem + 0.25vw, 0.875rem);
+      --text-sm: clamp(0.875rem, 0.8rem + 0.35vw, 1rem);
+      --text-base: clamp(1rem, 0.95rem + 0.25vw, 1.125rem);
+      --text-lg: clamp(1.125rem, 1rem + 0.75vw, 1.5rem);
+      --text-xl: clamp(1.5rem, 1.2rem + 1.25vw, 2.25rem);
+      --text-2xl: clamp(2rem, 1.2rem + 2.5vw, 3.5rem);
+      --space-1: 0.25rem; --space-2: 0.5rem; --space-3: 0.75rem; --space-4: 1rem; --space-5: 1.25rem; --space-6: 1.5rem; --space-8: 2rem; --space-10: 2.5rem; --space-12: 3rem; --space-16: 4rem;
+      --color-bg: #f7f6f2; --color-surface: #f9f8f5; --color-surface-2: #fbfbf9; --color-surface-offset: #f3f0ec; --color-border: #d4d1ca;
+      --color-text: #28251d; --color-text-muted: #7a7974; --color-text-faint: #bab9b4; --color-primary: #01696f; --color-primary-hover:#0c4e54;
+      --color-success:#437a22; --color-error:#a13544; --color-warning:#964219; --radius-sm:0.375rem; --radius-md:0.5rem; --radius-lg:0.75rem; --radius-xl:1rem;
+      --shadow-sm: 0 1px 2px rgba(0,0,0,.06); --shadow-md: 0 6px 20px rgba(0,0,0,.08); --content-wide: 1200px; --font-body:'Inter',sans-serif; --font-display:'Inter',sans-serif;
+    }
+    [data-theme="dark"] {
+      --color-bg:#171614; --color-surface:#1c1b19; --color-surface-2:#201f1d; --color-surface-offset:#1d1c1a; --color-border:#393836;
+      --color-text:#cdccca; --color-text-muted:#9a9996; --color-text-faint:#5a5957; --color-primary:#4f98a3; --color-primary-hover:#227f8b;
+      --color-success:#6daa45; --color-error:#dd6974; --color-warning:#fdab43; --shadow-sm:0 1px 2px rgba(0,0,0,.2); --shadow-md:0 10px 28px rgba(0,0,0,.35);
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    html{-webkit-font-smoothing:antialiased;scroll-behavior:smooth}
+    body{min-height:100dvh;font-family:var(--font-body);font-size:var(--text-base);line-height:1.6;background:var(--color-bg);color:var(--color-text)}
+    button{font:inherit;cursor:pointer;border:none;background:none;color:inherit}
+    .shell{max-width:var(--content-wide);margin:0 auto;padding:var(--space-6)}
+    .topbar{display:flex;justify-content:space-between;align-items:center;gap:var(--space-4);margin-bottom:var(--space-6)}
+    .brand{display:flex;align-items:center;gap:var(--space-3)}
+    .logo{width:36px;height:36px;border-radius:12px;background:linear-gradient(135deg,var(--color-primary),transparent);display:grid;place-items:center;box-shadow:var(--shadow-sm)}
+    .logo svg{width:22px;height:22px}
+    .title{font-size:var(--text-lg);font-weight:800}
+    .muted{color:var(--color-text-muted)}
+    .controls{display:flex;gap:var(--space-3);align-items:center;flex-wrap:wrap}
+    .btn{padding:.72rem 1rem;border-radius:999px;background:var(--color-surface);border:1px solid var(--color-border);box-shadow:var(--shadow-sm)}
+    .btn.primary{background:var(--color-primary);color:#fff;border-color:transparent}
+    .hero{display:grid;grid-template-columns:1.5fr 1fr;gap:var(--space-6);margin-bottom:var(--space-6)}
+    .card{background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-xl);padding:var(--space-6);box-shadow:var(--shadow-sm)}
+    .hero h1{font-size:var(--text-2xl);line-height:1.05;letter-spacing:-.03em;margin-bottom:var(--space-4)}
+    .hero p{max-width:58ch;color:var(--color-text-muted)}
+    .score-wrap{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--space-4);margin-top:var(--space-6)}
+    .score{padding:var(--space-4);border-radius:var(--radius-lg);background:var(--color-surface-2);border:1px solid var(--color-border)}
+    .score .k{font-size:var(--text-xs);color:var(--color-text-muted);text-transform:uppercase;letter-spacing:.08em}
+    .score .v{font-size:var(--text-xl);font-weight:800;margin-top:var(--space-2)}
+    .prob{display:flex;align-items:end;justify-content:space-between;gap:var(--space-4);margin-bottom:var(--space-5)}
+    .ring{width:180px;height:180px;border-radius:50%;background:conic-gradient(var(--color-success) 0 67%, var(--color-error) 67% 100%);display:grid;place-items:center;margin:auto;position:relative}
+    .ring::after{content:"";position:absolute;inset:16px;background:var(--color-surface);border-radius:50%;border:1px solid var(--color-border)}
+    .ring .inner{position:relative;z-index:1;text-align:center}
+    .ring .big{font-size:var(--text-xl);font-weight:800}
+    .grid{display:grid;grid-template-columns:1.1fr .9fr;gap:var(--space-6);margin-bottom:var(--space-6)}
+    .section-title{font-size:var(--text-lg);font-weight:700;margin-bottom:var(--space-4)}
+    table{width:100%;border-collapse:collapse;font-size:var(--text-sm)}
+    th,td{padding:0.9rem .75rem;border-bottom:1px solid var(--color-border);text-align:left;vertical-align:top}
+    th{color:var(--color-text-muted);font-weight:600}
+    .badge{display:inline-flex;align-items:center;gap:.35rem;padding:.28rem .6rem;border-radius:999px;font-size:var(--text-xs);font-weight:700}
+    .up{background:rgba(67,122,34,.12);color:var(--color-success)}
+    .down{background:rgba(161,53,68,.12);color:var(--color-error)}
+    .flat{background:rgba(150,66,25,.12);color:var(--color-warning)}
+    .list{display:grid;gap:var(--space-3)}
+    .item{padding:var(--space-4);border-radius:var(--radius-lg);background:var(--color-surface-2);border:1px solid var(--color-border)}
+    .meter{height:10px;background:var(--color-surface-offset);border-radius:999px;overflow:hidden;margin-top:var(--space-2)}
+    .meter > span{display:block;height:100%;background:linear-gradient(90deg,var(--color-primary),var(--color-success));border-radius:999px}
+    .footer-note{font-size:var(--text-xs);color:var(--color-text-muted);margin-top:var(--space-4)}
+    @media (max-width: 960px){.hero,.grid{grid-template-columns:1fr}.score-wrap{grid-template-columns:1fr}.ring{width:150px;height:150px}}
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="logo" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 16 10 8l4 4 6-8"/>
+            <path d="M4 20h16"/>
+          </svg>
+        </div>
+        <div>
+          <div class="title">Market Mood One-Page</div>
+          <div class="muted">Perplexity API + 증권사 API + 점수 엔진 + Codex 구현용 프로토타입</div>
+        </div>
+      </div>
+      <div class="controls">
+        <button class="btn" data-theme-toggle>다크모드</button>
+        <button class="btn">08:55 동기화</button>
+        <button class="btn primary">09:05 점수 확정</button>
+      </div>
+    </header>
+
+    <section class="hero">
+      <div class="card">
+        <div class="badge up">실전 해석 · 시장 강세 우위</div>
+        <h1>오늘 시장 분위기, 한 페이지에서 상승 확률과 하락 확률로 바로 판단</h1>
+        <p>장전 뉴스 요약, 동시호가 반응, 시초가 갭, 장 초반 거래량과 체결강도를 결합해 시장 강도 점수를 산출하는 화면입니다. Perplexity API는 뉴스와 매크로 해석을 맡고, 증권사 API는 호가·체결·거래량을 맡는 구조로 설계합니다.</p>
+        <div class="score-wrap">
+          <div class="score"><div class="k">시장 종합 점수</div><div class="v">72 / 100</div></div>
+          <div class="score"><div class="k">상승 확률</div><div class="v" style="color:var(--color-success)">67%</div></div>
+          <div class="score"><div class="k">하락 확률</div><div class="v" style="color:var(--color-error)">33%</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="section-title">확률 요약</div>
+        <div class="prob">
+          <div>
+            <div class="muted">현재 해석</div>
+            <div style="font-size:var(--text-xl);font-weight:800;margin-top:var(--space-2)">상승 우세, 단타 가능</div>
+            <div class="footer-note">조건: 개장 후 5분 거래대금 유지, 선도주 이탈 없을 때</div>
+          </div>
+        </div>
+        <div class="ring">
+          <div class="inner">
+            <div class="muted" style="font-size:var(--text-xs)">Bullish Bias</div>
+            <div class="big">67%</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid">
+      <div class="card">
+        <div class="section-title">점수 테이블</div>
+        <table>
+          <thead>
+            <tr><th>항목</th><th>실시간 평가</th><th>점수</th><th>메모</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>장전 뉴스</td><td><span class="badge up">호재 우세</span></td><td>18 / 25</td><td>Perplexity 요약 기준, 반도체·AI·정책 뉴스 우호적</td></tr>
+            <tr><td>동시호가</td><td><span class="badge up">매수 우위</span></td><td>16 / 20</td><td>예상체결가 상향 유지, 선도주 호가 탄탄</td></tr>
+            <tr><td>시초가 갭</td><td><span class="badge flat">과열 주의</span></td><td>11 / 20</td><td>일부 종목 갭 과도, 눌림 확인 필요</td></tr>
+            <tr><td>초반 거래량</td><td><span class="badge up">강함</span></td><td>15 / 20</td><td>5분 거래량이 최근 평균 대비 1.8배</td></tr>
+            <tr><td>체결·수급</td><td><span class="badge up">우호적</span></td><td>12 / 15</td><td>체결강도 유지, 대금 상위 종목 확산 양호</td></tr>
+          </tbody>
+        </table>
+        <div class="footer-note">추천 표시: 75점 이상 공격적, 60~74점 선별, 59점 이하 관망.</div>
+      </div>
+      <div class="card">
+        <div class="section-title">수집 파이프라인</div>
+        <div class="list">
+          <div class="item"><strong>1. Perplexity API</strong><br><span class="muted">장전 뉴스, 정책, 섹터 이슈, 해외증시 요약 → 이벤트 태깅</span><div class="meter"><span style="width:82%"></span></div></div>
+          <div class="item"><strong>2. 증권사 WebSocket API</strong><br><span class="muted">호가, 예상체결, 체결강도, 거래량, 거래대금 실시간 수집</span><div class="meter"><span style="width:90%"></span></div></div>
+          <div class="item"><strong>3. Codex 전용 개발</strong><br><span class="muted">FastAPI 또는 Next.js API Route에서 점수 계산·표 렌더링·알림 생성</span><div class="meter"><span style="width:76%"></span></div></div>
+          <div class="item"><strong>4. 한 페이지 대시보드</strong><br><span class="muted">시장 종합, 상승/하락 확률, 상위 후보 종목, 주의 경고를 한 화면에 배치</span><div class="meter"><span style="width:88%"></span></div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid">
+      <div class="card">
+        <div class="section-title">Codex용 구현 메모</div>
+        <table>
+          <tbody>
+            <tr><th>백엔드</th><td>Python FastAPI 권장, asyncio로 WebSocket 수집기 분리</td></tr>
+            <tr><th>프론트</th><td>Next.js 또는 정적 HTML 대시보드, SSE/WebSocket으로 점수 갱신</td></tr>
+            <tr><th>저장소</th><td>PostgreSQL + Redis, 원시 tick은 압축 저장</td></tr>
+            <tr><th>알림</th><td>Telegram/Slack: 70점 이상 시 장전 알림, 09:05 재평가 발송</td></tr>
+            <tr><th>보안</th><td>증권사 appKey/appSecret은 서버 환경변수 보관, 프론트 직접 노출 금지</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card">
+        <div class="section-title">상위 액션</div>
+        <div class="list">
+          <div class="item"><strong>A.</strong> 08:10 Perplexity 요약 시작, 섹터별 뉴스 점수 산출</div>
+          <div class="item"><strong>B.</strong> 08:30 동시호가와 예상체결가 변화 추적 시작</div>
+          <div class="item"><strong>C.</strong> 09:03 거래량 급증 종목과 선도주 유지 여부 재채점</div>
+          <div class="item"><strong>D.</strong> 09:05 시장 분위기 확정 점수와 코멘트 표 생성</div>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+    (function(){const t=document.querySelector('[data-theme-toggle]'),r=document.documentElement;let d=matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light';r.setAttribute('data-theme',d);t.textContent=d==='dark'?'라이트모드':'다크모드';t&&t.addEventListener('click',()=>{d=d==='dark'?'light':'dark';r.setAttribute('data-theme',d);t.textContent=d==='dark'?'라이트모드':'다크모드';});})();
+  </script>
+</body>
+</html>

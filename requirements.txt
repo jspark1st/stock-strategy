@@ -1,0 +1,5 @@
+# stock_strategy (easystock) 런타임 의존성 — stdlib 외 최소.
+httpx>=0.28
+anthropic>=0.69
+# requests 는 현재 미사용(httpx만). 필요 시 활성화.
+# requests>=2.32

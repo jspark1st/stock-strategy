@@ -1,0 +1,24 @@
+# secrets — 절대 커밋 금지
+.env
+.env.*.local
+
+# python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# 수집 원본 / 산출물
+data/raw/
+out/
+
+# LS 접근토큰 캐시 (시크릿 — 절대 커밋 금지)
+data/.ls_token.json
+
+# 로컬 DB 캐시 (정본은 원격 Proxmox 서버 — 커밋 안 함)
+data/history.db
+
+# 도구/에디터 산출물
+.playwright-mcp/
+.claude/settings.local.json
+*.log

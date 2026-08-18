@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="ko" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>market-close-review-dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root, [data-theme="light"] {
+      --text-xs: clamp(0.75rem, 0.7rem + 0.25vw, 0.875rem);
+      --text-sm: clamp(0.875rem, 0.8rem + 0.35vw, 1rem);
+      --text-base: clamp(1rem, 0.95rem + 0.25vw, 1.125rem);
+      --text-lg: clamp(1.125rem, 1rem + 0.75vw, 1.5rem);
+      --text-xl: clamp(1.5rem, 1.2rem + 1.25vw, 2.25rem);
+      --text-2xl: clamp(2rem, 1.2rem + 2.5vw, 3.5rem);
+      --space-1: 0.25rem; --space-2: 0.5rem; --space-3: 0.75rem; --space-4: 1rem; --space-5: 1.25rem; --space-6: 1.5rem; --space-8: 2rem; --space-10: 2.5rem; --space-12: 3rem; --space-16: 4rem;
+      --color-bg: #f7f6f2; --color-surface: #f9f8f5; --color-surface-2: #fbfbf9; --color-surface-offset: #f3f0ec; --color-border: #d4d1ca;
+      --color-text: #28251d; --color-text-muted: #7a7974; --color-text-faint: #bab9b4; --color-primary: #01696f; --color-primary-hover:#0c4e54;
+      --color-success:#437a22; --color-error:#a13544; --color-warning:#964219; --radius-sm:0.375rem; --radius-md:0.5rem; --radius-lg:0.75rem; --radius-xl:1rem;
+      --shadow-sm: 0 1px 2px rgba(0,0,0,.06); --shadow-md: 0 6px 20px rgba(0,0,0,.08); --content-wide: 1200px; --font-body:'Inter',sans-serif; --font-display:'Inter',sans-serif;
+    }
+    [data-theme="dark"] {
+      --color-bg:#171614; --color-surface:#1c1b19; --color-surface-2:#201f1d; --color-surface-offset:#1d1c1a; --color-border:#393836;
+      --color-text:#cdccca; --color-text-muted:#9a9996; --color-text-faint:#5a5957; --color-primary:#4f98a3; --color-primary-hover:#227f8b;
+      --color-success:#6daa45; --color-error:#dd6974; --color-warning:#fdab43; --shadow-sm:0 1px 2px rgba(0,0,0,.2); --shadow-md:0 10px 28px rgba(0,0,0,.35);
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    html{-webkit-font-smoothing:antialiased;scroll-behavior:smooth}
+    body{min-height:100dvh;font-family:var(--font-body);font-size:var(--text-base);line-height:1.6;background:var(--color-bg);color:var(--color-text)}
+    button{font:inherit;cursor:pointer;border:none;background:none;color:inherit}
+    .shell{max-width:var(--content-wide);margin:0 auto;padding:var(--space-6)}
+    .topbar{display:flex;justify-content:space-between;align-items:center;gap:var(--space-4);margin-bottom:var(--space-6)}
+    .brand{display:flex;align-items:center;gap:var(--space-3)}
+    .logo{width:36px;height:36px;border-radius:12px;background:linear-gradient(135deg,var(--color-primary),transparent);display:grid;place-items:center;box-shadow:var(--shadow-sm)}
+    .logo svg{width:22px;height:22px}
+    .title{font-size:var(--text-lg);font-weight:800}
+    .muted{color:var(--color-text-muted)}
+    .controls{display:flex;gap:var(--space-3);align-items:center;flex-wrap:wrap}
+    .btn{padding:.72rem 1rem;border-radius:999px;background:var(--color-surface);border:1px solid var(--color-border);box-shadow:var(--shadow-sm)}
+    .btn.primary{background:var(--color-primary);color:#fff;border-color:transparent}
+    .hero{display:grid;grid-template-columns:1.5fr 1fr;gap:var(--space-6);margin-bottom:var(--space-6)}
+    .card{background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-xl);padding:var(--space-6);box-shadow:var(--shadow-sm)}
+    .hero h1{font-size:var(--text-2xl);line-height:1.05;letter-spacing:-.03em;margin-bottom:var(--space-4)}
+    .hero p{max-width:58ch;color:var(--color-text-muted)}
+    .score-wrap{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--space-4);margin-top:var(--space-6)}
+    .score{padding:var(--space-4);border-radius:var(--radius-lg);background:var(--color-surface-2);border:1px solid var(--color-border)}
+    .score .k{font-size:var(--text-xs);color:var(--color-text-muted);text-transform:uppercase;letter-spacing:.08em}
+    .score .v{font-size:var(--text-xl);font-weight:800;margin-top:var(--space-2)}
+    .prob{display:flex;align-items:end;justify-content:space-between;gap:var(--space-4);margin-bottom:var(--space-5)}
+    .ring{width:180px;height:180px;border-radius:50%;background:conic-gradient(var(--color-success) 0 67%, var(--color-error) 67% 100%);display:grid;place-items:center;margin:auto;position:relative}
+    .ring::after{content:"";position:absolute;inset:16px;background:var(--color-surface);border-radius:50%;border:1px solid var(--color-border)}
+    .ring .inner{position:relative;z-index:1;text-align:center}
+    .ring .big{font-size:var(--text-xl);font-weight:800}
+    .grid{display:grid;grid-template-columns:1.1fr .9fr;gap:var(--space-6);margin-bottom:var(--space-6)}
+    .section-title{font-size:var(--text-lg);font-weight:700;margin-bottom:var(--space-4)}
+    table{width:100%;border-collapse:collapse;font-size:var(--text-sm)}
+    th,td{padding:0.9rem .75rem;border-bottom:1px solid var(--color-border);text-align:left;vertical-align:top}
+    th{color:var(--color-text-muted);font-weight:600}
+    .badge{display:inline-flex;align-items:center;gap:.35rem;padding:.28rem .6rem;border-radius:999px;font-size:var(--text-xs);font-weight:700}
+    .up{background:rgba(67,122,34,.12);color:var(--color-success)}
+    .down{background:rgba(161,53,68,.12);color:var(--color-error)}
+    .flat{background:rgba(150,66,25,.12);color:var(--color-warning)}
+    .list{display:grid;gap:var(--space-3)}
+    .item{padding:var(--space-4);border-radius:var(--radius-lg);background:var(--color-surface-2);border:1px solid var(--color-border)}
+    .meter{height:10px;background:var(--color-surface-offset);border-radius:999px;overflow:hidden;margin-top:var(--space-2)}
+    .meter > span{display:block;height:100%;background:linear-gradient(90deg,var(--color-primary),var(--color-success));border-radius:999px}
+    .footer-note{font-size:var(--text-xs);color:var(--color-text-muted);margin-top:var(--space-4)}
+    @media (max-width: 960px){.hero,.grid{grid-template-columns:1fr}.score-wrap{grid-template-columns:1fr}.ring{width:150px;height:150px}}
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="logo" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 16 10 8l4 4 6-8"/>
+            <path d="M4 20h16"/>
+          </svg>
+        </div>
+        <div>
+          <div class="title">Market Close Review One-Page</div>
+          <div class="muted">마감 점수 + 익일 확률 + 당일 복기 · Perplexity API + 증권사 API + 점수 엔진</div>
+        </div>
+      </div>
+      <div class="controls">
+        <button class="btn" data-theme-toggle>다크모드</button>
+        <button class="btn">15:45 동기화</button>
+        <button class="btn primary">16:30 점수 확정</button>
+      </div>
+    </header>
+
+    <section class="hero">
+      <div class="card">
+        <div class="badge up">마감 해석 · 익일 우호 · [확정]</div>
+        <h1>오늘 마감을 채점하고, 내일 상승 확률과 하락 확률로 바로 판단</h1>
+        <p>종가 위치, 시장 폭, 투자주체별 순매수, 거래대금, 마감 동시호가, 마감 후 재료를 결합해 마감 강도 점수와 익일 확률을 산출하는 화면입니다. Perplexity API는 마감 뉴스·공시 해석을 맡고, 증권사 API는 종가·수급·거래대금을 맡는 구조로 설계합니다.</p>
+        <div class="score-wrap">
+          <div class="score"><div class="k">마감 종합 점수</div><div class="v">68 / 100</div></div>
+          <div class="score"><div class="k">익일 상승 확률</div><div class="v" style="color:var(--color-success)">62%</div></div>
+          <div class="score"><div class="k">익일 하락 확률</div><div class="v" style="color:var(--color-error)">38%</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="section-title">익일 확률 요약</div>
+        <div class="prob">
+          <div>
+            <div class="muted">현재 해석</div>
+            <div style="font-size:var(--text-xl);font-weight:800;margin-top:var(--space-2)">익일 우호, 선별 진입</div>
+            <div class="footer-note">조건: 익일 아침 게이트 동시 충족, 마감 후 악재 공시 없을 때</div>
+          </div>
+        </div>
+        <div class="ring" style="background:conic-gradient(var(--color-success) 0 62%, var(--color-error) 62% 100%)">
+          <div class="inner">
+            <div class="muted" style="font-size:var(--text-xs)">Next-Day Bullish</div>
+            <div class="big">62%</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid">
+      <div class="card">
+        <div class="section-title">점수 테이블</div>
+        <table>
+          <thead>
+            <tr><th>항목</th><th>마감 평가</th><th>점수</th><th>메모</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>종가 강도</td><td><span class="badge up">고가권 마감</span></td><td>15 / 20</td><td>종가 위치 0.78, 5일선 상회 유지</td></tr>
+            <tr><td>시장 폭</td><td><span class="badge flat">보통</span></td><td>11 / 20</td><td>상승 비율 0.54, 대형주 주도 성격</td></tr>
+            <tr><td>투자주체 수급</td><td><span class="badge up">외국인 순매수</span></td><td>18 / 25</td><td>외국인 3일 연속 순매수, 기관 소폭 매도</td></tr>
+            <tr><td>거래대금</td><td><span class="badge up">증가</span></td><td>11 / 15</td><td>20일 평균 대비 1.7배</td></tr>
+            <tr><td>마감 동시호가</td><td><span class="badge up">매수 우위</span></td><td>7 / 10</td><td>15:20 대비 지수 상향 마감</td></tr>
+            <tr><td>마감 후 재료</td><td><span class="badge flat">중립</span></td><td>6 / 10</td><td>미국 선물 강보합, 악재 공시 없음</td></tr>
+          </tbody>
+        </table>
+        <div class="footer-note">익일 대응: 75점 이상 공격적, 55~74점 선별, 54점 이하 관망. 최종 비중 = min(마감 게이트, 익일 아침 게이트).</div>
+      </div>
+      <div class="card">
+        <div class="section-title">채점 · 복기</div>
+        <div class="list">
+          <div class="item"><strong>아침 점수 채점</strong><br><span class="muted">예측 81점 / 상승 85% → 실제 상승 마감. 방향 적중</span><div class="meter"><span style="width:85%"></span></div></div>
+          <div class="item"><strong>누적 브라이어 스코어</strong><br><span class="muted">최근 30거래일 0.19 · 모델 신뢰 가능 구간</span><div class="meter"><span style="width:81%"></span></div></div>
+          <div class="item"><strong>규칙 준수율</strong><br><span class="muted">손절 준수 O · 타임스톱 준수 O · 계획 이탈 없음 → 100%</span><div class="meter"><span style="width:100%"></span></div></div>
+          <div class="item"><strong>항목별 최대 오차</strong><br><span class="muted">시장 폭 — 지수 대비 과대평가 경향 3일 연속</span><div class="meter"><span style="width:42%"></span></div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid">
+      <div class="card">
+        <div class="section-title">Codex용 구현 메모</div>
+        <table>
+          <tbody>
+            <tr><th>백엔드</th><td>Python FastAPI + APScheduler, 아침 파이프라인과 같은 DB·서버 공유</td></tr>
+            <tr><th>프론트</th><td>Next.js App Router + recharts, 결측 항목은 회색 빗금 처리</td></tr>
+            <tr><th>저장소</th><td>PostgreSQL: daily_market, daily_flows, scores(phase), candidates, trades</td></tr>
+            <tr><th>알림</th><td>Telegram 17:00 발송, 확정치 반영 후 [정정] 메시지 별도 발송</td></tr>
+            <tr><th>공시 감시</th><td>DART OpenAPI 16:00~18:00 5분 폴링, 유상증자·CB 감지 시 후보 즉시 탈락</td></tr>
+            <tr><th>보안</th><td>증권사 appKey/appSecret은 서버 환경변수 보관, 프론트 직접 노출 금지</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card">
+        <div class="section-title">마감 루틴</div>
+        <div class="list">
+          <div class="item"><strong>A.</strong> 15:20 마감 동시호가 추적, 종가 베팅 3조건 판정</div>
+          <div class="item"><strong>B.</strong> 15:45 종가·거래대금·투자자별 수급 잠정치 수집</div>
+          <div class="item"><strong>C.</strong> 16:30 마감 점수 확정, 아침 점수 채점, 브라이어 갱신</div>
+          <div class="item"><strong>D.</strong> 17:00 리포트 발송 · 18:20 확정치 반영 재계산</div>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+    (function(){const t=document.querySelector('[data-theme-toggle]'),r=document.documentElement;let d=matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light';r.setAttribute('data-theme',d);t.textContent=d==='dark'?'라이트모드':'다크모드';t&&t.addEventListener('click',()=>{d=d==='dark'?'light':'dark';r.setAttribute('data-theme',d);t.textContent=d==='dark'?'라이트모드':'다크모드';});})();
+  </script>
+</body>
+</html>
