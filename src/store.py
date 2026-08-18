@@ -134,6 +134,16 @@ def grade_pending(conn: sqlite3.Connection, market: str, report_type: str,
             "outcome_chg_pct": round(outcome_chg_pct, 2)}
 
 
+def latest_prediction(conn: sqlite3.Connection, market: str,
+                      report_type: str = "close") -> dict | None:
+    """가장 최근 기록된 예측 1건(개장 전 재검토의 앵커)."""
+    cur = conn.execute(
+        "SELECT * FROM daily WHERE market=? AND report_type=? "
+        "ORDER BY trade_date DESC, id DESC LIMIT 1", (market, report_type))
+    row = cur.fetchone()
+    return dict(row) if row else None
+
+
 def accuracy(conn: sqlite3.Connection, market: str, report_type: str = "close",
              window: int = 20) -> dict:
     """최근 window 채점건의 성적 요약(자가학습 지표)."""

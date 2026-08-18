@@ -98,19 +98,22 @@ def build_hero(r: dict) -> str:
     p_up = r.get("p_up") or 0.0
     p_down = r.get("p_down") or (1 - p_up)
     total_txt = fmt(total) if total is not None else "—"
+    preopen = r.get("report_type") == "preopen"
+    total_lbl = "전일 마감 총점 / 100" if preopen else "총점 / 100"
+    up_lbl, down_lbl = ("오늘 상승 확률", "오늘 하락 확률") if preopen else ("익일 상승 확률", "익일 하락 확률")
     return f"""
     <div class="stat">
       <div class="big" style="color:var(--accent)">{total_txt}</div>
-      <div class="lbl">총점 / 100</div>
+      <div class="lbl">{total_lbl}</div>
       <div class="grade" style="color:{grade_color(r.get('grade',''))}">{grade}</div>
     </div>
     <div class="stat">
       <div class="donut" style="--p:{p_up*100:.0f};--dc:var(--up)"><div class="inner" style="color:var(--up)">{p_up*100:.0f}%</div></div>
-      <div class="lbl">익일 상승 확률</div>
+      <div class="lbl">{up_lbl}</div>
     </div>
     <div class="stat">
       <div class="donut" style="--p:{p_down*100:.0f};--dc:var(--down)"><div class="inner" style="color:var(--down)">{p_down*100:.0f}%</div></div>
-      <div class="lbl">익일 하락 확률</div>
+      <div class="lbl">{down_lbl}</div>
     </div>"""
 
 
@@ -450,10 +453,11 @@ def build_reopen(r: dict) -> str:
     rr = (r.get("narrative", {}) or {}).get("reopen_review") or []
     if not rr:
         return ""
+    title = "장중 확인 체크리스트" if r.get("report_type") == "preopen" else "익일 개장 전 재검토 체크리스트"
     items = "".join(f"<li>{esc(x)}</li>" for x in rr)
     return f"""
   <div class="card">
-    <h2>익일 개장 전 재검토 체크리스트</h2>
+    <h2>{esc(title)}</h2>
     <ul class="check">{items}</ul>
   </div>"""
 
@@ -471,11 +475,12 @@ def render_report_view(r: dict, date: str) -> str:
                   else '<span class="badge badge-ok">확정</span>')
     group = esc(r.get("group", "장 마감"))
     label = esc(r.get("label", "코스피"))
+    view_date = esc(r.get("trade_date", date))
     nar = r.get("narrative", {}) or {}
     headline = nar.get("character") or r.get("headline", "")
     return f"""
     <div class="view-head">
-      <div class="view-title">{label} <span class="view-sub">· {group} · {esc(date)}</span> {prov_badge}</div>
+      <div class="view-title">{label} <span class="view-sub">· {group} · {view_date}</span> {prov_badge}</div>
       <div class="muted">{build_market_line(r.get('market', {}))}</div>
     </div>
 

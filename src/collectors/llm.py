@@ -190,7 +190,7 @@ _CLAUDE_SYS = (
 
 
 def claude_synthesize(ctx: dict, research: dict | None, draft: str | None,
-                      env: dict) -> dict | None:
+                      env: dict, sys: str | None = None) -> dict | None:
     key = env.get("claude_api")
     if not key:
         return None
@@ -206,7 +206,7 @@ def claude_synthesize(ctx: dict, research: dict | None, draft: str | None,
         client = anthropic.Anthropic(api_key=key)
         msg = client.messages.create(
             model=CLAUDE_MODEL, max_tokens=4000,
-            system=_CLAUDE_SYS, messages=[{"role": "user", "content": user}])
+            system=sys or _CLAUDE_SYS, messages=[{"role": "user", "content": user}])
         text = "".join(b.text for b in msg.content if getattr(b, "type", "") == "text")
         return _parse_json(text)
     except Exception:  # noqa
@@ -265,5 +265,80 @@ def build_narrative(ctx: dict, env: dict | None = None) -> Narrative:
     elif draft:                       # Claude 실패 → Gemini 초안을 성격으로 대체
         n.character = draft
     elif research:                    # 둘 다 실패 → 리서치 텍스트라도
+        n.character = research["text"]
+    return n
+
+
+# ── 개장 전(재검토) 파이프라인 ─────────────────────────────────────────────
+_PREOPEN_SYS = (
+    "너는 한국 증시 '개장 전' 재검토 리포트의 최종 편집자다. 사용자는 전일 마감 리포트로 "
+    "매수/매도를 정했고, 오늘 개장 전 그 판단을 재검토한다. Perplexity(간밤 실시간)와 "
+    "Gemini(계산·검증)를 종합한다. 규칙: 점수·확률·가격 등 수치는 '확정 수치'(전일 마감 값)만 "
+    "인용하고 새 수치를 만들지 마라. 간밤 미국장/선물/환율 수치는 정성적으로 쓰거나 '(간밤 확인)' "
+    "이라고 명시. 반드시 '전일 판단 유지 or 수정'을 분명히 하는 개장 대응 결론을 낸다. "
+    "출력은 아래 JSON 하나만(마크다운·설명 없이):\n"
+    '{"character": str(2~3문장, 간밤 시장 요약),'
+    ' "scenarios": {"up": str(갭업/상방 시나리오), "down": str(갭다운/하방 시나리오), "trigger": str(개장 핵심 변수)},'
+    ' "conclusion": str(오늘 개장 대응 한 줄 — 전일 판단 유지/수정 명시),'
+    ' "risks": [str,...](장중 경계 리스크 2~4개),'
+    ' "materials": [{"tag":"호재|악재","text":str},...](간밤 주요 재료 2~5개),'
+    ' "reopen_review": [str,...](장중 확인 체크리스트 3~5개)}')
+
+
+def preopen_research(ctx: dict, env: dict) -> dict | None:
+    key = env.get("perplexity_api")
+    if not key:
+        return None
+    sys = ("너는 한국 증시 애널리스트다. 웹 실시간으로 간밤 해외 증시와 오늘 개장 여건을 "
+           "조사한다. 한국어, 사실 위주, 확인 안 된 수치는 지어내지 마라.")
+    user = (f"오늘({ctx.get('trade_date')}) {ctx.get('label')} 개장 전 브리핑:\n"
+            "1) 간밤 미국 증시(다우·나스닥·S&P500·필라델피아 반도체 SOX) 방향\n"
+            "2) 야간 선물·원달러 환율 동향\n"
+            "3) 전일 한국 마감 이후 나온 주요 재료(호재/악재)\n"
+            "4) 오늘 한국 증시 개장 갭 전망(상방/하방)과 근거\n"
+            "5) 장중 경계할 리스크\n각 항목 간결히. 마지막에 한 줄 총평.")
+    body = {"model": PPLX_MODEL, "temperature": 0.2, "max_tokens": 900,
+            "messages": [{"role": "system", "content": sys}, {"role": "user", "content": user}]}
+    try:
+        r = httpx.post(PPLX_URL, headers={"Authorization": f"Bearer {key}"},
+                       json=body, timeout=TIMEOUT)
+        r.raise_for_status()
+        data = r.json()
+        text = data["choices"][0]["message"]["content"]
+        sources = [{"title": s.get("title", ""), "url": s.get("url", "")}
+                   for s in (data.get("search_results") or [])]
+        if not sources:
+            sources = [{"title": u, "url": u} for u in (data.get("citations") or [])[:8]]
+        return {"text": text, "sources": sources}
+    except Exception:  # noqa
+        return None
+
+
+def build_preopen(ctx: dict, env: dict | None = None) -> Narrative:
+    """개장 전 재검토 서술 — Perplexity(간밤) → Gemini(검증) → Claude(종합)."""
+    env = env or load_env()
+    trace, sources = [], []
+    research = preopen_research(ctx, env)
+    trace.append("간밤 리서치 ✓" if research else "간밤 리서치 미실행")
+    if research:
+        sources.extend(research.get("sources", []))
+    draft = gemini_draft(ctx, research, env)
+    trace.append("검증 ✓" if draft else "검증 미실행")
+    final = claude_synthesize(ctx, research, draft, env, sys=_PREOPEN_SYS)
+    trace.append("종합 ✓" if final else "종합 미실행")
+
+    n = Narrative(engine_trace=trace, sources=sources[:8])
+    if final:
+        n.character = final.get("character", "")
+        sc = final.get("scenarios") or {}
+        n.scenarios = {"up": sc.get("up", ""), "down": sc.get("down", ""),
+                       "trigger": sc.get("trigger", "")}
+        n.conclusion = final.get("conclusion", "")
+        n.risks = final.get("risks") or []
+        n.materials = final.get("materials") or []
+        n.reopen_review = final.get("reopen_review") or []
+    elif draft:
+        n.character = draft
+    elif research:
         n.character = research["text"]
     return n
