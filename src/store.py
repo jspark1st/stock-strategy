@@ -113,6 +113,12 @@ CREATE TABLE IF NOT EXISTS paper_trades (
 VOL_FACTOR_DEFAULT = {"KOSPI": 0.93, "KOSDAQ": 0.96}
 MIN_VOL_SAMPLES = 8
 
+# 목표 레이블 고정(evaluation2 P0-6): 방향 모델의 '익일 상승/하락' 공식 정의.
+# = **다음 거래일 종가 수익률 부호**(realized_up = outcome_chg_pct > 0). 코드·UI·백테스트가
+# 이 하나만 쓴다. ATR 목표·손절 '도달 확률'은 이것과 다른 값(별도 path model, 미구현)이며,
+# 방향확률을 손익비 승률로 대체하지 않는다.
+DIRECTION_LABEL = "next_close_return_sign"
+
 
 # 기존 DB에 나중에 추가된 컬럼 — CREATE TABLE IF NOT EXISTS 로는 안 붙으므로 명시 마이그레이션.
 _MIGRATIONS = [("daily", "p_up_raw", "REAL")]

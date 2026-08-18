@@ -95,7 +95,8 @@ def build_preopen(close_rep: dict, today: str, env: dict, anchor_date: str,
     state = strategy.preopen_state(entered, direction, confirm_mult, cfg, event_lock)
     ov = {**tilt_info, "anchor_p_up": anchor_p_up, "p_up": p_up,
           "world": world or {}, "usdkrw_chg": fx_chg,
-          "confirm_mult": confirm_mult, "direction": direction}
+          "confirm_mult": confirm_mult, "direction": direction,
+          "exit_plan": strategy.exit_plan(cfg, direction)}
 
     ctx = {
         "label": market_ko, "trade_date": today,

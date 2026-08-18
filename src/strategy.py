@@ -112,6 +112,43 @@ def preopen_state(entered: bool, direction: str, confirm_mult: float | None,
             "reason": f"야간 컨펌 {confirm_mult:.2f} — 전제 유지"}
 
 
+# ── 5) OPEN_EXIT_OR_HOLD — 개장 후 청산 규칙 ─────────────────────────────────
+EXIT_RULES = {
+    "next_open_0905": "다음날 09:05 청산(갭 방향만 취득, 기준 전략)",
+    "opening_range": "첫 5~15분 고저 이탈에 따라 유지/청산",
+    "time_stop": "지정 시각까지 기대 방향 미확인 시 청산",
+}
+
+
+def exit_plan(cfg: dict, direction: str = "long") -> dict:
+    """개장 후 청산 규칙 템플릿(evaluation3). 기준 전략은 단순(09:05 청산) → 이후 A/B 확장.
+
+    실제 청산가는 다음날 장초반 데이터(LS 분봉)로 채운다. 여기선 어떤 규칙을 쓸지만 고정.
+    """
+    x = cfg["exit"]
+    rule = x.get("baseline", "next_open_0905")
+    return {"rule": rule, "description": EXIT_RULES.get(rule, rule),
+            "time_stop": x.get("time_stop"), "direction": direction}
+
+
+def exit_decision(entry_price: float, direction: str, prices: dict, rule: str) -> dict:
+    """청산 판정 — 다음날 장초반 실측 prices({open, p0905, p0915, high, low})로.
+
+    반환: {exit, price, reason}. 데이터 없으면 exit=False(대기).
+    """
+    if rule == "next_open_0905" and prices.get("p0905"):
+        return {"exit": True, "price": prices["p0905"], "reason": "09:05 정시 청산"}
+    if rule == "opening_range":
+        hi, lo = prices.get("or_high"), prices.get("or_low")
+        last = prices.get("p0915")
+        if hi and lo and last:
+            if direction != "short" and last < lo:
+                return {"exit": True, "price": last, "reason": "오프닝레인지 저가 이탈"}
+            if direction == "short" and last > hi:
+                return {"exit": True, "price": last, "reason": "오프닝레인지 고가 이탈"}
+    return {"exit": False, "price": None, "reason": "청산 조건 미충족(보유)"}
+
+
 # ── 6) 순기대값(비용 포함) — path 확률 아님, 방향확률 기준 근사 ────────────────
 def net_expected_value(p_win: float, avg_win_pct: float, avg_loss_pct: float,
                        cfg: dict) -> dict:

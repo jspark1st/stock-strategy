@@ -333,10 +333,13 @@ def build_preopen_state(r: dict) -> str:
     ov = r.get("overnight") or {}
     cm = ov.get("confirm_mult")
     cmtxt = f' · 야간 컨펌 배수 {cm:.2f}' if cm is not None else ''
+    xp = ov.get("exit_plan") or {}
+    xtxt = (f'<div class="note muted">개장 후 청산 규칙: {esc(xp.get("description",""))}</div>'
+            if xp.get("description") else '')
     return (f'<div class="card"><h2>개장 전 최종 결정 '
             f'<span class="pill" style="background:{scol}">{esc(st["state"])}</span></h2>'
             f'<div class="ov-trans"><b>{esc(st.get("action",""))}</b>'
-            f'<span class="muted"> — {esc(st.get("reason",""))}{cmtxt}</span></div>'
+            f'<span class="muted"> — {esc(st.get("reason",""))}{cmtxt}</span></div>{xtxt}'
             f'<div class="note muted">전날 종가 진입분에 대한 개장 행동. 위험등급 신규진입은 계속 차단.</div></div>')
 
 
