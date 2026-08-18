@@ -8,7 +8,7 @@ export const config = {
 };
 
 export default function middleware(request) {
-  const token = process.env.AUTH_TOKEN || '';
+  const token = process.env.auth_token || process.env.AUTH_TOKEN || '';
   const cookie = request.headers.get('cookie') || '';
   const authed = token && cookie.split(/;\s*/).includes('es_auth=' + token);
   if (authed) return next();

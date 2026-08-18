@@ -8,8 +8,8 @@ export default function handler(req, res) {
   } else {
     password = body.password || (req.query && req.query.password) || '';
   }
-  const expected = process.env.VIEW_PASSWORD || '';
-  const token = process.env.AUTH_TOKEN || '';
+  const expected = process.env.view_password || process.env.VIEW_PASSWORD || '';
+  const token = process.env.auth_token || process.env.AUTH_TOKEN || '';
   if (password && expected && password === expected && token) {
     res.setHeader(
       'Set-Cookie',
