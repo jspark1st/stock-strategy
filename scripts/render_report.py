@@ -351,7 +351,7 @@ def build_risks(r: dict) -> str:
         return ""
     live_html = "".join(f'<li class="risk-live">{esc(x)}</li>' for x in live)
     sys_html = "".join(f"<li>{esc(w)}</li>" for w in sys_warn)
-    live_sec = (f'<div class="sub-h">실시간 리스크 <span class="tag-src">Perplexity</span></div>'
+    live_sec = (f'<div class="sub-h">실시간 리스크</div>'
                 f'<ul class="risk-ul">{live_html}</ul>' if live else "")
     sys_sec = (f'<div class="sub-h">시스템 신호</div><ul>{sys_html}</ul>'
                if sys_warn else "")
@@ -374,7 +374,7 @@ def build_materials(r: dict) -> str:
         col = tag_col.get(tag, "var(--muted)")
         mat_html += (f'<li><span class="mtag" style="background:{col}">{esc(tag)}</span>'
                      f'{esc(text)}</li>')
-    mat_sec = (f'<div class="sub-h">주요 재료 <span class="tag-src">Perplexity</span></div>'
+    mat_sec = (f'<div class="sub-h">주요 재료</div>'
                f'<ul class="mat-ul">{mat_html}</ul>' if mats else "")
 
     def _src_li(s: dict) -> str:
@@ -458,8 +458,7 @@ def render_report_view(r: dict, date: str) -> str:
     {build_risks(r)}
     {build_materials(r)}
     {build_accuracy(r)}
-    {build_reopen(r)}
-    {build_engine_trace(r)}"""
+    {build_reopen(r)}"""
 
 
 def render_placeholder_view(p: dict) -> str:
