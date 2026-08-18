@@ -107,9 +107,11 @@ def main() -> int:
     out_dir = ROOT / "out"
     out_dir.mkdir(exist_ok=True)
     out_path = out_dir / f"report_{today}.html"
-    out_path.write_text(render(bundle), encoding="utf-8")
-    (out_dir / f"bundle_preopen_{today}.json").write_text(
-        json.dumps(bundle, ensure_ascii=False, indent=2), encoding="utf-8")
+    html = render(bundle)
+    out_path.write_text(html, encoding="utf-8")
+    pub = ROOT / "public"
+    pub.mkdir(exist_ok=True)
+    (pub / "index.html").write_text(html, encoding="utf-8")
     print(f"✓ 개장 전 대시보드 생성: {out_path}  ({out_path.stat().st_size:,} bytes)")
 
     if remote.push_report(out_path, env):

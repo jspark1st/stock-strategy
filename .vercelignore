@@ -1,0 +1,22 @@
+# Vercel 배포엔 웹 자산만 — 파이썬 파이프라인/데이터/문서 제외.
+# 포함되는 것: public/ · api/ · middleware.js · vercel.json · package.json
+src/
+scripts/
+tests/
+docs/
+guide_docs/
+assets/
+data/
+out/
+memory/
+__pycache__/
+.pytest_cache/
+.claude/
+*.py
+*.pyc
+requirements.txt
+conftest.py
+CLAUDE.md
+README.md
+.env
+.env.*

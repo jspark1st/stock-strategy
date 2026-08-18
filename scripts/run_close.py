@@ -313,7 +313,12 @@ def main() -> int:
     out_dir = ROOT / "out"
     out_dir.mkdir(exist_ok=True)
     out_path = out_dir / f"report_{trade_date}.html"
-    out_path.write_text(render(bundle), encoding="utf-8")
+    html = render(bundle)
+    out_path.write_text(html, encoding="utf-8")
+    # Vercel 배포용 최신 대시보드
+    pub = ROOT / "public"
+    pub.mkdir(exist_ok=True)
+    (pub / "index.html").write_text(html, encoding="utf-8")
     # 번들 JSON 저장(무료 재렌더 · 개장전 파이프라인 재사용용)
     (out_dir / f"bundle_{trade_date}.json").write_text(
         json.dumps(bundle, ensure_ascii=False, indent=2), encoding="utf-8")

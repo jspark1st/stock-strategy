@@ -1,0 +1,8 @@
+{
+  "name": "easystock-web",
+  "private": true,
+  "description": "easystock by junaitech — 정적 대시보드 + 비밀번호 게이트(Vercel)",
+  "dependencies": {
+    "@vercel/functions": "^2.0.0"
+  }
+}
