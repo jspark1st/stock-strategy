@@ -51,6 +51,8 @@ CREATE TABLE IF NOT EXISTS daily (
   hit_stop      INTEGER,
   correct       INTEGER,
   brier         REAL,
+  mfe_pct       REAL,
+  mae_pct       REAL,
   graded_at     TEXT,
   UNIQUE(market, report_type, trade_date)
 );
@@ -121,7 +123,8 @@ DIRECTION_LABEL = "next_close_return_sign"
 
 
 # 기존 DB에 나중에 추가된 컬럼 — CREATE TABLE IF NOT EXISTS 로는 안 붙으므로 명시 마이그레이션.
-_MIGRATIONS = [("daily", "p_up_raw", "REAL")]
+_MIGRATIONS = [("daily", "p_up_raw", "REAL"),
+               ("daily", "mfe_pct", "REAL"), ("daily", "mae_pct", "REAL")]
 
 
 def connect(path: str | Path) -> sqlite3.Connection:
@@ -244,11 +247,21 @@ def _apply_grade(conn: sqlite3.Connection, prev, outcome_date: str, outcome_chg_
             hit_target = 1 if day_low <= prev["target"] else 0
         if prev["stop"] is not None:
             hit_stop = 1 if day_high >= prev["stop"] else 0
+    # MFE/MAE(최대 유리·불리 변동) — 예측일 종가 기준 익일 장중 고/저까지. 방향 반영.
+    mfe_pct = mae_pct = None
+    base = prev["index_close"]
+    if base:
+        up_exc = (day_high - base) / base * 100
+        down_exc = (day_low - base) / base * 100
+        if direction == "short":
+            mfe_pct, mae_pct = round(-down_exc, 2), round(-up_exc, 2)
+        else:  # long/watch
+            mfe_pct, mae_pct = round(up_exc, 2), round(down_exc, 2)
     conn.execute(
         "UPDATE daily SET outcome_date=?, outcome_chg_pct=?, realized_up=?, "
-        "hit_target=?, hit_stop=?, correct=?, brier=?, graded_at=? WHERE id=?",
+        "hit_target=?, hit_stop=?, correct=?, brier=?, mfe_pct=?, mae_pct=?, graded_at=? WHERE id=?",
         (outcome_date, round(outcome_chg_pct, 2), realized_up, hit_target,
-         hit_stop, correct, brier, graded_at, prev["id"]))
+         hit_stop, correct, brier, mfe_pct, mae_pct, graded_at, prev["id"]))
     conn.commit()
     return {"trade_date": prev["trade_date"], "p_up": p_up,
             "realized_up": realized_up, "correct": correct, "brier": brier,
@@ -303,11 +316,13 @@ def performance(conn: sqlite3.Connection, market: str, report_type: str = "close
     표본이 적으면 각 지표는 `축적 중`(n 함께). 수치를 강요하지 않고 검증 상태를 함께 낸다.
     """
     cur = conn.execute(
-        "SELECT trade_date, p_up, realized_up, correct, brier FROM daily "
+        "SELECT trade_date, p_up, realized_up, correct, brier, mfe_pct, mae_pct FROM daily "
         "WHERE market=? AND report_type=? AND graded_at IS NOT NULL "
         "ORDER BY trade_date DESC", (market, report_type))
     rows = cur.fetchall()
     all_n = len(rows)
+    mfes = [r["mfe_pct"] for r in rows if r["mfe_pct"] is not None]
+    maes = [r["mae_pct"] for r in rows if r["mae_pct"] is not None]
 
     def _win(w: int) -> dict:
         rs = rows[:w]
@@ -349,7 +364,10 @@ def performance(conn: sqlite3.Connection, market: str, report_type: str = "close
 
     return {"n_total": all_n,
             "windows": {"20": _win(20), "60": _win(60), "120": _win(120), "250": _win(250)},
-            "calibration_bins": bins, "max_consecutive_wrong": max_wrong, "roc_auc": auc}
+            "calibration_bins": bins, "max_consecutive_wrong": max_wrong, "roc_auc": auc,
+            "avg_mfe_pct": round(sum(mfes) / len(mfes), 2) if mfes else None,
+            "avg_mae_pct": round(sum(maes) / len(maes), 2) if maes else None,
+            "mfe_mae_n": len(mfes)}
 
 
 def save_snapshot(conn: sqlite3.Connection, report_id: str, market: str, market_date: str,

@@ -357,8 +357,12 @@ def build_performance(r: dict) -> str:
     status = (f'<span class="badge badge-warn">검증 표본 축적 중 {ntot}/{min_sample}</span>'
               if ntot < min_sample else f'<span class="badge badge-ok">표본 {ntot}</span>')
     auc = p.get("roc_auc")
+    mfe, mae = p.get("avg_mfe_pct"), p.get("avg_mae_pct")
     extra = (f'ROC-AUC {auc} · ' if auc is not None else '') + \
             f'최대 연속 오판 {p.get("max_consecutive_wrong", 0)}회'
+    if mfe is not None or mae is not None:
+        extra += (f' · 평균 MFE {signed(mfe)}% / MAE {signed(mae)}%'
+                  f' (최대 유리·불리, n={p.get("mfe_mae_n", 0)})')
     return (f'<div class="card"><h2>모델 검증 성과 {status}</h2>'
             f'<div class="note muted">확률이 역사적으로 무엇을 의미하는지 — 표본 부족 시 수치는 참고만</div>'
             f'<table class="cd-table"><thead><tr><th>기간</th><th style="text-align:right">표본</th>'
