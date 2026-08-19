@@ -383,7 +383,11 @@ def build_conclusion(r: dict) -> str:
                     else f"비중 배수 <b>{ps:.0%}</b>" if ps is not None else "")
         bits.append(f"후보 최대 <b>{gate.get('max_candidates')}</b>종목")
         bits.append("종가베팅 <b>" + ("검토 가능" if gate.get("close_betting") else "불가") + "</b>")
-    if atr.get("instrument"):
+    # 신규진입 차단/NO_TRADE 면 인버스 등 '실행 수단'을 병기하지 않는다(관망/현금과 충돌).
+    no_position = gate.get("new_entry_blocked") or (r.get("preopen_state") or {}).get("state") == "NO_TRADE"
+    if no_position:
+        bits.append("실행 <b>관망/현금</b>")
+    elif atr.get("instrument"):
         bits.append(f"실행 수단 <b>{esc(atr['instrument'])}</b>")
     gate_html = (f'<div class="concl-gate">{" · ".join(b for b in bits if b)}</div>'
                  if bits else "")
@@ -413,6 +417,10 @@ def build_atr_plan(r: dict) -> str:
     edge_col = "var(--up)" if (edge or 0) > 0 else "var(--down)"
     kelly = p.get("kelly_pct") or 0
     blocked = bool(atr.get("gate_blocked"))
+    no_position = blocked or (r.get("preopen_state") or {}).get("state") == "NO_TRADE"
+    # 차단/NO_TRADE 면 인버스 등 체결수단을 명시하지 않는다(관망/현금이므로)
+    instr_txt = ("" if no_position
+                 else f" · 실제 체결 수단: {esc(atr.get('instrument') or 'KODEX 200 / 코스닥150')}")
     if blocked:
         qual = "등급 게이트 차단 — 신규 진입 없음"
     elif p.get("qualified"):
@@ -487,8 +495,7 @@ def build_atr_plan(r: dict) -> str:
       </table>
     </div>
     {anchor_note}
-    <div class="note muted">지수 포인트 기준 타점 · 실제 체결 수단:
-      {esc(atr.get('instrument') or 'KODEX 200 / 코스닥150')}.
+    <div class="note muted">지수 포인트 기준 <b>참고</b> 타점{instr_txt}.
       edge·켈리는 <b>익일 방향확률(p)</b>을 손익비 승률로 간주한 값이다 — 목표·손절 도달
       확률과는 다르므로 비중은 항상 게이트·상한 안에서. 투자 권유 아님.</div>
   </div>"""
