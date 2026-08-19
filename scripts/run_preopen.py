@@ -70,7 +70,7 @@ def _mk_of(rep: dict) -> str:
 
 def build_preopen(close_rep: dict, today: str, env: dict, anchor_date: str,
                   stale_note: str | None, as_of: str, fx: dict | None,
-                  world: dict | None = None) -> dict:
+                  world: dict | None = None, macro: dict | None = None) -> dict:
     mk = _mk_of(close_rep)
     market_ko = close_rep.get("label", "코스피")
     ms = dict(close_rep.get("market", {}))
@@ -97,6 +97,7 @@ def build_preopen(close_rep: dict, today: str, env: dict, anchor_date: str,
           "world": world or {}, "usdkrw_chg": fx_chg,
           "confirm_mult": confirm_mult, "direction": direction,
           "anchor_intraday": bool(close_rep.get("intraday_snapshot")),
+          "macro": macro or {},
           "exit_plan": strategy.exit_plan(cfg, direction)}
 
     ctx = {
@@ -184,10 +185,14 @@ def main() -> int:
     if world:
         print("간밤 미국장: " + " · ".join(
             f"{v['name']} {v['chg_pct']:+.2f}%" for v in world.values()))
+    macro = naver.macro_overnight()
+    if macro:
+        print("간밤 매크로: " + " · ".join(
+            f"{v['name']} {v['chg_pct']:+.2f}%" for v in macro.values()))
 
     preopen_reports = []
     for cr in close_reports:
-        prep = build_preopen(cr, today, env, anchor_date, stale_note, as_of, fx, world)
+        prep = build_preopen(cr, today, env, anchor_date, stale_note, as_of, fx, world, macro)
         preopen_reports.append(prep)
         n = prep["narrative"]
         print(f"[{prep['label']} 개장 전] {' / '.join(n.get('engine_trace', []))}")

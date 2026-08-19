@@ -273,6 +273,42 @@ def world_indices(client: httpx.Client | None = None) -> dict:
             c.close()
 
 
+BOND_URL = "https://api.stock.naver.com/marketindex/majors/bond"
+ENERGY_URL = "https://api.stock.naver.com/marketindex/energy"
+
+
+def macro_overnight(client: httpx.Client | None = None) -> dict:
+    """간밤 매크로(참고) — 미국 10년물 금리 + WTI 유가. 개장 전 방향 재평가의 정성 맥락.
+
+    evaluation3 야간 필터의 금리·유가. 실측 소스: 네이버 marketindex(금리 majors/bond,
+    유가 energy). **야간선물(CME @ES/@NQ)은 네이버 미제공** → 여기 없음(선물은 여전히 서술만).
+    반환: {'us10y': {name,value,chg_pct}, 'wti': {...}} (실패한 건 빠짐)."""
+    own = client is None
+    c = client or _client()
+    out: dict = {}
+    try:
+        try:
+            for x in c.get(BOND_URL, headers={"Referer": "https://finance.naver.com/marketindex/"}).json():
+                if x.get("reutersCode") == "US10YT=RR":
+                    out["us10y"] = {"name": "미국 10년물", "value": _num(x.get("closePrice")),
+                                    "chg_pct": _num(x.get("fluctuationsRatio"))}
+                    break
+        except Exception:  # noqa
+            pass
+        try:
+            for x in c.get(ENERGY_URL, headers={"Referer": "https://finance.naver.com/marketindex/"}).json():
+                if x.get("reutersCode") == "CLcv1":
+                    out["wti"] = {"name": "WTI 유가", "value": _num(x.get("closePrice")),
+                                  "chg_pct": _num(x.get("fluctuationsRatio"))}
+                    break
+        except Exception:  # noqa
+            pass
+        return out
+    finally:
+        if own:
+            c.close()
+
+
 def usdkrw(client: httpx.Client | None = None) -> dict | None:
     """원달러 환율 스냅샷(하나은행 고시). {'price','chg_pct','as_of'} 또는 None."""
     own = client is None

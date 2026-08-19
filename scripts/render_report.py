@@ -920,11 +920,19 @@ def build_overnight(r: dict) -> str:
                    f'<span class="muted">— {dir_ko} 전제 {strength}(1.0=중립). 확률에 곱하지 않는 '
                    f'독립 지표: 08:50 유지/축소/청산 판정에 사용.</span></div>')
     note = esc(ov.get("note", ""))
+    # 금리·유가는 참고(비점수) 맥락. 야간선물(CME)은 네이버 미제공 → 표시하지 않음.
+    macro = ov.get("macro") or {}
+    macro_html = ""
+    if macro:
+        items = " · ".join(f'{esc(v["name"])} <b style="color:{dir_color(v.get("chg_pct"))}">'
+                           f'{signed(v.get("chg_pct"))}%</b>' for v in macro.values())
+        macro_html = (f'<div class="note muted" style="margin-top:6px">간밤 매크로(참고·비점수): '
+                      f'{items} · 야간선물은 소스 미연동</div>')
     return (f'<div class="card"><h2>간밤 재평가 '
             f'<span class="pill pill-ghost">미국장·환율 정량 반영</span></h2>'
             f'{trans}{floor_note}{cm_html}<div class="note muted">{note}</div>'
             f'<table class="cd-table"><thead><tr><th>간밤 지표</th><th>등락</th><th>비중</th>'
-            f'</tr></thead><tbody>{rows}</tbody></table>'
+            f'</tr></thead><tbody>{rows}</tbody></table>{macro_html}'
             f'<div class="note muted">총점·구조는 {anchor_lbl} 앵커, 방향확률만 간밤 반영(유계 보정).</div></div>')
 
 
