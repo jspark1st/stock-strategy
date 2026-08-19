@@ -40,7 +40,7 @@ try:
 except Exception:
     pass
 
-from src import atr, config, execution, quant, remote, store, strategy
+from src import atr, calibration, config, execution, quant, remote, store, strategy
 from src.collectors import llm, naver, news
 from src.collectors.ls import LSClient, LSError, load_env
 from src.models import (
@@ -52,6 +52,7 @@ from render_report import render
 
 KST = timezone(timedelta(hours=9))
 DB_LOCAL = ROOT / "data" / "history.db"
+CALIB_BOOTSTRAP = ROOT / "data" / "calibration.json"   # 재구성 이력 부트스트랩 프라이어
 
 # 장 종료(종가 단일가 체결) 시각. 이 시각 전 실행 = 장중 스냅샷.
 SESSION_END_HHMM = 1530
@@ -369,7 +370,11 @@ def build_report(cfg: dict, ls, client, conn, env, session_of: dict,
         # 통일한다(확정 회차에서 갑자기 결측→재배분으로 총점이 출렁이지 않게). 전용 수집기가
         # 생기면 그때 실제 값으로 채운다.
         call_not_applicable=True)
-    result = score_close(inputs)
+    # 적응형 확률 캘리브레이션: store 채점이력 학습치(N≥40) > 재구성 부트스트랩 > SoT 폴백.
+    # (총점→p_up 을 데이터로 재보정 — 하네스 검증: 고정 시그모이드의 비관편향 제거.)
+    calib_obj = calibration.resolve(conn, market, "close",
+                                    bootstrap_path=CALIB_BOOTSTRAP, store_mod=store)
+    result = score_close(inputs, calib=calib_obj)
     rep = result.to_report_dict(sources=sources)
     rep["id"] = cfg["id"]
     rep["group"] = "장 마감"
@@ -408,8 +413,9 @@ def build_report(cfg: dict, ls, client, conn, env, session_of: dict,
     }
 
     # ── 자가학습: 확정 일봉으로만 소급 채점 (장중 미완성치로 채점 금지) ──
+    # 확률 캘리브레이션은 위 score_close(calib=…)에서 이미 적용됨(총점→p_up 재보정, p_up_raw 보존).
+    # rep["calibration"] 에 적용 소스(store 학습치/부트스트랩) 메타가 실려 렌더러·감사에서 확인 가능.
     graded, acc = [], None
-    calib = 0.0
     perf = None
     if conn is not None and not dry_run:
         try:
@@ -426,22 +432,16 @@ def build_report(cfg: dict, ls, client, conn, env, session_of: dict,
         except Exception:  # noqa
             graded = []
         acc = store.accuracy(conn, market, "close")
-        calib = store.calibration_shift(conn, market, "close")
         try:
             perf = store.performance(conn, market, "close")
         except Exception:  # noqa
             perf = None
-
-    # 캘리브레이션 보정 p_up (자가학습 피드백). 원본은 p_up_raw 로 보존.
-    rep["p_up_raw"] = rep.get("p_up")
-    if calib and rep.get("p_up") is not None:
-        base_p = rep["p_up"]
-        rep["p_up"] = round(min(0.80, max(0.20, base_p + calib)), 4)
-        rep["p_down"] = round(1 - rep["p_up"], 4)
+    if calib_obj:
+        src = "학습치" if calib_obj["source"] == "store" else "부트스트랩"
         rep.setdefault("warnings", []).append(
-            f"자가학습 캘리브레이션: 최근 성적 기반 익일확률 {base_p:.0%}→{rep['p_up']:.0%} 보정")
+            f"확률 캘리브레이션 적용({src}, n={calib_obj['n']}) — 고정 시그모이드 대비 비관편향 교정")
 
-    # ── ATR 타점(보정된 p_up 기준) ──
+    # ── ATR 타점(캘리브레이션된 p_up 기준) ──
     plan = atr.compute_plan(market, daily_series, rep.get("p_up"), gate=rep.get("gate"))
     atr_dict = plan.to_dict() if plan else None
     rep["atr"] = atr_dict

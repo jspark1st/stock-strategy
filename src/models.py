@@ -317,6 +317,8 @@ class ScoreResult:
     confidence: float | None = None          # 신뢰도(완전성×일치도, 표본 보정은 파이프라인)
     as_of: str | None = None                 # 데이터 기준시각(장중 스냅샷 투명화)
     intraday_snapshot: bool = False          # 장중(마감 전) 스냅샷 기반 여부
+    p_up_raw: float | None = None            # 캘리브레이션 전 SoT 시그모이드 확률(감사·비교용)
+    calibration: dict | None = None          # 적용된 캘리브레이션 메타 {source, n}, None=SoT 폴백
 
     def headline(self) -> str:
         if not self.data_sufficient:
@@ -342,7 +344,9 @@ class ScoreResult:
             "total": self.total,
             "grade": self.grade,
             "p_up": self.p_up,
+            "p_up_raw": self.p_up_raw,
             "p_down": self.p_down,
+            "calibration": self.calibration,
             "subscores": [s.to_dict() for s in self.subscores],
             "flows": self.flows,
             "candidates": candidates or [],

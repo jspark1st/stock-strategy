@@ -109,11 +109,16 @@ scripts/auto_close.bat / auto_preopen.bat / setup_schedule.bat  [done] (대안) 
 scripts/make_sample_dashboard.py [done] 코스피/코스닥 시장레벨 데모 번들(sample_dashboard.json) 생성
 scripts/make_sample_charts.py    [done] (레거시) 단일 리포트용 OHLC → sample_close.json charts 주입
 scripts/probe_ls.py              [done] LS TR 응답 스펙 실측 프로브 (read-only)
+scripts/diag_factors.py          [done] 팩터 단독 판별력 진단(표본 캐시 → 팩터별 AUC·분포). 5차
+scripts/exp_calibrate.py         [done] 캘리브레이션/판별 후보 walk-forward 비교(캐시 사용, 무네트워크). 5차
+scripts/fit_calibration.py       [done] 재구성 이력 → 부트스트랩 캘리브레이션 프라이어(data/calibration.json). 5차
 src/models.py                    [done] input/output + collector dataclasses (pure)
 src/scoring.py                   [done] pure-function scoring engine (+신호 일치도·데이터 완전성)
 src/quant.py                     [done] 기술·퀀트 확장 서브스코어(0.15) + 마감 1시간봉 분석
 src/atr.py                       [done] ATR 매매 타점(정규화 ATR·변동성 국면·구조 손절·Kelly)
-src/store.py                     [done] SQLite 자가학습(예측→익일채점→캘리브레이션)
+src/store.py                     [done] SQLite 자가학습(예측→익일채점) + fit_calibrator(총점→확률 재적합)
+src/calibration.py               [done] 적응형 확률 캘리브레이션 sigmoid(a·total+b) — 비관편향 제거(5차)
+                                 store 학습치>부트스트랩>SoT 폴백. scoring.score_close(calib=)로 주입.
 src/remote.py                    [done] 원격 서버 DB/리포트 scp 동기화(서버선 자동 degrade)
 src/collectors/ls.py             [🔶] LS client: token cache + throttle + MTF candles + quote
 src/collectors/naver.py          [done] 네이버 우회 수집기: 지수 일/주/월봉 + 투자자 수급(억원)
@@ -132,6 +137,7 @@ public/login.html                [done] easystock 비밀번호 로그인 폼
 middleware.js / api/login.js      [done] Vercel 비번 게이트(쿠키 검증·fail-closed) + 로그인 API
 vercel.json / package.json / .vercelignore  [done] Vercel 정적+함수 배포 설정(framework:null)
 data/history.db                  SQLite 자가학습 DB (gitignored; 정본은 서버)
+data/calibration.json            [done] 부트스트랩 캘리브레이션 프라이어(추적됨; fit_calibration.py 재생성)
 guide_docs/sample/…              [untracked] SoT 스킬 참조본 로컬 사본(scoring-close·atr-risk-sizing·
                                  review-playbook·SKILL·broker-api). "Source of truth" 섹션이 여기를 가리킴.
 guide_docs/source/evaluation.md  [untracked] 2026-08-18 라이브 리포트 사후검증 — 확정치 대조로 드러난
@@ -306,16 +312,47 @@ Keep this section updated as work advances. Status legend: ✅ done · 🔶 part
   - ✅ **문서 체계 확립**: `AGENTS.md`(북극성·규칙·자동화 로드맵) → CLAUDE.md → `guide_docs/index.md`
     (참조·평가·계획 인덱스) → 폴더. 새 작업은 AGENTS.md 에서 시작.
 
+- **2026-08-19 (5차) — 서버 이전 후 첫 개발: 확률 캘리브레이션(비관편향 제거)**
+  방향예측 정확도(최우선 과제) 착수. 하네스로 **측정→진단→검증→라이브 반영** 순으로 진행.
+  - 🔬 **진단**(`scripts/diag_factors.py`, `scripts/exp_calibrate.py`) — 재구성 표본(각 시장 149일,
+    2026-01~08)을 캐시(`out/backtest_samples_<MK>.json`)하고 팩터별 단독 판별력 + 후보 예측기를
+    **walk-forward(확장창, 전구간 out-of-sample)** 로 비교. **핵심 발견**:
+    ① 지배 문제는 **판별이 아니라 캘리브레이션**. 고정 `sigmoid((total-55)/10)` 는 심한 **비관편향**
+       (20~30% 예측 구간 실제 상승 62%, Brier skill ≈ −0.28). walk-forward: **캘리브레이션만으로
+       Brier 0.30→0.24·적중 +6~9%p**. 판별(AUC)은 0.53→0.54 소폭.
+    ② **팩터 신호가 시장별로 다름**: flow 는 KOSPI 최강(AUC 0.558)인데 **KOSDAQ 은 역전(0.453)**,
+       amt 는 반대(KOSDAQ 0.588 vs KOSPI 0.539). → 단일 글로벌 가중치가 작동 못 하는 이유. 4가중치
+       그리드 탐색은 104표본에서 과최적화(train 60.6%→test 48.9%). **가중치 튜닝은 개선 경로 아님.**
+  - ✅ **적응형 캘리브레이션 구현·라이브 반영**(`src/calibration.py`) — 총점→p_up 을
+    `sigmoid(a·total+b)` 로 데이터 적합(파라미터 2개, 과최적 최소). 우선순위: **store 채점이력
+    학습치(N≥40) > 재구성 부트스트랩(`data/calibration.json`) > SoT 고정 폴백**. 기울기 [0.005,0.20]
+    양수 클램프(총점↑⇒확률↑ 강제), 절편이 캘리브레이션 담당(신호 약/역이어도 비관편향 복귀 안 함).
+    - `scoring.score_close(inputs, calib=…)` 옵션 인자 추가(폴백 시 기존과 완전 동일 — 하위호환).
+      `p_up_raw`(캘리브레이션 전 SoT) 보존 + `rep["calibration"]` 메타(소스·n) 노출(감사·투명).
+    - `store.fit_calibrator()` — 채점된 (total, realized_up) 이력으로 라이브 총점 그대로 재적합.
+      기존 `store.calibration_shift`(가산 편향, 채점 0건이라 무효)를 **대체**(run_close 에서 제거).
+    - `scripts/fit_calibration.py` — 재구성 이력으로 부트스트랩 프라이어 생성(즉시 효과용).
+    - **라이브 검증**(dry-run 2026-08-19): 코스피 총점 33.7 → SoT라면 20%(하한 클립) → **캘리브 58%**
+      (비관 하한 pile-up 제거). 게이트(위험)는 그대로 진입 차단 → 규칙4 유지.
+    - 테스트 +10(`tests/test_calibration.py`, 총 116). 폴백 하위호환·min_n 가드·비관교정·직렬화·
+      store 적합·score_close 통합 계약을 고정.
+  - ⚠️ **주의(정직)**: 단일 레짐(2026 상반기 상승, 기저상승 60%) 8개월·소표본. 캘리브레이션은 견고하나
+    (양 시장 Brier 개선), 판별 향상은 미미(AUC ~0.54). 부트스트랩 총점(코어4팩터)은 라이브 총점(시장폭·
+    재료 포함)과 스케일이 약간 달라 **근사** — store 학습치가 쌓이면 대체됨.
+
 ### 이어서 할 곳 (open items)
-0. **[최우선] 방향예측 정확도 개선** — 하네스가 현재 ≈동전던지기(AUC 0.51~0.54)임을 드러냄. 팩터·
-   가중치·캘리브레이션·신규 피처(간밤 반영·레짐 조건부)로 AUC/Brier 를 올리는 게 이 프로젝트의 본질.
-   `run_backtest.py --tune` 로 측정하며 개선. 과최적화는 train/test 로 방어.
+0. **[최우선] 방향예측 — 판별력(AUC) 향상** — 캘리브레이션(비관편향)은 5차에서 처리(라이브 반영).
+   남은 본질은 **판별**(현재 AUC ~0.54). 검증된 방향: ⓐ **시장별 팩터 처리**(KOSDAQ flow 역전 확인됨 —
+   `diag_factors.py` AUC 0.453, logit4 계수 −0.15. 단 단일레짐이라 부호 뒤집기 전 다레짐 재측정 필요),
+   ⓑ 신규 피처(간밤 반영·레짐 조건부), ⓒ store 학습치 축적 후 캘리브레이터 재적합. 개선은 항상
+   `run_backtest.py`/`exp_calibrate.py` walk-forward 로 측정. 과최적화는 train/test·다레짐으로 방어.
 1. **첫 라이브 15:00 회차 확인** — 코드는 장중 경로를 모두 갖췄지만 *실제 장중* 응답으로는 아직 미검증.
    확인할 것: ①네이버 일봉이 장중 오늘 봉을 주는가(아니면 실시간 지수 경로로 자동 폴백) ②
    `investorDealTrendTime` 이 장중 행을 주는가 ③`out/auto_close.log` 에 '거래일/장중 스냅샷' 라인이 찍히는가.
 2. **거래량 완성계수 학습** — `intraday_volume` 표본이 8일 쌓이면 기본값(0.93/0.96)에서 학습치로 자동 전환.
    그때 리포트의 `(기본값·표본 n/8)` 표기가 `(학습치 n=N)` 으로 바뀌는지 확인.
-3. **SoT 분기 기록** — ATR 정규화·신호 일치도·quant 확장·**게이트 우선 사이징**·**뉴스 시황 제외**는
+3. **SoT 분기 기록** — ATR 정규화·신호 일치도·quant 확장·**게이트 우선 사이징**·**뉴스 시황 제외**·
+   **적응형 확률 캘리브레이션(5차 — 고정 sigmoid((total-55)/10) → 데이터 적합 sigmoid(a·total+b))** 는
    sibling `scoring-close.md`/`atr-risk-sizing.md` 대비 easystock 확장. SoT에 반영/분기 명시 필요.
 4. **남은 데이터 갭**: 지수 거래대금 20일 이력(현재 거래량 대용), **야간선물** % 정량치(미국 지수 마감은
    `naver.world_indices()` 로 개장전 재평가에 반영됨 — 선물은 아직 서술만), 마감 동시호가 확정치.

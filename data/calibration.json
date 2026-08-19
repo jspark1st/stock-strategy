@@ -1,0 +1,18 @@
+{
+  "KOSPI": {
+    "close": {
+      "a": 0.010397,
+      "b": 0.035819,
+      "n": 149,
+      "source": "bootstrap"
+    }
+  },
+  "KOSDAQ": {
+    "close": {
+      "a": 0.005,
+      "b": -0.100721,
+      "n": 149,
+      "source": "bootstrap"
+    }
+  }
+}

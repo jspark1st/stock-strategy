@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import math
 
+from . import calibration
 from .models import (
     BreadthInput,
     CallAuctionInput,
@@ -227,8 +228,12 @@ def grade_and_gate(total: float) -> tuple[str, Gate]:
 
 # ── 오케스트레이션 (여전히 순수함수) ─────────────────────────────────────────
 
-def score_close(inputs: CloseInputs) -> ScoreResult:
-    """전체 마감 점수를 계산한다. 외부 IO 없음."""
+def score_close(inputs: CloseInputs, calib: dict | None = None) -> ScoreResult:
+    """전체 마감 점수를 계산한다. 외부 IO 없음.
+
+    calib: 적응형 캘리브레이션 {a,b,n,source}. 있으면 총점→확률을 데이터로 재보정하고,
+    없으면 SoT 고정 시그모이드로 폴백(하위호환). 파이프라인이 store 학습치/부트스트랩을 주입.
+    """
     subs: dict[str, SubScore] = {}
     missing: list[str] = []
     excluded: list[str] = []
@@ -358,7 +363,10 @@ def score_close(inputs: CloseInputs) -> ScoreResult:
     total = round(total_raw, 1)
 
     # ── 익일 확률 + 보정 ──
-    p_up = raw_prob(total)
+    # p_up_raw = SoT 고정 시그모이드(캘리브레이션 전, 감사·비교용).
+    # p_up = 적응형 캘리브레이션(있으면) — 하네스 검증: 고정 시그모이드의 비관편향 제거.
+    p_up_raw = raw_prob(total)
+    p_up = calibration.apply(calib, total)
     # 대형주 착시: 지수 상승 + 시장폭 약함(adv_ratio<0.4) → 5%p 하향
     if chg_pct is not None and chg_pct > 0 and adv_ratio is not None and adv_ratio < 0.4:
         p_up -= 0.05
@@ -393,7 +401,9 @@ def score_close(inputs: CloseInputs) -> ScoreResult:
     p_down = 1 - p_up
 
     # ── 항목별 기여도 (P1-10): 중립(50) 대비 총점·확률 기여. 총점기여 합 = total-50 ──
-    slope = p_up * (1 - p_up) / 10.0   # sigmoid 국소 기울기(Δp_up per Δtotal)
+    # 국소 기울기(Δp_up per Δtotal). 캘리브레이션 있으면 그 기울기 a, 없으면 SoT 1/scale.
+    d_dtotal = calib["a"] if calib else (1.0 / PROB_SCALE)
+    slope = p_up * (1 - p_up) * d_dtotal
     contributions = []
     for k in present:
         tc = eff[k] * (subs[k].score - 50.0)
@@ -420,7 +430,9 @@ def score_close(inputs: CloseInputs) -> ScoreResult:
         total=total,
         grade=grade,
         p_up=round(p_up, 4),
+        p_up_raw=round(p_up_raw, 4),
         p_down=round(p_down, 4),
+        calibration=({"source": calib["source"], "n": calib["n"]} if calib else None),
         gate=gate,
         provisional=provisional,
         data_sufficient=True,

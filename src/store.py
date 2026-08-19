@@ -310,6 +310,24 @@ def accuracy(conn: sqlite3.Connection, market: str, report_type: str = "close",
     }
 
 
+def fit_calibrator(conn: sqlite3.Connection, market: str, report_type: str = "close",
+                   min_n: int | None = None) -> dict | None:
+    """채점된 (total, realized_up) 이력으로 적응형 확률 캘리브레이션을 적합한다.
+
+    라이브 총점 정의 그대로 학습하므로 부트스트랩(재구성 근사)보다 정확 → 우선한다.
+    표본이 min_n 미만이면 None(→ 파이프라인이 부트스트랩/ SoT 로 폴백).
+    """
+    from . import calibration
+    rows = conn.execute(
+        "SELECT total, realized_up FROM daily "
+        "WHERE market=? AND report_type=? AND graded_at IS NOT NULL "
+        "AND total IS NOT NULL AND realized_up IS NOT NULL",
+        (market, report_type)).fetchall()
+    pairs = [(r["total"], r["realized_up"]) for r in rows]
+    return calibration.fit(pairs, source="store",
+                           min_n=min_n if min_n is not None else calibration.MIN_N)
+
+
 def performance(conn: sqlite3.Connection, market: str, report_type: str = "close") -> dict:
     """확률 검증 성과(evaluation2 P0-5) — 다중 window·calibration bins·연속오판·AUC.
 
