@@ -213,12 +213,15 @@ Keep this section updated as work advances. Status legend: ✅ done · 🔶 part
   - ✅ **배포** — GitHub Public `jspark1st/stock-strategy` + **Vercel `easystock`**(team junaitech). 커스텀 비번 게이트(fail-closed).
   - ✅ **서버 자동화** — 아래 "서버 운영" 참조.
 
-### 서버 운영 (인수인계 — 이제 작업/실행은 이 서버에서)
-- **서버**: `ssh KS5F-PROXMOX-VM2` = `ssh -i C:/keys/anyang-private-key-openssh.pem -p 4159 jspark1st@1.241.52.6`. Ubuntu·**KST**·**한국 IP(SK BB)**로 네이버/KRX 정상. python3.12(deps는 `pip --user`: httpx·anthropic. venv 아님 — python3.12-venv 미설치, sudo 필요).
-- **코드 위치**: `~/stock_strategy` (git in-place, remote fetch=https·push=git@github deploy key `~/.ssh/easystock_deploy`). **DB**: `~/stock_strategy/data/history.db` → 심볼릭 → `~/stock_strategy/db/history.db`(정본, 누적). **`.env`는 서버에 사용자가 배치**(9키). 로컬 `remote.py`는 서버에 key 없어 자동으로 local-only degrade.
-- **cron**(평일): `0 15 * * 1-5` 마감(종가베팅 15:00 KST, 장중 잠정) `auto_close.sh` · `30 16 * * 1-5` **마감 후 확정 재계산** `auto_final.sh` · `0 8 * * 1-5` 개장전 재확인 08:00 `auto_preopen.sh`. 각 스크립트: 파이프라인(--auto) → `public/index.html` 변경 시만 git push → **Vercel 자동배포**. 로그: `out/auto_*.log`. `auto_update=false`(.env)면 예약 건너뜀(비용 절약).
-  - **15:00 vs 16:30 회차**: `run_close.py` 는 실행 시각이 16:00(`FINAL_AFTER_HHMM`)을 지나면 `resolve_session` 이 `intraday=False` 를 돌려줘 **확정 일봉·확정 수급·확정 종가**로 재계산하고 같은 날 리포트를 덮어쓴다(잠정 배지 → '마감 확정치'). 별도 코드 분기 없이 같은 스크립트를 두 시각에 돌리는 구조. 등록: `crontab -e` 에 `30 16 * * 1-5 /home/jspark1st/stock_strategy/scripts/auto_final.sh` 추가.
-- **수동 실행**: `cd ~/stock_strategy && python3 scripts/run_close.py` (또는 run_preopen). **코드 수정 후**: 로컬에서 push → 서버 `cd ~/stock_strategy && git pull`.
+### 서버 운영 (인수인계 — 2026-08-19 **KS6F 로 이전 완료**. 이제 작업/실행은 KS6F)
+- **서버(현행)**: `KS6F-JNT-3-VM-1` = `ssh -i C:/keys/anyang-private-key-openssh.pem -p 4159 jspark1st@211.37.73.241` (내부망 `192.168.75.170`). Ubuntu·**KST**·한국 IP로 네이버/KRX 정상. python3.12. **deps 는 venv**: `~/overnight_report/.venv`(httpx·anthropic·pytest). passwordless sudo 가능.
+- **코드 위치**: **`~/overnight_report`** (git in-place, remote fetch=https·push=git@github deploy key `~/.ssh/easystock_deploy`, 권한 600). **DB**: `~/overnight_report/data/history.db` → 심볼릭 → `~/overnight_report/db/history.db`(정본, 누적 — 구 서버서 이관). **`.env`는 사용자 관리**(9키). `remote.py`는 REMOTE_KEY(C:/keys…) 리눅스에 없어 자동 local-only degrade → **이 서버가 primary**.
+- **구 서버(KS5F, `1.241.52.6:4159` `~/stock_strategy`) = 폐기.** 크론 삭제됨. 더는 실행/커밋하지 않음.
+- **venv 주의**: 스크립트는 `.venv/bin/python` 을 우선 사용(`auto_*.sh` 자동 감지). 수동 실행도 `~/overnight_report/.venv/bin/python scripts/...` 로. 시스템 python3 엔 deps 없음.
+- **cron**(평일, KS6F): `0 8 * * 1-5` 개장전 `auto_preopen.sh` · `0 15 * * 1-5` 마감(잠정) `auto_close.sh` · `30 16 * * 1-5` 마감확정 `auto_final.sh`. 각 스크립트: 파이프라인(--auto) → `public/index.html` 변경 시만 git push(배포키) → **Vercel 자동배포**. 로그: `out/auto_*.log` · 경보 `out/alerts.log`. `auto_update=false`(.env)면 예약 건너뜀.
+  - **15:00 vs 16:30 회차**: `run_close.py` 는 실행 시각이 16:00(`FINAL_AFTER_HHMM`)을 지나면 `resolve_session` 이 `intraday=False` 를 돌려줘 **확정 일봉·확정 수급·확정 종가**로 재계산하고 같은 날 리포트를 덮어쓴다(잠정 배지 → '마감 확정치'). 같은 스크립트를 두 시각에 도는 구조.
+- **수동 실행**: `cd ~/overnight_report && .venv/bin/python scripts/run_close.py` (또는 run_preopen / run_backtest). **코드 수정 후**: 이 서버서 직접 편집 → commit → push(배포키), 또는 어디서든 push 후 서버서 `git pull`.
+- **이전 검증(2026-08-19)**: clone·venv·deps·106 테스트·LS/Tavily/LLM 키·`auto_close.sh` 실행→커밋→**push `f1ab04d..42b0d0a`→Vercel 배포**까지 end-to-end 성공. 크론 3회차 등록 확인.
 - **Vercel**: 프로젝트 `easystock`(prj_MVEYDzFx7LG0WddGqIQeMfsM1qSO, team_4rQsEoiwakRmCY4Ru0QJ7c1o), URL **easystock-junaitech.vercel.app**. 게이트 env **`view_password`·`auth_token`**(대시보드 설정 — MCP에 env 도구 없음). 네이티브 비번보호는 유료라 커스텀 미들웨어(middleware.js+api/login.js) 사용.
 
 - **2026-08-19 (2차) — 전면 점검: 자동화·논리정합성·데이터 신뢰도·리포트 품질·UI**
