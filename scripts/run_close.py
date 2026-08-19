@@ -491,6 +491,14 @@ def build_report(cfg: dict, ls, client, conn, env, session_of: dict,
         sample_factor = 0.5 + 0.5 * min(1.0, n / min_sample)  # 표본 없으면 신뢰도 절반
         rep["confidence"] = round(base_conf * sample_factor, 2)
         rep["confidence_sample_n"] = n
+        # 산식 투명화(평가 지적: 표본 0인데 신뢰도가 나오는 근거 불명확). 신뢰도는 '검증 실적'이
+        # 아니라 데이터품질(완전성×신호일치도)을 검증표본 부족으로 할인한 값임을 노출.
+        rep["confidence_detail"] = {
+            "completeness": rep.get("data_completeness"),
+            "agreement": rep.get("signal_agreement"),
+            "sample_factor": round(sample_factor, 2),
+            "n": n, "min_sample": min_sample,
+        }
     rep["entry"] = strategy.entry_decision(rep, cfg)
     rep["lifecycle"] = strategy.resolve_lifecycle(
         now.hour * 100 + now.minute, "close", session.intraday)

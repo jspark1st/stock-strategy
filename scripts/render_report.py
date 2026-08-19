@@ -204,10 +204,19 @@ def build_confidence(r: dict) -> str:
     dcol = "var(--neutral)" if r.get("intraday_snapshot") else "var(--good)"
     chips.append(f'<span class="conf-chip">데이터 확정성 <b style="color:{dcol}">{defin}</b></span>')
     if conf is not None:
-        nn = r.get("confidence_sample_n")
-        nnote = f" · 표본 {nn}" if nn is not None else ""
+        cd = r.get("confidence_detail") or {}
+        # 산식 노출: 신뢰도 = 완전성 × 신호일치도 × 표본보정. '검증 실적'이 아니라 데이터품질을
+        # 검증표본 부족으로 할인한 값임을 명시(표본 0인데 값이 나오는 근거를 투명하게).
+        if cd.get("completeness") is not None and cd.get("agreement") is not None:
+            nn, ms = cd.get("n", 0), cd.get("min_sample")
+            formula = (f' <span class="muted">= 완전성 {cd["completeness"]*100:.0f}% × '
+                       f'일치도 {cd["agreement"]*100:.0f}% × 표본보정 {cd["sample_factor"]:.2f}'
+                       f'(표본 {nn}/{ms} — 검증 실적 아님, 부족분 할인)</span>')
+        else:
+            nn = r.get("confidence_sample_n")
+            formula = f" · 표본 {nn}" if nn is not None else ""
         chips.append(f'<span class="conf-chip">신뢰도 '
-                     f'<b style="color:{_conf_color(conf, 0.7, 0.4)}">{conf:.2f}</b>{nnote}</span>')
+                     f'<b style="color:{_conf_color(conf, 0.7, 0.4)}">{conf:.2f}</b>{formula}</span>')
     if sa is not None:
         chips.append(f'<span class="conf-chip">신호 일치도 '
                      f'<b style="color:{_conf_color(sa, 0.8, 0.5)}">{sa*100:.0f}%</b></span>')
@@ -397,20 +406,28 @@ def build_conclusion(r: dict) -> str:
     atr = r.get("atr") or {}
     gate = r.get("gate") or {}
     concl = nar.get("conclusion", "")
+    entry = r.get("entry") or {}
+    grade_blocked = gate.get("new_entry_blocked")
+    entry_blocked = entry.get("allow") is False   # 전체 진입 게이트(신뢰도 등) 차단
     dlabel, dcol = DIR_LABEL.get(atr.get("direction"), ("판단 보류", "var(--muted)"))
-    if gate.get("new_entry_blocked"):
+    if grade_blocked:
         dlabel, dcol = "신규 진입 차단", "var(--caution)"
+    elif entry_blocked:
+        dlabel, dcol = "진입 게이트 차단", "var(--caution)"
     if not concl and not atr:
         return ""
     bits = []
     if gate:
         ps = gate.get("position_scale")
-        bits.append("신규 진입 <b>차단</b>" if gate.get("new_entry_blocked")
+        # 등급 차단 또는 전체 진입 게이트 차단이면 실효 비중 0%(등급 배수만 보여주면 오해).
+        bits.append("신규 진입 <b>차단</b>" if grade_blocked
+                    else "진입 게이트 <b>차단</b>" if entry_blocked
                     else f"비중 배수 <b>{ps:.0%}</b>" if ps is not None else "")
         bits.append(f"후보 최대 <b>{gate.get('max_candidates')}</b>종목")
         bits.append("종가베팅 <b>" + ("검토 가능" if gate.get("close_betting") else "불가") + "</b>")
     # 신규진입 차단/NO_TRADE 면 인버스 등 '실행 수단'을 병기하지 않는다(관망/현금과 충돌).
-    no_position = gate.get("new_entry_blocked") or (r.get("preopen_state") or {}).get("state") == "NO_TRADE"
+    no_position = (grade_blocked or entry_blocked
+                   or (r.get("preopen_state") or {}).get("state") == "NO_TRADE")
     if no_position:
         bits.append("실행 <b>관망/현금</b>")
     elif atr.get("instrument"):
@@ -442,13 +459,20 @@ def build_atr_plan(r: dict) -> str:
     edge = p.get("edge")
     edge_col = "var(--up)" if (edge or 0) > 0 else "var(--down)"
     kelly = p.get("kelly_pct") or 0
-    blocked = bool(atr.get("gate_blocked"))
-    no_position = blocked or (r.get("preopen_state") or {}).get("state") == "NO_TRADE"
+    blocked = bool(atr.get("gate_blocked"))          # 등급(위험) 게이트
+    # 전체 진입 게이트(신뢰도·완전성·신선도·확률 AND) — 권위 판정. 등급만 보면 안 됨.
+    entry = r.get("entry") or {}
+    entry_blocked = entry.get("allow") is False
+    entry_reasons = ", ".join(entry.get("blocked_reasons") or [])
+    no_position = (blocked or entry_blocked
+                   or (r.get("preopen_state") or {}).get("state") == "NO_TRADE")
     # 차단/NO_TRADE 면 인버스 등 체결수단을 명시하지 않는다(관망/현금이므로)
     instr_txt = ("" if no_position
                  else f" · 실제 체결 수단: {esc(atr.get('instrument') or 'KODEX 200 / 코스닥150')}")
     if blocked:
         qual = "등급 게이트 차단 — 신규 진입 없음"
+    elif entry_blocked:
+        qual = f"진입 게이트 차단 — {entry_reasons or '조건 미충족'}"
     elif p.get("qualified"):
         qual = "진입 자격 ✓"
     else:
@@ -470,9 +494,10 @@ def build_atr_plan(r: dict) -> str:
         _tile("손익비", f"1 : {fmt(p.get('rr'),1)}", "var(--accent)"),
         _tile("edge", signed(edge, 3) if edge is not None else "—", edge_col,
               f"손익분기 {fmt(p.get('p_breakeven'),2)}"),
-        _tile("권장비중", f"{kelly:.0f}%",
-              "var(--caution)" if blocked else "var(--accent)",
+        _tile("권장비중", "0%" if (blocked or entry_blocked) else f"{kelly:.0f}%",
+              "var(--caution)" if (blocked or entry_blocked) else "var(--accent)",
               "등급 게이트 차단 → 0%" if blocked else
+              f"진입 게이트 차단({entry_reasons or '조건 미충족'}) → 0%" if entry_blocked else
               (f"Half-Kelly × 게이트 {atr.get('position_scale', 1):.0%} · 상한 25%"
                if atr.get("position_scale", 1) != 1 else "Half-Kelly · 상한 25%")),
     ])
