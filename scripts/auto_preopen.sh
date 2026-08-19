@@ -37,6 +37,7 @@ fi
 RC=$?
 if [ $RC -ne 0 ]; then
   echo "[$(date '+%F %T')] ✗ 파이프라인 실패(exit $RC) — 배포하지 않음" >> "$LOG"
+  echo "[$(date '+%F %T')] ALERT: auto_preopen 파이프라인 실패(exit $RC)" >> out/alerts.log
   exit $RC
 fi
 
@@ -53,5 +54,6 @@ if git push origin main >> "$LOG" 2>&1; then
   echo "[$(date '+%F %T')] ✓ 개장 전 리포트 배포 완료(Vercel 자동배포 트리거)" >> "$LOG"
 else
   echo "[$(date '+%F %T')] ✗ git push 실패 — 커밋은 로컬에 남음" >> "$LOG"
+  echo "[$(date '+%F %T')] ALERT: auto_preopen git push 실패" >> out/alerts.log
   exit 1
 fi

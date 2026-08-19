@@ -844,9 +844,16 @@ def build_stage_strip(r: dict) -> str:
         sep = '<span class="stage-sep">›</span>' if i else ""
         steps += f'{sep}<span class="stage-step {on}">{["①","②","③"][i]} {name}</span>'
     _, cname, cdesc, cnext = _STAGES[cur - 1]
+    lc = r.get("lifecycle") or {}
+    lc_html = ""
+    if lc.get("state"):
+        lc_html = (f'<div class="stage-note">상태 <b>{esc(lc["state"])}</b> · '
+                   f'허용 데이터: {esc(lc.get("allowed_data",""))} · '
+                   f'허용 액션: {esc(lc.get("allowed_actions",""))} · '
+                   f'자동주문 {"허용" if lc.get("orders_allowed") else "차단"}</div>')
     return (f'<div class="stage-strip"><div class="stage-steps">{steps}</div>'
             f'<div class="stage-note">지금 <b>{["①","②","③"][cur-1]} {cname}</b> · {esc(cdesc)}'
-            f' · 다음 갱신 {esc(cnext)}</div></div>')
+            f' · 다음 갱신 {esc(cnext)}</div>{lc_html}</div>')
 
 
 def build_confirm_diff(r: dict) -> str:

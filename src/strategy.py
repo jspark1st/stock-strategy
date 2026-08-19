@@ -14,6 +14,51 @@ from __future__ import annotations
 STATES = ["CLOSE_CANDIDATE", "CLOSE_ENTRY", "AFTER_CLOSE_CONFIRM", "OVERNIGHT_HOLD",
           "PREOPEN_RECONFIRM", "OPEN_EXIT_OR_HOLD", "POST_TRADE_REVIEW"]
 
+# 일중 라이프사이클 상태(evaluation2 P2-12) — 시각/회차로 결정되며, 상태별 허용 데이터·
+# 허용 액션을 강제한다(문구가 아니라 구조). 각 리포트에 현재 상태를 각인한다.
+LIFECYCLE = ["PREOPEN", "OPENING_CONFIRM", "INTRADAY_MONITOR",
+             "PRE_CLOSE_DECISION", "CLOSE_RECONCILIATION", "NEXT_DAY_REVIEW"]
+
+STATE_POLICY = {
+    "PREOPEN": {"data": "전일 확정치·미국장·금리·유가·환율",
+                "actions": "관심 시나리오·개장 대응(유지/축소/청산) 결정만", "orders": False},
+    "OPENING_CONFIRM": {"data": "개장가·초기 수급",
+                        "actions": "보유분 청산 판정(09:05 등)", "orders": False},
+    "INTRADAY_MONITOR": {"data": "장중 지수·수급(잠정)",
+                         "actions": "모니터링만 — 종가 판정 전", "orders": False},
+    "PRE_CLOSE_DECISION": {"data": "장중 지수·수급·폭(잠정, 15:00)",
+                           "actions": "종가베팅 진입/차단 판정", "orders": False},
+    "CLOSE_RECONCILIATION": {"data": "확정 종가·확정 수급(16:30)",
+                             "actions": "잠정→확정 재계산·컨펌 행동(유지/축소/청산예약)", "orders": False},
+    "NEXT_DAY_REVIEW": {"data": "익일 실측 결과",
+                        "actions": "예측 채점·성과 적재", "orders": False},
+}
+
+
+def resolve_lifecycle(hhmm: int | None, report_type: str, intraday: bool) -> dict:
+    """시각(HHMM)·회차로 현재 라이프사이클 상태를 결정 + 허용 데이터/액션 반환.
+
+    hhmm=None 이면 회차 유형만으로 판정(preopen/확정). 상태를 리포트에 각인해, '지금 어떤
+    데이터로 무엇이 허용되는가'를 화면·정책이 일관되게 따르도록 한다.
+    """
+    if report_type == "preopen":
+        state = "PREOPEN"
+    elif not intraday:
+        state = "CLOSE_RECONCILIATION"
+    elif hhmm is None:
+        state = "PRE_CLOSE_DECISION"
+    elif hhmm < 903:
+        state = "PREOPEN"
+    elif hhmm < 930:
+        state = "OPENING_CONFIRM"
+    elif hhmm >= 1400:
+        state = "PRE_CLOSE_DECISION"
+    else:
+        state = "INTRADAY_MONITOR"
+    pol = STATE_POLICY.get(state, {})
+    return {"state": state, "allowed_data": pol.get("data", ""),
+            "allowed_actions": pol.get("actions", ""), "orders_allowed": pol.get("orders", False)}
+
 
 def _p_win(p_up: float, direction: str) -> float:
     return p_up if direction != "short" else 1.0 - p_up

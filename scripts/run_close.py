@@ -121,6 +121,22 @@ def _now() -> str:
     return datetime.now(KST).isoformat(timespec="seconds")
 
 
+ALERTS_LOG = ROOT / "out" / "alerts.log"
+
+
+def _alert(msg: str) -> None:
+    """운영 경보(evaluation2 P2-13) — 데이터 결측·수집 실패 등을 alerts.log 에 누적.
+
+    cron 실패는 auto_*.sh 가, 데이터 이상은 여기서 기록한다. 사람이 주기적으로 확인하는
+    단일 파일(무푸시). 실패해도 파이프라인을 막지 않는다."""
+    try:
+        ALERTS_LOG.parent.mkdir(exist_ok=True)
+        with open(ALERTS_LOG, "a", encoding="utf-8") as f:
+            f.write(f"[{_now()}] ALERT: {msg}\n")
+    except Exception:  # noqa
+        pass
+
+
 def _unix_kst(ymd: str, hms: str | None) -> int:
     """KST 벽시계를 UTC로 취급 → LWC가 KST 시각을 그대로 표시(분봉용)."""
     h = (hms or "090000").zfill(6)
@@ -369,6 +385,8 @@ def build_report(cfg: dict, ls, client, conn, env, session_of: dict,
         rep["fx"] = fx
     if flow_warn:
         rep["warnings"] = [flow_warn] + rep.get("warnings", [])
+        if not dry_run:
+            _alert(f"{cfg['label']} 수급 미확보(거래일 {session.trade_ymd}) — 결측 처리됨")
 
     # ── 데이터 계보(P0-2): 각 수치의 출처·기준시각·잠정/확정·시장범위 (본문 vs 기사 혼동 방지) ──
     defin = "잠정(15:00)" if session.intraday else "마감 확정"
@@ -470,6 +488,8 @@ def build_report(cfg: dict, ls, client, conn, env, session_of: dict,
         rep["confidence"] = round(base_conf * sample_factor, 2)
         rep["confidence_sample_n"] = n
     rep["entry"] = strategy.entry_decision(rep, cfg)
+    rep["lifecycle"] = strategy.resolve_lifecycle(
+        now.hour * 100 + now.minute, "close", session.intraday)
 
     for g in graded:
         rep.setdefault("warnings", []).append(
@@ -478,6 +498,8 @@ def build_report(cfg: dict, ls, client, conn, env, session_of: dict,
 
     if ls_warn:
         rep["warnings"] = [ls_warn] + rep.get("warnings", [])
+        if not dry_run:
+            _alert(f"{cfg['label']} LS 시장폭 조회 실패 — 시장폭 결측")
 
     # ── 예측 기록(오늘) + 불변 스냅샷(P0-3) ──
     if conn is not None and not dry_run:

@@ -37,6 +37,7 @@ echo "───────── $(date '+%F %T') 마감 확정 재계산 시�
 RC=$?
 if [ $RC -ne 0 ]; then
   echo "[$(date '+%F %T')] ✗ 재계산 실패(exit $RC) — 배포하지 않음" >> "$LOG"
+  echo "[$(date '+%F %T')] ALERT: auto_final 재계산 실패(exit $RC)" >> out/alerts.log
   exit $RC
 fi
 
@@ -57,5 +58,6 @@ if git push origin main >> "$LOG" 2>&1; then
   echo "[$(date '+%F %T')] ✓ 마감 확정본 배포 완료(Vercel 재배포)" >> "$LOG"
 else
   echo "[$(date '+%F %T')] ✗ git push 실패 — 커밋은 로컬에 남음" >> "$LOG"
+  echo "[$(date '+%F %T')] ALERT: auto_final git push 실패" >> out/alerts.log
   exit 1
 fi
