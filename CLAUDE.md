@@ -393,13 +393,37 @@ Keep this section updated as work advances. Status legend: ✅ done · 🔶 part
   - ✅ 테스트 +8(`tests/test_overnight_plan.py`: σ_AM 유계·primary=overnight·RR1:1 대칭·게이트0·
     HTS 정상/인버스 구조·결측 가드). 총 **130 통과**. 기존 게이트 사이징 회귀(test_pipeline_logic)도 그대로.
 
+- **2026-08-19 (8차) — 판별력(AUC): 간밤 미국장 신호가 개장전 방향예측을 개선함을 walk-forward 검증**
+  최우선 과제(방향 판별) 착수. 사용자 승인하 "간밤 미국장 신호부터" 를 **측정 우선**으로 진행.
+  - ⚠️ **인과성 확정** — 15:00 마감 예측엔 *그날 밤* 미국장이 미발생 → 쓰면 미래참조. 간밤 신호가
+    유효한 지점은 **08:50 개장전 재평가**(overnight.py)뿐. 마감 리포트의 판별은 이걸로 못 올린다.
+  - ✅ **역사적 세계지수 수집기**(`naver.world_index_daily`) — `api.stock.naver.com/chart/foreign/
+    index/{code}?periodType=dayCandle`(.SOX/.IXIC/.INX/.DJI, priceInfos, 현재 ~110거래일). localDate=
+    미국 거래일(그 세션은 익일 KST 개장 전 마감 → 선행정보, 미래참조 아님). 개장전 계수 검증용.
+  - ✅ **walk-forward 실험**(`scripts/exp_overnight.py`) — 정렬: blend(N)=미국 localDate==N 등락%를
+    시장별 가중(overnight.WEIGHTS). 베이스라인=라이브 캘리브레이션(총점 재보정). 비교: F.고정틸트
+    (현 overnight.py 계수) · G.학습틸트(train β 적합, 과최적 방어). **결과(간밤 정렬 87일 OOS)**:
+    · **KOSPI: blend 단독 AUC 0.679**(익일↑일 간밤 +0.64% vs ↓일 −0.36%) — 강한 선행신호.
+      캘리브 베이스 AUC 0.505 → **+고정틸트 0.597 · +학습틸트 0.614**(skill −0.02→+0.02, Brier↓).
+    · KOSDAQ: blend AUC 0.592 → +고정 0.559(skill −0.013→−0.004). 개선되나 약함, skill 여전히 음.
+  - ✅ **검증 결론(정직)** — 간밤 미국장은 **개장전 방향예측을 실제로 개선**(특히 KOSPI, AUC +0.1 OOS).
+    **이 고정틸트는 이미 라이브**([run_preopen.py](scripts/run_preopen.py) `apply_to_p_up`) — 실험이
+    노이즈 아님을 확인. **학습틸트 G 는 KOSPI 미미·KOSDAQ 악화 → 계수 재적합 안 함**(단일 상승레짐
+    과최적 위험). 현 고정계수 유지가 방어적으로 옳다. 테스트 +4(`test_overnight_signal.py`: 정렬·
+    블렌드 재정규화·β 부호·고정식 일치). 총 **134 통과**.
+  - ⚠️ **한계** — 2026 봄~여름 단일레짐·미국 커버 반년·87 OOS일. KOSPI blend AUC 0.679는 추세장
+    공동움직임이 섞였을 수 있음(walk-forward라 in-sample 과최적은 아니나 레짐 일반화는 미검증).
+    하락/횡보 표본 쌓이면 `exp_overnight.py` 재측정 필수.
+
 ### 이어서 할 곳 (open items)
 0. **[최우선] 방향예측 — 판별력(AUC) 계속** — 5차 처리분: 캘리브레이션(비관편향, 양시장) + **가드된
    KOSDAQ 거래량 틸트**(walk-forward AUC 0.488→0.577). 남은 것:
    ⓐ **다레짐 재검증**(핵심) — 캘리브레이터·vol_tilt·KOSDAQ flow 역전 모두 2026 상반기 **단일 상승레짐**
       위 결과. 하락/횡보 표본이 쌓이면 `exp_guarded.py`/`exp_calibrate.py` 로 재측정. vol_tilt 는 모멘텀성
       이라 하락장에서 부호가 약해지거나 역전될 수 있음 — cap(±0.10)이 손상은 제한하나 재적합 필요.
-   ⓑ **KOSPI 판별** — 원천피처 전부 과최적(OOS≈0.50). 새 각도 필요(간밤 반영·레짐 조건부·비선형).
+   ⓑ **KOSPI 판별** — 마감(15:00) 종가피처는 전부 과최적(OOS≈0.50). **개장전은 8차에서 돌파**:
+      간밤 미국장 blend 단독 AUC 0.679, 고정틸트로 개장전 OOS AUC 0.505→0.597(이미 라이브). 마감
+      리포트 판별은 여전히 미해결 — 간밤은 인과상 마감엔 못 씀. 남은 각도: 레짐 조건부·비선형·전일 간밤.
    ⓒ **store 학습치 축적 후 재적합** — 라이브 채점이 N≥40 쌓이면 `fit_calibrator` 가 부트스트랩을 대체.
       그때 vol_tilt 도 라이브 총점 기준으로 재적합(현재 부트스트랩 근사).
    개선은 항상 `run_backtest.py`/`exp_*.py` walk-forward 로 측정. 과최적화는 train/test·다레짐 방어.
@@ -417,8 +441,11 @@ Keep this section updated as work advances. Status legend: ✅ done · 🔶 part
 7. **t1601 suffix 확정(개장 후)** — 오늘 16:30 `auto_final.sh` 가 `probe_investor_map.py` 를 돌려
    `.ls_investor_map.json` 을 만든다. `out/auto_final.log` 의 `conf=…`·`map=…` 확인 후, conf≥0.95면
    수급 소스를 네이버→LS 로 옮길지 결정(현재는 하네스만, 소비는 미연결).
-8. **간밤 보정 계수 검증/캘리브레이션** — `overnight.py` 의 K_MARKET·가중치는 초기 추정. 개장전 재평가
-   p_up 을 당일 실측과 채점(store)해 계수를 사후 보정하면 더 정밀. 지금은 유계·투명 고정값.
+8. **간밤 보정 계수 검증/캘리브레이션** — ✅ **8차에서 walk-forward 검증**(`exp_overnight.py`):
+   현 고정 K_MARKET·CAP 이 개장전 OOS AUC 를 유의하게 올림(KOSPI 0.505→0.597). 학습 재적합은
+   단일레짐 과최적이라 **보류**(고정 유지가 방어적). 남은 것: ⓐ 다레짐 표본 쌓이면 재측정, ⓑ store
+   채점(개장전 p_up→당일 실측)으로 라이브 계수 사후검증, ⓒ WEIGHTS 가정(코스닥 SOX 더 민감)과 실측
+   (KOSPI blend AUC 0.679 > KOSDAQ 0.592)의 불일치 재검토. 미국 커버 반년 한계.
 9. **첫 16:30 확정 회차 확인** — 컨펌 diff(`provisional_<date>.json` → confirm_diff)가 실제로 15:00 대비
    변화를 렌더하는지, `auto_final.log` 에서 확인.
 5. **방법론 주의(문서화됨)** — `edge = p_up − 1/(1+b)` 는 '익일 방향확률'을 '손익비 승률'로 간주한다.

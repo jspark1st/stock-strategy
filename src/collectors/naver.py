@@ -266,6 +266,37 @@ def index_quote(market: str, client: httpx.Client | None = None) -> dict | None:
             c.close()
 
 
+WORLD_HIST = "https://api.stock.naver.com/chart/foreign/index/{code}?periodType=dayCandle"
+
+
+def world_index_daily(code: str, count: int = 120,
+                      client: httpx.Client | None = None) -> list[dict]:
+    """간밤 미국 지수(.SOX/.IXIC/.INX/.DJI 등) **역사적** 일봉 → [{date,open,high,low,close}] 오름차순.
+
+    개장 전 방향 보정 계수(overnight.py)를 과거 실측으로 **검증/캘리브레이션**하기 위한 소스.
+    네이버 worldstock 차트(priceInfos)를 쓴다 — 현재 ~110거래일(반년) 제공. localDate 는 미국
+    거래일 기준(그 세션은 다음 KST 개장 전에 마감 → 익일 국내 방향의 선행정보, 미래참조 아님).
+    실패 시 빈 리스트(호출부가 폴백). count 는 상한(엔드포인트가 더 적게 줄 수 있음)."""
+    own = client is None
+    c = client or _client()
+    try:
+        r = c.get(WORLD_HIST.format(code=code),
+                  headers={"Referer": "https://finance.naver.com/world/"})
+        r.raise_for_status()
+        rows = r.json().get("priceInfos") or []
+        out = [{"date": str(x.get("localDate")), "open": _num(x.get("openPrice")),
+                "high": _num(x.get("highPrice")), "low": _num(x.get("lowPrice")),
+                "close": _num(x.get("closePrice"))}
+               for x in rows if x.get("localDate") and x.get("closePrice")]
+        out.sort(key=lambda d: d["date"])
+        return out[-count:]
+    except Exception:  # noqa — 보조 소스
+        return []
+    finally:
+        if own:
+            c.close()
+
+
 WORLD_RT = "https://polling.finance.naver.com/api/realtime/worldstock/index/{code}"
 # 개장 전 재평가에 쓰는 간밤 미국 지수. SOX(반도체)는 한국 증시 선행성이 커 별도로 본다.
 WORLD_CODES = [(".DJI", "다우"), (".IXIC", "나스닥"), (".INX", "S&P500"),
