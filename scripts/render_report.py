@@ -256,6 +256,28 @@ def build_entry_gate(r: dict) -> str:
             f'<ul class="gate-ul">{rows}</ul></div>')
 
 
+def build_lineage(r: dict) -> str:
+    """데이터 계보(P0-2) — 각 수치의 출처·기준시각·잠정/확정·시장범위.
+
+    본문 수급값과 출처 기사 수치가 달라 보이던 혼동을 없앤다(모델 입력값 기준을 명시)."""
+    lin = r.get("lineage") or {}
+    if not lin:
+        return ""
+    rows = ""
+    for metric, m in lin.items():
+        st = m.get("status", "")
+        scol = ("var(--neutral)" if "잠정" in st else
+                "var(--good)" if ("확정" in st or "검증" in st) else "var(--muted)")
+        rows += (f'<tr><td><b>{esc(metric)}</b></td><td>{esc(m.get("source",""))}</td>'
+                 f'<td>{esc(m.get("as_of",""))}</td>'
+                 f'<td style="color:{scol};font-weight:700">{esc(st)}</td>'
+                 f'<td class="muted">{esc(m.get("scope",""))}</td></tr>')
+    return (f'<div class="card"><h2>데이터 계보 <span class="pill pill-ghost">모델 입력값 기준</span></h2>'
+            f'<div class="note muted">화면 수치 = 아래 출처·시각·상태의 값. 기사 인용치와 시점·집계가 다를 수 있음</div>'
+            f'<div style="overflow-x:auto"><table class="cd-table"><thead><tr><th>지표</th><th>출처</th>'
+            f'<th>기준시각</th><th>상태</th><th>범위</th></tr></thead><tbody>{rows}</tbody></table></div></div>')
+
+
 def build_order_card(r: dict) -> str:
     """상품(ETF) 주문 카드(P1-7) — 지수 ATR 을 ETF 가격으로 변환 + 괴리/스프레드/추적오차 경고."""
     oc = r.get("order_card") or {}
@@ -844,19 +866,37 @@ def build_overnight(r: dict) -> str:
         rows += (f'<tr><td>{esc(d.get("name",""))}</td>'
                  f'<td style="color:{dir_color(chg)};font-weight:800">{signed(chg)}%</td>{wtxt}</tr>')
     ap, pp = ov.get("anchor_p_up"), ov.get("p_up")
-    trans = ""
+    # #5: 앵커가 15:00 잠정이면 '마감'이라 부르지 않는다(확정 회차면 '마감 확정').
+    anchor_lbl = "전일 15:00 잠정" if ov.get("anchor_intraday") else "전일 마감 확정"
+    trans = floor_note = ""
     if ap is not None and pp is not None:
-        trans = (f'<div class="ov-trans">전일 마감 익일확률 <b>{ap*100:.0f}%</b> '
+        # #1/#2: '익일 상승확률'로 방향을 명시(‘익일확률’ 모호성 제거)
+        trans = (f'<div class="ov-trans">{anchor_lbl} <b>익일 상승확률 {ap*100:.0f}%</b> '
                  f'<span class="cd-arrow">→</span> 간밤 재평가 '
-                 f'<b style="color:{dir_color(pp-ap)}">{pp*100:.0f}%</b>'
-                 f'<span class="muted"> ({signed((pp-ap)*100)}%p)</span></div>')
+                 f'<b style="color:{dir_color(pp-ap)}">상승 {pp*100:.0f}%</b>'
+                 f'<span class="muted"> ({signed((pp-ap)*100)}%p, 하락 {(1-pp)*100:.0f}%)</span></div>')
+        # #3: 하한(20%) 걸림으로 %p 변화가 0이면 명시 — '변화 없음'이 아니라 하한 도달
+        if abs(pp - ap) < 1e-9 and abs(ov.get("tilt", 0)) > 1e-9:
+            floor_note = ('<div class="note muted">※ 상승확률이 하한(20%)에 도달해 %p 변화 0 — '
+                          '추가 하방 우위는 아래 <b>야간 컨펌 점수</b>로 반영(확률 아님).</div>')
+    # #3: 배수를 '야간 컨펌 점수'로 라벨 + 무엇에 대한 확인인지 명시(p_up 에 곱하지 않음)
+    cm = ov.get("confirm_mult")
+    direction = ov.get("direction", "")
+    cm_html = ""
+    if cm is not None:
+        dir_ko = {"short": "하방(숏/현금)", "long": "상방(롱)"}.get(direction, "방향")
+        strength = "강화" if cm > 1.02 else "약화" if cm < 0.98 else "중립"
+        cm_html = (f'<div class="ov-trans">야간 컨펌 점수 '
+                   f'<b style="color:{dir_color(cm-1)}">{cm:.2f}</b> '
+                   f'<span class="muted">— {dir_ko} 전제 {strength}(1.0=중립). 확률에 곱하지 않는 '
+                   f'독립 지표: 08:50 유지/축소/청산 판정에 사용.</span></div>')
     note = esc(ov.get("note", ""))
     return (f'<div class="card"><h2>간밤 재평가 '
             f'<span class="pill pill-ghost">미국장·환율 정량 반영</span></h2>'
-            f'{trans}<div class="note muted">{note}</div>'
+            f'{trans}{floor_note}{cm_html}<div class="note muted">{note}</div>'
             f'<table class="cd-table"><thead><tr><th>간밤 지표</th><th>등락</th><th>비중</th>'
             f'</tr></thead><tbody>{rows}</tbody></table>'
-            f'<div class="note muted">총점·구조는 전일 마감 앵커, 방향확률만 간밤 반영(유계 보정).</div></div>')
+            f'<div class="note muted">총점·구조는 {anchor_lbl} 앵커, 방향확률만 간밤 반영(유계 보정).</div></div>')
 
 
 def render_report_view(r: dict, date: str) -> str:
@@ -892,6 +932,7 @@ def render_report_view(r: dict, date: str) -> str:
     {build_performance(r)}
     {build_intraday(r)}
     {build_flows(r)}
+    {build_lineage(r)}
     {build_index_chart(r)}
     {build_risks(r)}
     {build_materials(r)}

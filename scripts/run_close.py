@@ -370,6 +370,25 @@ def build_report(cfg: dict, ls, client, conn, env, session_of: dict,
     if flow_warn:
         rep["warnings"] = [flow_warn] + rep.get("warnings", [])
 
+    # ── 데이터 계보(P0-2): 각 수치의 출처·기준시각·잠정/확정·시장범위 (본문 vs 기사 혼동 방지) ──
+    defin = "잠정(15:00)" if session.intraday else "마감 확정"
+    flow_status = ("미확보" if fl is None else
+                   ("장중 잠정" if fl.provisional else "확정"))
+    rep["lineage"] = {
+        "지수": {"source": session.source, "as_of": as_of, "status": defin,
+                 "scope": f"{cfg['label']} 지수"},
+        "수급": {"source": "네이버 투자자매매동향(KRX 원천)",
+                 "as_of": (_iso(fl.date) if fl else "—"), "status": flow_status,
+                 "scope": f"{cfg['label']} 현물 · 단위 억원"},
+        "환율": {"source": "네이버(하나은행 고시)", "as_of": (fx or {}).get("as_of", "—"),
+                 "status": "장중", "scope": "USD/KRW"},
+        "시장폭": {"source": "LS t1511" if snap is not None else "미확보",
+                   "as_of": as_of, "status": defin, "scope": f"{cfg['label']} 등락종목수"},
+        "재료": {"source": "Tavily(발행시각 팩트체크)",
+                 "as_of": _iso(session.trade_ymd),
+                 "status": "당일 검증", "scope": "지수 영향 재료만 점수 반영"},
+    }
+
     # ── 자가학습: 확정 일봉으로만 소급 채점 (장중 미완성치로 채점 금지) ──
     graded, acc = [], None
     calib = 0.0

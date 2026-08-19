@@ -96,6 +96,7 @@ def build_preopen(close_rep: dict, today: str, env: dict, anchor_date: str,
     ov = {**tilt_info, "anchor_p_up": anchor_p_up, "p_up": p_up,
           "world": world or {}, "usdkrw_chg": fx_chg,
           "confirm_mult": confirm_mult, "direction": direction,
+          "anchor_intraday": bool(close_rep.get("intraday_snapshot")),
           "exit_plan": strategy.exit_plan(cfg, direction)}
 
     ctx = {
@@ -106,6 +107,7 @@ def build_preopen(close_rep: dict, today: str, env: dict, anchor_date: str,
         "p_up": p_up, "p_down": p_down,
         "subscores": close_rep.get("subscores", []), "flows": close_rep.get("flows", {}),
         "atr": close_rep.get("atr"), "gate": close_rep.get("gate"),
+        "preopen_state": state,
         "warnings": [], "headlines": [], "overnight": ov,
         "as_of": f"앵커 {anchor_date} 마감 / 재검토 {as_of}",
         "intraday_snapshot": False,

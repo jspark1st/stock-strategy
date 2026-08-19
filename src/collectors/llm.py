@@ -139,14 +139,24 @@ def facts_block(ctx: dict) -> str:
             f"[등급게이트] 신규진입 {'차단' if g.get('new_entry_blocked') else '허용'} · "
             f"비중배수 {g.get('position_scale')} · 후보 최대 {g.get('max_candidates')}종목 · "
             f"종가베팅 {'가능' if g.get('close_betting') else '불가'}")
+    g = m.get("gate") or {}
+    blocked = bool(g.get("new_entry_blocked"))
+    st = (m.get("preopen_state") or {}).get("state")
+    no_position = blocked or st == "NO_TRADE"
     atr = m.get("atr") or {}
     if atr:
         p = atr.get("primary") or {}
+        # 신규진입 차단/NO_TRADE 면 실행수단(인버스 등)을 노출하지 않는다 — 관망/현금이므로
+        # 인버스·숏을 '실행수단'으로 병기하면 정책과 충돌한다(NO_TRADE ≠ 숏 진입).
+        instr = "" if no_position else (
+            f" · 실행수단 {atr.get('instrument')}" if atr.get("instrument") else "")
         lines.append(
-            f"[ATR타점] 방향 {atr.get('direction')} · 진입 {p.get('entry')} · "
+            f"[ATR타점(참고)] 방향 {atr.get('direction')} · 진입 {p.get('entry')} · "
             f"손절 {p.get('stop')} · 목표 {p.get('target')} · 손익비 1:{p.get('rr')} · "
-            f"edge {p.get('edge')} · 권장비중 {p.get('kelly_pct')}%"
-            + (f" · 실행수단 {atr.get('instrument')}" if atr.get("instrument") else ""))
+            f"edge {p.get('edge')} · 권장비중 {p.get('kelly_pct')}%" + instr)
+    if no_position:
+        lines.append("[포지션 정책] 신규진입 차단/NO_TRADE — 관망·현금만. 인버스·숏 등 어떤 "
+                     "신규 실행수단도 제시 금지(보유분 리스크 관리 언급만 허용).")
     ov = m.get("overnight") or {}
     if ov.get("drivers"):
         drv = " · ".join(f"{d['name']} {d['chg_pct']:+.2f}%" for d in ov["drivers"])
@@ -454,6 +464,9 @@ _PREOPEN_SYS = (
     "Gemini(계산·검증)를 종합한다. 규칙: 점수·확률·가격 등 수치는 '확정 수치'(전일 마감 값)만 "
     "인용하고 새 수치를 만들지 마라. 간밤 미국장/선물/환율 수치는 정성적으로 쓰거나 '(간밤 확인)' "
     "이라고 명시. 반드시 '전일 판단 유지 or 수정'을 분명히 하는 개장 대응 결론을 낸다. "
+    "**포지션 정책 절대규칙**: 확정수치에 'NO_TRADE' 또는 '신규진입 차단'이 있으면 인버스·숏·"
+    "매수 등 어떤 신규 실행수단도 제시하지 말고 결론은 '관망/현금'이어야 한다. 전날 진입이 "
+    "없었으므로 '숏 유지'·'인버스 보유'처럼 없는 포지션을 언급하지 마라(보유분 관리 언급만 허용). "
     "출력은 아래 JSON 하나만(마크다운·설명 없이):\n"
     '{"character": str(2~3문장, 간밤 시장 요약),'
     ' "scenarios": {"up": str(갭업/상방 시나리오), "down": str(갭다운/하방 시나리오), "trigger": str(개장 핵심 변수)},'
