@@ -1,5 +1,12 @@
 # CLAUDE.md
 
+> **먼저 `AGENTS.md`를 읽어라 (최상위 북극성).** 문서 체계: **AGENTS.md**(전략·규칙·로드맵) →
+> **이 파일**(상세 운영·데이터·코드맵·진행 로그) → **guide_docs/index.md**(참조·평가·계획) → 폴더.
+>
+> **이 프로젝트는 딱 하나다:** 오버나이트 롱(**장마감 매수 → 익일 장전 재평가 후 매도**) 방향예측 시스템.
+> 최종 목표는 이 단일 전략의 **매매 자동화**. 성공의 척도는 **총점·상승/하락 확률의 방향예측 정확도**뿐.
+> 다른 전략(숏 단독·데이트레이딩 등)은 섞지 않는다. 개선은 `scripts/run_backtest.py` 하네스로 측정한다.
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Where you are running (read this first)
@@ -278,7 +285,28 @@ Keep this section updated as work advances. Status legend: ✅ done · 🔶 part
   - 🔶 **LS-first 점검 결과** — 이미 LS 우선(t1102/t8410/t8412/t1511). 네이버로 남은 지수 일봉(t8419
     0행)·투자자 수급(t1601 매핑 미확정)은 LS 미해결분과 정확히 일치. api_id URL=ETF 그룹(t1901/t1903)이었음.
 
+- **2026-08-19 (4차) — 전략 단일화 · 방향예측 하네스 · 문서 체계 · evaluation2~5 반영**
+  사용자 확정: **전략은 오버나이트 롱 하나**(장마감 매수→익일 장전 매도), 목표는 **매매 자동화**,
+  척도는 **방향예측 정확도** 하나. 다른 전략 미포함.
+  - ✅ **evaluation2/3 로드맵 코드 가능분 전부 완료**(101→106 테스트): 완전성 4분해·데이터 계보·
+    불변 스냅샷·개념분리+confidence·검증성과(다중window·calibration·AUC·MFE/MAE)·ETF 실행엔진·
+    paper L1·strategy_config·기여도·팩트/해석 4섹션·상태머신 formalize·골든/계약 테스트·운영 알림.
+  - ✅ **전략 상태머신·게이트**(`src/strategy.py`): 진입 게이트·마감후 컨펌 행동룰·08:50 4상태·
+    청산 규칙·순기대값·라이프사이클 6상태. **간밤 정량 재평가**(`src/overnight.py`) + 금리/유가 소스.
+  - ✅ **evaluation4/5 반영**: 확률 라벨('익일 상승확률')·야간 컨펌 점수·NO_TRADE 인버스 억제(3곳)·
+    데이터 계보 카드. 확률 검증성 지적은 **하네스로 직접 측정하도록 전환**.
+  - ✅ **방향예측 백테스트 하네스**(`src/backtest.py` + `scripts/run_backtest.py`) — **개발의 중심**.
+    과거 실데이터 재구성(종가강도·수급·거래대금·기술퀀트)→익일 방향 레이블→적중률·Brier·AUC·
+    캘리브레이션·가중치 그리드 탐색(train/test). `naver.investor_history` 페이지네이션(수개월 이력).
+    **첫 측정: KOSPI 적중 52%/AUC 0.54, KOSDAQ 51%/AUC 0.51 — 현재 모델 방향예측 ≈ 동전던지기,
+    과도한 비관 편향. 이걸 올리는 게 최우선 개발 과제.**
+  - ✅ **문서 체계 확립**: `AGENTS.md`(북극성·규칙·자동화 로드맵) → CLAUDE.md → `guide_docs/index.md`
+    (참조·평가·계획 인덱스) → 폴더. 새 작업은 AGENTS.md 에서 시작.
+
 ### 이어서 할 곳 (open items)
+0. **[최우선] 방향예측 정확도 개선** — 하네스가 현재 ≈동전던지기(AUC 0.51~0.54)임을 드러냄. 팩터·
+   가중치·캘리브레이션·신규 피처(간밤 반영·레짐 조건부)로 AUC/Brier 를 올리는 게 이 프로젝트의 본질.
+   `run_backtest.py --tune` 로 측정하며 개선. 과최적화는 train/test 로 방어.
 1. **첫 라이브 15:00 회차 확인** — 코드는 장중 경로를 모두 갖췄지만 *실제 장중* 응답으로는 아직 미검증.
    확인할 것: ①네이버 일봉이 장중 오늘 봉을 주는가(아니면 실시간 지수 경로로 자동 폴백) ②
    `investorDealTrendTime` 이 장중 행을 주는가 ③`out/auto_close.log` 에 '거래일/장중 스냅샷' 라인이 찍히는가.
