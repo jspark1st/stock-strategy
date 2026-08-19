@@ -94,14 +94,39 @@ def investor_flows(market: str, date: str | None = None,
 
 
 def investor_history(market: str, date: str | None = None, limit: int = 10,
-                     client: httpx.Client | None = None) -> list[InvestorFlows]:
-    """최근일부터 과거순으로 투자자 순매수 이력(억원). 외국인 연속 순매수/순매도 판정용."""
+                     client: httpx.Client | None = None, max_pages: int = 15
+                     ) -> list[InvestorFlows]:
+    """최근일부터 과거순으로 투자자 순매수 이력(억원). 외국인 연속 판정 + 백테스트용.
+
+    네이버 투자자 페이지는 한 번에 최근 ~20일만 준다. limit 이 그보다 크면 더 과거 bizdate 로
+    페이지를 이어 받아 누적한다(백테스트가 긴 이력을 필요로 함). max_pages 로 호출을 제한.
+    """
+    from datetime import date as _date, timedelta
     market = market.upper()
     own = client is None
     c = client or _client()
     try:
-        rows = _fetch_rows(c, market, date)
-        return [_flows_from(market, ymd, vals) for ymd, vals in rows[:limit]]
+        acc: list = []
+        seen: set = set()
+        cur = date
+        for _ in range(max_pages):
+            rows = _fetch_rows(c, market, cur)
+            new = [(ymd, vals) for ymd, vals in rows if ymd not in seen]
+            if not new:
+                break
+            for ymd, vals in new:
+                seen.add(ymd)
+            acc.extend(new)
+            if len(acc) >= limit:
+                break
+            oldest = min(ymd for ymd, _ in new)
+            try:
+                y, m, d = int(oldest[:4]), int(oldest[4:6]), int(oldest[6:8])
+                cur = (_date(y, m, d) - timedelta(days=1)).strftime("%Y%m%d")
+            except ValueError:
+                break
+        acc.sort(key=lambda t: t[0], reverse=True)
+        return [_flows_from(market, ymd, vals) for ymd, vals in acc[:limit]]
     finally:
         if own:
             c.close()
