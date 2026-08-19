@@ -482,11 +482,14 @@ def build_report(cfg: dict, ls, client, conn, env, session_of: dict,
     rep["performance"] = perf
 
     # ── 신뢰도 확정(표본 보정) + 진입 게이트 + 버전 각인 (evaluation2/3) ──
-    cfg = config.load()
-    rep["versions"] = config.versions(cfg)
+    # 주의: 여기서 필요한 건 전역 앱 config(risk 임계 등)다. **시장 cfg(id/mk/label 보유)를
+    # 덮어쓰면 안 된다** — 아래 컨펌 diff(cfg["id"]·cfg["mk"])·LS 경보(cfg["label"])가 깨진다.
+    # (과거 `cfg = config.load()` 덮어쓰기로 16:30 확정 회차가 KeyError 로 죽던 잠복 버그.)
+    appcfg = config.load()
+    rep["versions"] = config.versions(appcfg)
     base_conf = rep.get("confidence")
     n = (acc or {}).get("n") or 0
-    min_sample = cfg["risk"]["min_calibration_sample"]
+    min_sample = appcfg["risk"]["min_calibration_sample"]
     if base_conf is not None:
         sample_factor = 0.5 + 0.5 * min(1.0, n / min_sample)  # 표본 없으면 신뢰도 절반
         rep["confidence"] = round(base_conf * sample_factor, 2)
@@ -499,7 +502,7 @@ def build_report(cfg: dict, ls, client, conn, env, session_of: dict,
             "sample_factor": round(sample_factor, 2),
             "n": n, "min_sample": min_sample,
         }
-    rep["entry"] = strategy.entry_decision(rep, cfg)
+    rep["entry"] = strategy.entry_decision(rep, appcfg)
     rep["lifecycle"] = strategy.resolve_lifecycle(
         now.hour * 100 + now.minute, "close", session.intraday)
 
