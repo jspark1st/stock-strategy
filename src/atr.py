@@ -19,13 +19,23 @@ from dataclasses import dataclass, field
 from .models import CandleSeries
 
 # 트레이더 유형별 손절(k1)/목표(k2) 배수 — 정본 §2 표의 대표값(범위 중앙 근처).
-# 마감→익일개장 재검토 지평은 1~3일 → 기본(primary)은 '단기'.
+# **우리 전략은 오버나이트 1회(장마감 매수→익일 오전 매도)** 이므로 주 타점(primary)은
+# 아래 R배수 스윙이 아니라 '오버나이트(익일 오전)' σ_AM 지평이다(compute_plan 에서 산출).
+# 이 R배수 유형들은 '다일 보유 시' 참고용으로만 남긴다(variants).
 TRADER_TYPES: dict[str, dict] = {
     "swing_short": {"label": "단기(1~3일)", "k1": 1.1, "k2": 2.2},   # b≈2.0
     "swing_std":   {"label": "표준 스윙",   "k1": 1.5, "k2": 3.0},   # b≈2.0
     "position":    {"label": "포지션",     "k1": 2.5, "k2": 6.0},   # b≈2.4
 }
-PRIMARY_TYPE = "swing_short"
+PRIMARY_TYPE = "swing_short"   # 오버나이트 σ_AM 표본 부족 시 폴백
+
+# ── 오버나이트(익일 오전) 예상 변동폭 σ_AM ─────────────────────────────────
+# 우리 전략의 실제 보유 지평은 '하룻밤→익일 오전'. 다일 스윙 R배수(2~6·ATR)는
+# 하루짜리 오버나이트에서 비현실적이므로, 실제 이 지평에서 벌어지는 폭을 데이터로 측정한다.
+OVERNIGHT_TYPE = "overnight"
+OVERNIGHT_LABEL = "오버나이트(익일 오전)"
+AM_BUFFER_K = 0.35        # 시가 직후 첫 구간 추가 변동 = 이 배수 × 일간 ATR%(√시간 근사)
+AM_K_MIN, AM_K_MAX = 0.30, 0.80   # σ_AM 은 일간 ATR 의 이 배수 범위로 클램프(비현실 확대 방지)
 
 MAX_POSITION_PCT = 25.0   # 정본 §4: 종목당 상한 25%
 KELLY_FRACTION = 0.5      # Half Kelly (정본 §4 기본값)
@@ -119,6 +129,36 @@ def robust_atr(candles: list, n: int = 14, cap_mult: float = 3.0) -> dict | None
     return {"raw": raw, "median": med, "winsor": winsor, "regime_pct": pct, "regime": regime}
 
 
+def overnight_sigma(candles: list, atr_eff: float, entry: float,
+                    lookback: int = 60) -> dict | None:
+    """익일 오전(오버나이트 갭 + 시가 후 첫 구간) 예상 변동폭 σ_AM.
+
+    - 갭 변동성: (open_t / close_{t-1} − 1) 의 최근 lookback 표준편차 — **측정값**(가정 아님).
+      "다음 날 시가까지 얼마나 벌어지나"를 우리가 이미 받는 지수 일봉에서 직접 잰다.
+    - 오전 버퍼: AM_BUFFER_K × 일간 ATR%(시가 직후 첫 구간 추가 변동, √시간 근사).
+    - σ_AM% = √(갭² + 버퍼²), 일간 ATR% 의 [AM_K_MIN, AM_K_MAX] 배로 클램프(비현실 확대 방지).
+
+    반환 {gap_pct, sigma_am_pct, k_atr} — k_atr = σ_AM/ATR(일간 ATR 배수). 표본 부족이면 None.
+    """
+    if not entry or not atr_eff or len(candles) < 12:
+        return None
+    seg = candles[-(lookback + 1):]
+    gaps = [seg[i].open / seg[i - 1].close - 1.0
+            for i in range(1, len(seg)) if seg[i - 1].close and seg[i].open]
+    if len(gaps) < 8:
+        return None
+    mg = sum(gaps) / len(gaps)
+    gap_sd = (sum((g - mg) ** 2 for g in gaps) / len(gaps)) ** 0.5 * 100.0   # %
+    atr_pct = atr_eff / entry * 100.0
+    if atr_pct <= 0:
+        return None
+    buffer = AM_BUFFER_K * atr_pct
+    sigma_am = (gap_sd ** 2 + buffer ** 2) ** 0.5
+    sigma_am = clamp(sigma_am, AM_K_MIN * atr_pct, AM_K_MAX * atr_pct)
+    return {"gap_pct": round(gap_sd, 3), "sigma_am_pct": round(sigma_am, 3),
+            "k_atr": round(sigma_am / atr_pct, 3)}
+
+
 def swing_low(candles: list, k: int = 10) -> float | None:
     seg = candles[-k:]
     return min(c.low for c in seg) if seg else None
@@ -174,6 +214,11 @@ class AtrPlan:
     gate_blocked: bool = False
     position_scale: float = 1.0
     instrument: str = ""                  # 실제 체결 수단(방향별)
+    # 오버나이트(익일 오전) σ_AM — 주 타점의 근거. 표본 부족 시 None(단기 폴백).
+    am_sigma_pct: float | None = None     # 익일 오전 예상 변동폭(%, 진입가 대비)
+    am_gap_pct: float | None = None       # 그 중 오버나이트 갭 변동성(측정값)
+    am_k: float | None = None             # σ_AM / 일간 ATR(배수)
+    horizon: str = "overnight"            # 주 타점 지평(overnight | swing_short 폴백)
 
     def to_dict(self) -> dict:
         def lvl(l: AtrLevels) -> dict:
@@ -206,13 +251,22 @@ class AtrPlan:
             "gate_blocked": self.gate_blocked,
             "position_scale": self.position_scale,
             "instrument": self.instrument,
+            "am_sigma_pct": self.am_sigma_pct,
+            "am_gap_pct": self.am_gap_pct,
+            "am_k": self.am_k,
+            "horizon": self.horizon,
         }
 
 
 def _levels(type_key: str, entry: float, atr14: float, p_used: float,
-            direction: str) -> AtrLevels:
-    t = TRADER_TYPES[type_key]
-    k1, k2 = t["k1"], t["k2"]
+            direction: str, k1: float | None = None, k2: float | None = None,
+            label: str | None = None) -> AtrLevels:
+    if k1 is None or k2 is None:
+        t = TRADER_TYPES[type_key]
+        k1, k2 = t["k1"], t["k2"]
+        label = t["label"]
+    elif label is None:
+        label = type_key
     if direction == "short":
         stop = entry + k1 * atr14
         target = entry - k2 * atr14
@@ -225,7 +279,7 @@ def _levels(type_key: str, entry: float, atr14: float, p_used: float,
     # 켈리: f* = p - (1-p)/b, Half Kelly, 0~cap 클립. edge<=0 이면 0.
     f_star = p_used - (1 - p_used) / b
     kelly = clamp(f_star * KELLY_FRACTION * 100, 0.0, MAX_POSITION_PCT) if edge > 0 else 0.0
-    return AtrLevels(type_key=type_key, label=t["label"], k1=k1, k2=k2,
+    return AtrLevels(type_key=type_key, label=label, k1=k1, k2=k2,
                      entry=entry, stop=stop, target=target, rr=b,
                      p_used=p_used, p_breakeven=p_be, edge=edge,
                      kelly_pct=kelly, qualified=edge > 0)
@@ -273,14 +327,24 @@ def compute_plan(market: str, daily: CandleSeries, p_up: float | None,
         direction = "watch"
     p_used = p_up if direction != "short" else (1 - p_up)
 
+    # 참고용 다일(1~3일/스윙/포지션) R배수 타점 — 우리 전략은 오버나이트지만 보유 연장 대비.
     variants = [_levels(k, entry, a_eff, p_used, direction) for k in TRADER_TYPES]
+    # ── 주 타점 = 오버나이트(익일 오전) σ_AM. 손절·목표를 이 지평의 실제 예상 변동폭(±1σ_AM)으로. ──
+    am = overnight_sigma(candles, a_eff, entry)
+    if am:
+        overnight = _levels(OVERNIGHT_TYPE, entry, a_eff, p_used, direction,
+                            k1=am["k_atr"], k2=am["k_atr"], label=OVERNIGHT_LABEL)  # RR 1:1
+        horizon = OVERNIGHT_TYPE
+    else:
+        overnight = None
+        horizon = PRIMARY_TYPE   # σ_AM 표본 부족 → 단기(1~3일) 폴백
     # ── 등급 게이트 적용(스코어링 결론이 사이징을 지배한다) ──
     gate = gate or {}
     blocked = bool(gate.get("new_entry_blocked"))
     pscale = float(gate.get("position_scale", 1.0))
-    for v in variants:
+    for v in variants + ([overnight] if overnight else []):
         v.kelly_pct = 0.0 if blocked else clamp(v.kelly_pct * pscale, 0.0, MAX_POSITION_PCT)
-    primary = next(v for v in variants if v.type_key == PRIMARY_TYPE)
+    primary = overnight or next(v for v in variants if v.type_key == PRIMARY_TYPE)
 
     pullback = entry - 0.5 * a_eff if direction != "short" else entry + 0.5 * a_eff
 
@@ -313,8 +377,12 @@ def compute_plan(market: str, daily: CandleSeries, p_up: float | None,
     atr_pct = a14 / entry * 100 if entry else 0.0
     eff_pct = a_eff / entry * 100 if entry else 0.0
     regime_txt = f" · 변동성 {regime}({(vol_pct or 0)*100:.0f}%)" if rob else ""
+    am_txt = ""
+    if am:
+        am_txt = (f" · 익일 오전 예상변동 σ_AM {am['sigma_am_pct']:.2f}%"
+                  f"(갭 {am['gap_pct']:.2f}% ⊕ 오전버퍼, 일간 ATR의 {am['k_atr']:.2f}배)")
     observed = (f"ATR14 원본 {a14:.2f}({atr_pct:.2f}%)→적용 {a_eff:.2f}({eff_pct:.2f}%)"
-                f"{regime_txt} · 진입 {entry:.2f} · 손절 {primary.stop:.2f}"
+                f"{regime_txt}{am_txt} · 진입 {entry:.2f} · 손절 {primary.stop:.2f}"
                 f"(권장 {rec_stop:.2f}·{rec_basis}) · 목표 {primary.target:.2f} · "
                 f"손익비 1:{primary.rr:.1f} · edge {primary.edge:+.1%}")
 
@@ -339,15 +407,11 @@ def compute_plan(market: str, daily: CandleSeries, p_up: float | None,
     elif regime == "저변동":
         comment += " · 저변동 → ATR 타이트, whipsaw 유의(배수 상향 고려)."
 
-    # ── 목표-기간 현실성: 기본 타점은 '단기(1~3일)'인데, 변동성 급확대 국면에선
-    # k2·ATR 목표가 단기 도달이 비현실적인 폭(예: 지수 -13%)까지 벌어진다.
-    # 목표를 조용히 그대로 두면 오해하므로, 도달 난도를 명시하고 1·ATR 중간 목표를 병기한다.
-    tgt_move = abs(primary.target - entry) / entry * 100 if entry else 0.0
-    if tgt_move > HORIZON_MOVE_WARN_PCT:
-        interim = entry + a_eff if direction != "short" else entry - a_eff
-        comment += (f" · ⚠ {primary.label} 목표 {primary.target:.2f}는 진입가 대비 "
-                    f"{tgt_move:.1f}%({primary.k2:.1f}·ATR)로 단기 도달 난도 높음 "
-                    f"— 1차 중간목표 {interim:.2f}(1·ATR) 우선 대응 권장.")
+    # ── 지평 정합: 주 타점은 오버나이트(익일 오전) σ_AM. 기본 청산은 08:50 장전 재평가(시간청산)이고
+    # 아래 손절/목표는 ±1σ_AM 안전망이다. 아래 미니표의 다일 R배수 타점은 '보유 연장 시' 참고일 뿐.
+    if am and primary.qualified and not blocked:
+        comment += (f" · 지평=오버나이트(익일 오전) ±{am['sigma_am_pct']:.1f}% 안전망; "
+                    "기본 청산은 장전 재평가(시간청산). 미니표 다일 타점은 보유 연장 시 참고.")
 
     return AtrPlan(
         market=market, direction=direction, atr14=a14, atr22=a22, entry=entry,
@@ -355,4 +419,7 @@ def compute_plan(market: str, daily: CandleSeries, p_up: float | None,
         price_limit_warn=surge, observed=observed, comment=comment,
         atr_eff=a_eff, atr_median=a_med, vol_pct=vol_pct, regime=regime,
         structure_stop=struct, rec_stop=rec_stop, rec_stop_basis=rec_basis,
-        gate_blocked=blocked, position_scale=pscale, instrument=instrument)
+        gate_blocked=blocked, position_scale=pscale, instrument=instrument,
+        am_sigma_pct=(am["sigma_am_pct"] if am else None),
+        am_gap_pct=(am["gap_pct"] if am else None),
+        am_k=(am["k_atr"] if am else None), horizon=horizon)

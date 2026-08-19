@@ -333,8 +333,50 @@ def build_order_card(r: dict) -> str:
             f'<table class="cd-table"><thead><tr><th>레벨</th><th style="text-align:right">지수</th>'
             f'<th></th><th style="text-align:right">ETF가</th></tr></thead><tbody>'
             f'{_row("entry","진입")}{_row("stop","손절")}{_row("target","목표")}</tbody></table>'
+            f'{build_hts_sell(oc)}'
             f'<ul class="risk-ul" style="margin-top:8px">{warns}</ul>'
             f'<div class="note muted">{esc(oc.get("note",""))}</div></div>')
+
+
+def _sgn_pct(v) -> str:
+    """진입가 대비 등락% — 한국 색관례(빨강 상승·파랑 하락)."""
+    if v is None:
+        return '<span class="muted">—</span>'
+    col = "var(--up)" if v >= 0 else "var(--down)"
+    return f'<span style="color:{col}">{v:+.2f}%</span>'
+
+
+def build_hts_sell(oc: dict) -> str:
+    """HTS '고급매도설정(개별)' 추천 — 손실제한·이익목표·T/S목표 + STEP2 실행조건.
+
+    정상/인버스 모두 그 ETF를 매수·보유하므로 매도 자동설정은 동일(손절 이하·목표 이상).
+    방향에 맞는 ETF 카드에만 붙는다(run_close 가 long→069500/229200, short→인버스 선택)."""
+    h = oc.get("hts_sell")
+    if not h:
+        return ""
+    ll, pt, ts = h.get("loss_limit") or {}, h.get("profit_target") or {}, h.get("trailing") or {}
+    notes = "".join(f"<li>{esc(n)}</li>" for n in (h.get("notes") or []))
+    step1 = (
+        f'<table class="cd-table"><thead><tr><th>STEP1 · 시세포착조건</th>'
+        f'<th style="text-align:right">설정값</th><th style="text-align:right">진입가 대비</th></tr></thead><tbody>'
+        f'<tr><td>손실제한 · 현재가 이하 → 매도</td>'
+        f'<td style="text-align:right;font-weight:800">{fmt(ll.get("price"),0)}원</td>'
+        f'<td style="text-align:right">{_sgn_pct(ll.get("pct"))}</td></tr>'
+        f'<tr><td>이익목표 · 현재가 이상 → 매도</td>'
+        f'<td style="text-align:right;font-weight:800">{fmt(pt.get("price"),0)}원</td>'
+        f'<td style="text-align:right">{_sgn_pct(pt.get("pct"))}</td></tr>'
+        f'<tr><td>T/S목표 · 1차 {fmt(ts.get("trigger_price"),0)}원 도달 후 고점대비 '
+        f'{ts.get("drop_pct")}% 하락 → 매도</td>'
+        f'<td style="text-align:right;font-weight:800">↓{ts.get("drop_pct")}%</td>'
+        f'<td style="text-align:right">{_sgn_pct(ts.get("trigger_pct"))}</td></tr>'
+        f'</tbody></table>')
+    step2 = (f'<div class="note muted" style="margin-top:6px">STEP2 · 매도주문 실행조건 — '
+             f'주문유형 <b>{esc(h.get("order_type",""))}</b> · 주문수량 <b>{esc(h.get("qty",""))}</b> · '
+             f'주문가격 <b>{esc(h.get("price_field",""))}</b> · 유효기간 <b>{esc(h.get("valid",""))}</b></div>')
+    return (f'<div class="sub-h" style="margin-top:12px">고급매도설정 추천 '
+            f'<span class="pill pill-ghost">{esc(h.get("kind",""))} · {esc(h.get("instrument",""))}</span></div>'
+            f'{step1}{step2}'
+            f'<ul class="risk-ul" style="margin-top:6px">{notes}</ul>')
 
 
 def build_performance(r: dict) -> str:
@@ -503,6 +545,9 @@ def build_atr_plan(r: dict) -> str:
     ])
     # 보조 정보 (초고수 보강: 원본 vs 정규화 ATR, 변동성 국면, 구조 손절)
     extra = []
+    if atr.get("am_sigma_pct") is not None:
+        extra.append(f"익일 오전 예상변동 σ_AM {atr['am_sigma_pct']:.1f}%"
+                     f"(갭 {atr.get('am_gap_pct') or 0:.1f}% ⊕ 오전버퍼 · 일간 ATR의 {atr.get('am_k') or 0:.2f}배)")
     if atr.get("atr14") is not None and atr.get("atr_eff") is not None:
         extra.append(f"ATR14 원본 {fmt(atr.get('atr14'),2)} → 적용(정규화) {fmt(atr.get('atr_eff'),2)}")
     if atr.get("vol_pct") is not None:
@@ -539,6 +584,8 @@ def build_atr_plan(r: dict) -> str:
     <div class="atr-extra">{' · '.join(extra)}</div>
     {warn}
     <div class="obs muted">{esc(atr.get('comment',''))}</div>
+    <div class="sub-h" style="margin-top:10px">참고 · 다일 보유 시 R배수 타점
+      <span class="pill pill-ghost">우리 전략은 오버나이트 1회</span></div>
     <div class="table-wrap">
       <table class="mini">
         <thead><tr><th>유형</th><th>손절</th><th>목표</th><th>손익비</th><th>edge</th><th>비중</th></tr></thead>
@@ -546,9 +593,10 @@ def build_atr_plan(r: dict) -> str:
       </table>
     </div>
     {anchor_note}
-    <div class="note muted">지수 포인트 기준 <b>참고</b> 타점{instr_txt}.
-      edge·켈리는 <b>익일 방향확률(p)</b>을 손익비 승률로 간주한 값이다 — 목표·손절 도달
-      확률과는 다르므로 비중은 항상 게이트·상한 안에서. 투자 권유 아님.</div>
+    <div class="note muted">주 타점은 <b>오버나이트(익일 오전) ±1σ_AM</b> — 기본 청산은
+      08:50 장전 재평가(시간청산)이고 손절/목표는 안전망이다. 위 표의 다일 타점은 보유 연장 시 참고.
+      지수 포인트 기준 <b>참고</b> 타점{instr_txt}. edge·켈리는 <b>익일 방향확률(p)</b>을 손익비
+      승률로 간주한 값 — 목표·손절 도달 확률과는 다르므로 비중은 항상 게이트·상한 안에서. 투자 권유 아님.</div>
   </div>"""
 
 

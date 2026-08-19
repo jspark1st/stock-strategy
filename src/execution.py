@@ -79,9 +79,54 @@ def order_card(market: str, direction: str, etf_quote: dict, beta_info: dict,
     if beta_info.get("tracking_error_pct") and beta_info["tracking_error_pct"] >= 0.3:
         warns.append(f"추적오차 일간 {beta_info['tracking_error_pct']:.2f}% — 지수와 괴리 가능")
     warns.append("일간 추종 ETF — 장기 보유 시 복리 괴리. 갭 발생 시 손절 미체결 가능성.")
+    hts = hts_sell_settings(etf_quote.get("name") or market, direction, price, etf_levels)
     return {"instrument": etf_quote.get("name") or market, "shcode": etf_quote.get("shcode"),
             "direction": direction, "etf_price": price,
             "nav": etf_quote.get("nav"), "disparity_pct": disp, "spread": sp,
             "beta": beta, "tracking_error_pct": beta_info.get("tracking_error_pct"),
             "etf_levels": etf_levels, "index_levels": index_levels, "warnings": warns,
+            "hts_sell": hts,
             "note": "지수 레벨을 베타로 ETF 가격에 변환한 참고치 — 실주문 아님(L0/L1)"}
+
+
+def hts_sell_settings(instrument: str, direction: str, price: float | None,
+                      etf_levels: dict) -> dict | None:
+    """LS증권 HTS '고급매도설정(개별)'에 그대로 옮겨 적을 추천값.
+
+    우리는 **정상(롱 ETF)이든 인버스든 그 ETF를 매수해서 보유**한다. 따라서 어느 쪽이든
+    자동매도는 동일하게 '손절가 이하 / 목표가 이상'으로 건다(인버스는 베타 반전이 etf_levels에
+    이미 반영되어 손절<진입<목표 구조가 롱과 같다). 값은 익일 오전 σ_AM(±1σ) 지평의 ETF 가격.
+
+    - 손실제한(STEP1): 현재가 ≤ 손절가 → 매도
+    - 이익목표(STEP1): 현재가 ≥ 목표가 → 매도
+    - T/S목표(STEP1): 1차(진입+0.5σ) 도달 후 고점대비 하락% → 매도(익일 장중 상승 연장 대비)
+    - STEP2 실행: 시장가 · 가능수량 100% · 현재가 · 유효기간 익일
+    """
+    stop_p = etf_levels.get("stop")
+    tgt_p = etf_levels.get("target")
+    if not price or stop_p is None or tgt_p is None:
+        return None
+
+    def _pct(x: float) -> float:
+        return round((x / price - 1.0) * 100.0, 2)
+
+    band = abs(tgt_p - price) / price * 100.0            # ±σ_AM(ETF 기준, %)
+    up = tgt_p > price                                    # 목표가 진입 위인가(정상/인버스 모두 True)
+    ts_trigger = round(price + (0.5 if up else -0.5) * abs(tgt_p - price))
+    ts_drop = max(round(0.5 * band, 1), 0.4)             # 고점대비 하락% (최소 0.4%)
+    kind = "인버스" if direction == "short" else "정상"
+    return {
+        "kind": kind, "instrument": instrument,
+        "loss_limit": {"price": round(stop_p), "pct": _pct(stop_p)},
+        "profit_target": {"price": round(tgt_p), "pct": _pct(tgt_p)},
+        "trailing": {"trigger_price": ts_trigger, "trigger_pct": _pct(ts_trigger),
+                     "drop_pct": ts_drop},
+        "order_type": "시장가", "qty": "가능수량 100%",
+        "price_field": "현재가", "valid": "익일까지",
+        "band_pct": round(band, 2),
+        "notes": [
+            "기본 청산은 08:50 장전 재평가 — 이 자동설정은 보조 안전망이다.",
+            "손절·T/S 모두 오버나이트 갭은 못 막는다(장 마감 중 무감시, 익일 시가 갭에 체결).",
+            f"손절/목표는 익일 오전 예상 변동폭 ±{band:.1f}%(σ_AM) 기준 — 다일 스윙 목표가 아님.",
+        ],
+    }

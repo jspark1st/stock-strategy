@@ -152,10 +152,15 @@ def facts_block(ctx: dict) -> str:
         # 인버스·숏을 '실행수단'으로 병기하면 정책과 충돌한다(NO_TRADE ≠ 숏 진입).
         instr = "" if no_position else (
             f" · 실행수단 {atr.get('instrument')}" if atr.get("instrument") else "")
+        am = (f" · 지평 오버나이트(익일 오전) ±{atr.get('am_sigma_pct')}%(σ_AM)"
+              if atr.get("am_sigma_pct") is not None else "")
         lines.append(
             f"[ATR타점(참고)] 방향 {atr.get('direction')} · 진입 {p.get('entry')} · "
             f"손절 {p.get('stop')} · 목표 {p.get('target')} · 손익비 1:{p.get('rr')} · "
-            f"edge {p.get('edge')} · 권장비중 {p.get('kelly_pct')}%" + instr)
+            f"edge {p.get('edge')} · 권장비중 {p.get('kelly_pct')}%" + am + instr)
+        lines.append("[지평 규율] 목표·손절은 익일 오전(오버나이트 1회) 예상 변동폭 기준이다. "
+                     "'며칠에 걸쳐'·'중장기 목표' 등 다일 보유를 전제한 서술 금지. 기본 청산은 "
+                     "08:50 장전 재평가(시간청산).")
     if no_position:
         lines.append("[포지션 정책] 신규진입 차단/NO_TRADE — 관망·현금만. 인버스·숏 등 어떤 "
                      "신규 실행수단도 제시 금지(보유분 리스크 관리 언급만 허용).")
