@@ -444,6 +444,21 @@ Keep this section updated as work advances. Status legend: ✅ done · 🔶 part
     구간 — 다른 레짐에선 밤 프리미엄이 줄거나 역전 가능. 지수 프록시·개장 슬리피지 미반영. **재검증 전
     실거래 확대 금지.** 남은 최우선은 여전히 **다레짐 데이터 축적 후 재측정**(신규 모델링 아님).
 
+- **2026-08-19 (9차) — 병렬 전면 감사(4에이전트) + 게이트 정합 재발 수정**
+  4개 에이전트 병렬 감사(스코어링·ATR / 파이프라인·크론 / 신규코드 / 수집기·인과성). 결과:
+  - ✅ **간밤 신호 진짜 재검증**(적대적) — 인과성 감사가 시간대 산술+라이브로 KOSPI blend AUC 0.679가
+    미래참조 아티팩트 아님 확인(walk-forward 독립 OOS 0.505→0.614). exp_* 전부 lookahead 없음.
+  - 🔴 **게이트 정합 함정 재발 2건 수정**(6차에 렌더에서 고친 결함이 오늘 신규 코드에 재발): ①상품 주문
+    카드(`build_order_card`)가 `entry.allow`(6조건 AND) 무시 → 관망/현금인데 HTS 100% 자동매도 세팅 노출.
+    진입 차단 시 HTS 억제+강등문구로 수정. ②개장전 텔레그램 요약(`build_report_summary`)이 등급 게이트만
+    봐 'NO_TRADE인데 진입 검토' 모순 → `build_preopen`에 `entry` 키 추가 + 요약이 `preopen_state`
+    (NO_TRADE/EXIT_OPEN) 우선 판정. 특히 **코스닥(등급 통과·entry.allow=False)** 케이스를 정확히 잡음.
+  - 🟡 **run_preopen 안전장치 이식** — dry-run 부재(수동 실행 시 무조건 public 덮어쓰기·텔레그램 실전송)
+    → `--dry-run/--now/--write` 이식. **이 서버서 처음 end-to-end 검증**(내일 08:00 첫 실행 리스크 해소).
+  - ✅ 나머지(appcfg 분리·크론 3종·confirm_diff·intraday 분기·hts 부호매핑·RR수학·fail-safe) 이상 없음.
+    테스트 +6(게이트 억제·요약 정합), 총 **143 통과**. 저우선 메모(resolve_session 이중임계·world_indices
+    신선도검증 gap·캐시 TTL)는 open item 유지.
+
 ### 이어서 할 곳 (open items)
 0. **[최우선] 방향예측 — 판별력(AUC) 계속** — 5차 처리분: 캘리브레이션(비관편향, 양시장) + **가드된
    KOSDAQ 거래량 틸트**(walk-forward AUC 0.488→0.577). 남은 것:

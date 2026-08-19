@@ -133,6 +133,9 @@ def build_preopen(close_rep: dict, today: str, env: dict, anchor_date: str,
         "total": close_rep.get("total"), "grade": close_rep.get("grade"),
         "p_up": p_up, "p_down": p_down, "p_up_anchor": anchor_p_up,
         "market": ms, "atr": close_rep.get("atr"), "gate": close_rep.get("gate"),
+        # 전날 진입 판정(entry.allow 6조건 AND)을 그대로 전달 — 요약/카드가 등급 게이트만
+        # 보고 오판하지 않도록(개장전 요약이 'NO_TRADE'인데 '진입 검토'로 뜨던 모순 방지).
+        "entry": close_rep.get("entry"),
         "narrative": narrative, "overnight": ov, "preopen_state": state,
         "lifecycle": strategy.resolve_lifecycle(None, "preopen", False),
         "sources": narrative.get("sources", []),
@@ -143,6 +146,11 @@ def build_preopen(close_rep: dict, today: str, env: dict, anchor_date: str,
 
 def main() -> int:
     env = load_env()
+    # run_close.py 와 동일한 안전장치: --dry-run 이면 public/index.html·preopen.json 미기록,
+    # 원격 push·텔레그램 미전송(수동 검증/디버그용). --write 는 --dry-run 을 무효화(실반영).
+    dry_run = "--dry-run" in sys.argv and "--write" not in sys.argv
+    if dry_run:
+        print("[DRY-RUN — public/텔레그램/원격 미반영]")
     if "--auto" in sys.argv and str(env.get("auto_update", "true")).strip().lower() \
             not in ("1", "true", "yes", "on"):
         print("auto_update=false — 예약 실행 건너뜀(API 비용 절약).")
@@ -203,30 +211,34 @@ def main() -> int:
     out_dir = ROOT / "out"
     out_dir.mkdir(exist_ok=True)
     # 오후 마감 파이프라인이 같은 날 대시보드에 이 뷰를 합칠 수 있게 저장한다.
-    (out_dir / f"preopen_{today}.json").write_text(
-        json.dumps({"trade_date": today, "anchor_date": anchor_date,
-                    "reports": preopen_reports}, ensure_ascii=False, indent=2),
-        encoding="utf-8")
+    # dry-run 이면 실운영 소비 파일(preopen.json)을 오염시키지 않도록 기록하지 않는다.
+    if not dry_run:
+        (out_dir / f"preopen_{today}.json").write_text(
+            json.dumps({"trade_date": today, "anchor_date": anchor_date,
+                        "reports": preopen_reports}, ensure_ascii=False, indent=2),
+            encoding="utf-8")
 
     bundle = {"trade_date": today, "as_of": as_of,
               "reports": close_reports + preopen_reports}
-    out_path = out_dir / f"report_{today}.html"
+    out_path = out_dir / (f"report_{today}.dryrun.html" if dry_run else f"report_{today}.html")
     html = render(bundle)
     out_path.write_text(html, encoding="utf-8")
-    pub = ROOT / "public"
-    pub.mkdir(exist_ok=True)
-    (pub / "index.html").write_text(html, encoding="utf-8")
+    if not dry_run:
+        pub = ROOT / "public"
+        pub.mkdir(exist_ok=True)
+        (pub / "index.html").write_text(html, encoding="utf-8")
     print(f"✓ 개장 전 대시보드 생성: {out_path}  ({out_path.stat().st_size:,} bytes)")
 
-    if remote.push_report(out_path, env):
+    if not dry_run and remote.push_report(out_path, env):
         print("리포트: 서버 백업 ✓")
 
-    try:
-        if notify.send_telegram(
-                notify.build_report_summary(preopen_reports, "개장 전(08:00)", today)):
-            print("텔레그램: 요약 전송 ✓")
-    except Exception:  # noqa — 알림 실패가 파이프라인을 막지 않는다
-        pass
+    if not dry_run:
+        try:
+            if notify.send_telegram(
+                    notify.build_report_summary(preopen_reports, "개장 전(08:00)", today)):
+                print("텔레그램: 요약 전송 ✓")
+        except Exception:  # noqa — 알림 실패가 파이프라인을 막지 않는다
+            pass
     return 0
 
 

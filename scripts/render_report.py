@@ -314,6 +314,12 @@ def build_order_card(r: dict) -> str:
     oc = r.get("order_card") or {}
     if not oc or not oc.get("etf_price"):
         return ""
+    # 진입 게이트가 권위(entry.allow 6조건 AND) — 매매결론·ATR 카드와 동일 판정. 차단이면
+    # HTS 자동매도 세팅(실행 직전 단계)을 노출하지 않는다(관망/현금인데 100% 매도세팅 = 모순).
+    gate = r.get("gate") or {}
+    entry = r.get("entry") or {}
+    no_position = (bool(gate.get("new_entry_blocked")) or entry.get("allow") is False
+                   or (r.get("preopen_state") or {}).get("state") in ("NO_TRADE", "EXIT_OPEN"))
     el = oc.get("etf_levels") or {}
     il = oc.get("index_levels") or {}
     def _row(k, ko):
@@ -327,13 +333,17 @@ def build_order_card(r: dict) -> str:
     if oc.get("disparity_pct") is not None: meta.append(f"NAV괴리 {oc['disparity_pct']:+.2f}%")
     if oc.get("spread") is not None: meta.append(f"스프레드 {oc['spread']}")
     warns = "".join(f"<li>{esc(w)}</li>" for w in (oc.get("warnings") or []))
+    hts_block = ('<div class="atr-warn" style="margin-top:8px">진입 게이트 차단 — '
+                 '신규 진입·자동매도 설정 없음(관망/현금). 위 지수↔ETF 환산은 참고용이며, '
+                 '보유분이 있을 때만 관리에 쓰세요.</div>'
+                 if no_position else build_hts_sell(oc))
     return (f'<div class="card"><h2>상품 주문 카드 '
             f'<span class="pill pill-ghost">{esc(oc.get("instrument",""))} {esc(oc.get("shcode",""))}</span></h2>'
             f'<div class="note muted">지수 레벨을 베타로 ETF 가격에 변환 · {esc(" · ".join(meta))} · ETF 기준가 {fmt(oc.get("etf_price"),0)}</div>'
             f'<table class="cd-table"><thead><tr><th>레벨</th><th style="text-align:right">지수</th>'
             f'<th></th><th style="text-align:right">ETF가</th></tr></thead><tbody>'
             f'{_row("entry","진입")}{_row("stop","손절")}{_row("target","목표")}</tbody></table>'
-            f'{build_hts_sell(oc)}'
+            f'{hts_block}'
             f'<ul class="risk-ul" style="margin-top:8px">{warns}</ul>'
             f'<div class="note muted">{esc(oc.get("note",""))}</div></div>')
 

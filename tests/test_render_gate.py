@@ -59,3 +59,40 @@ def test_grade_block_takes_precedence():
     html = rr.build_atr_plan(_report(entry_allow=False, grade_blocked=True))
     assert "등급 게이트 차단" in html
     assert "진입 자격 ✓" not in html
+
+
+def _order_card_report(entry_allow, grade_blocked=False, preopen_state=None):
+    oc = {"etf_price": 100.0, "instrument": "KODEX 200", "shcode": "069500",
+          "index_levels": {"entry": 6000.0, "stop": 5940.0, "target": 6060.0},
+          "etf_levels": {"entry": 100.0, "stop": 99.0, "target": 101.0},
+          "hts_sell": {"kind": "정상", "instrument": "KODEX 200",
+                       "loss_limit": {"price": 99, "pct": -1.0},
+                       "profit_target": {"price": 101, "pct": 1.0},
+                       "trailing": {"trigger_price": 100, "trigger_pct": 0.0, "drop_pct": 0.5},
+                       "order_type": "시장가", "qty": "가능수량 100%",
+                       "price_field": "현재가", "valid": "익일까지", "notes": []}}
+    r = {"order_card": oc, "gate": {"new_entry_blocked": grade_blocked},
+         "entry": {"allow": entry_allow}}
+    if preopen_state:
+        r["preopen_state"] = {"state": preopen_state}
+    return r
+
+
+def test_order_card_suppresses_hts_when_entry_blocked():
+    """진입 게이트 차단이면 HTS 고급매도설정(실행 세팅) 미표시 — 매매결론·ATR 카드와 정합."""
+    html = rr.build_order_card(_order_card_report(entry_allow=False))
+    assert "고급매도설정 추천" not in html      # 100% 자동매도 세팅 노출 금지
+    assert "가능수량 100%" not in html
+    assert "진입 게이트 차단" in html            # 명시 강등
+
+
+def test_order_card_suppressed_on_no_trade_preopen():
+    html = rr.build_order_card(_order_card_report(entry_allow=True, preopen_state="NO_TRADE"))
+    assert "고급매도설정 추천" not in html
+
+
+def test_order_card_shows_hts_when_allowed():
+    """진입 게이트 통과면 HTS 세팅 정상 표시(회귀 방지)."""
+    html = rr.build_order_card(_order_card_report(entry_allow=True))
+    assert "고급매도설정 추천" in html
+    assert "손실제한" in html and "가능수량 100%" in html

@@ -52,7 +52,12 @@ def build_report_summary(reports: list, kind: str, trade_date: str,
         p_up = r.get("p_up")
         entry = r.get("entry") or {}
         gate = r.get("gate") or {}
-        blocked = (entry.get("allow") is False) or bool(gate.get("new_entry_blocked"))
+        st = r.get("preopen_state") or {}
+        # 개장전은 preopen_state(NO_TRADE/EXIT_OPEN)가 권위. 마감은 entry.allow(6조건 AND) 우선,
+        # 없으면 등급 게이트. 등급 게이트만 보고 판단하면 'NO_TRADE인데 진입 검토'로 모순난다.
+        blocked = (st.get("state") in ("NO_TRADE", "EXIT_OPEN")
+                   or entry.get("allow") is False
+                   or bool(gate.get("new_entry_blocked")))
         tp = f"{total}" if total is not None else "미산출"
         # 개장전이면 간밤 반영으로 확률이 앵커→조정으로 바뀐다 → 둘 다 보여준다.
         anc = r.get("p_up_anchor")
@@ -62,7 +67,6 @@ def build_report_summary(reports: list, kind: str, trade_date: str,
             pp = f"{round(p_up * 100)}%" if p_up is not None else "—"
         gate_txt = "관망/현금" if blocked else "진입 검토"
         out.append(f"• {label}: {tp}·{grade}·익일↑{pp} · {gate_txt}")
-        st = r.get("preopen_state") or {}
         if st.get("state"):
             out.append(f"   개장 상태: {st['state']}{(' — ' + st['action']) if st.get('action') else ''}")
         oc = r.get("order_card") or {}
