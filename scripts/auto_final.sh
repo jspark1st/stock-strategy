@@ -38,6 +38,7 @@ RC=$?
 if [ $RC -ne 0 ]; then
   echo "[$(date '+%F %T')] ✗ 재계산 실패(exit $RC) — 배포하지 않음" >> "$LOG"
   echo "[$(date '+%F %T')] ALERT: auto_final 재계산 실패(exit $RC)" >> out/alerts.log
+  "$PY" scripts/notify.py "🔴 easystock 마감확정(16:30) 파이프라인 실패(exit $RC) — 배포 안 됨. out/auto_final.log 확인." >> "$LOG" 2>&1 || true
   exit $RC
 fi
 
@@ -59,5 +60,6 @@ if git push origin main >> "$LOG" 2>&1; then
 else
   echo "[$(date '+%F %T')] ✗ git push 실패 — 커밋은 로컬에 남음" >> "$LOG"
   echo "[$(date '+%F %T')] ALERT: auto_final git push 실패" >> out/alerts.log
+  "$PY" scripts/notify.py "🔴 easystock 마감확정(16:30) git push 실패 — 사이트 미갱신. 서버 확인." >> "$LOG" 2>&1 || true
   exit 1
 fi
