@@ -32,6 +32,50 @@ def _env(key: str) -> str | None:
     return None
 
 
+SITE_URL = "https://easystock-junaitech.vercel.app"
+
+
+def build_report_summary(reports: list, kind: str, trade_date: str,
+                         url: str = SITE_URL) -> str:
+    """리포트 목록 → 텔레그램용 간략 요약(한국어). 회차별 성공 시 전송.
+
+    각 시장: 총점·등급·익일상승% · 진입게이트(관망/진입). 진입 가능하면 ETF 손절/목표가도.
+    권위 판정은 entry.allow(6조건 AND) — 없으면 등급 게이트로 폴백.
+    """
+    out = [f"📊 easystock · {kind} · {trade_date}"]
+    for r in reports:
+        label = r.get("label")
+        if not label:
+            continue
+        total = r.get("total")
+        grade = r.get("grade") or "—"
+        p_up = r.get("p_up")
+        entry = r.get("entry") or {}
+        gate = r.get("gate") or {}
+        blocked = (entry.get("allow") is False) or bool(gate.get("new_entry_blocked"))
+        tp = f"{total}" if total is not None else "미산출"
+        # 개장전이면 간밤 반영으로 확률이 앵커→조정으로 바뀐다 → 둘 다 보여준다.
+        anc = r.get("p_up_anchor")
+        if r.get("report_type") == "preopen" and anc is not None and p_up is not None:
+            pp = f"{round(anc * 100)}%→{round(p_up * 100)}%"
+        else:
+            pp = f"{round(p_up * 100)}%" if p_up is not None else "—"
+        gate_txt = "관망/현금" if blocked else "진입 검토"
+        out.append(f"• {label}: {tp}·{grade}·익일↑{pp} · {gate_txt}")
+        st = r.get("preopen_state") or {}
+        if st.get("state"):
+            out.append(f"   개장 상태: {st['state']}{(' — ' + st['action']) if st.get('action') else ''}")
+        oc = r.get("order_card") or {}
+        h = oc.get("hts_sell") if isinstance(oc, dict) else None
+        if not blocked and h:
+            ll = (h.get("loss_limit") or {}).get("price")
+            pt = (h.get("profit_target") or {}).get("price")
+            if ll is not None and pt is not None:
+                out.append(f"   {oc.get('instrument', '')}: 손절 {ll:,.0f}·목표 {pt:,.0f}")
+    out.append(url)
+    return "\n".join(out)
+
+
 def send_telegram(text: str, timeout: float = 10.0) -> bool:
     """텔레그램으로 text 전송. 성공 True. 키 없거나 실패해도 예외 없이 False."""
     tok = _env("telegram_token")

@@ -40,7 +40,7 @@ try:
 except Exception:
     pass
 
-from src import atr, calibration, config, execution, quant, remote, store, strategy
+from src import atr, calibration, config, execution, notify, quant, remote, store, strategy
 from src.collectors import llm, naver, news
 from src.collectors.ls import LSClient, LSError, load_env
 from src.models import (
@@ -717,6 +717,15 @@ def main() -> int:
 
     if not dry_run and remote.push_report(out_path, env):
         print("리포트: 서버 백업 ✓")
+
+    # 회차 성공 요약 → 텔레그램(키 있으면). 실패 알림과 별개의 '정상 다이제스트'.
+    if not dry_run:
+        kind = "마감 잠정(15:00)" if any_intraday else "마감 확정(16:30)"
+        try:
+            if notify.send_telegram(notify.build_report_summary(reports, kind, trade_date)):
+                print("텔레그램: 요약 전송 ✓")
+        except Exception:  # noqa — 알림 실패가 파이프라인을 막지 않는다
+            pass
     return 0
 
 

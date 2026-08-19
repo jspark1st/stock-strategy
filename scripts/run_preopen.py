@@ -30,7 +30,7 @@ try:
 except Exception:
     pass
 
-from src import config, overnight, remote, strategy
+from src import config, notify, overnight, remote, strategy
 from src.collectors import llm, naver
 from src.collectors.ls import load_env
 from render_report import render
@@ -220,6 +220,13 @@ def main() -> int:
 
     if remote.push_report(out_path, env):
         print("리포트: 서버 백업 ✓")
+
+    try:
+        if notify.send_telegram(
+                notify.build_report_summary(preopen_reports, "개장 전(08:00)", today)):
+            print("텔레그램: 요약 전송 ✓")
+    except Exception:  # noqa — 알림 실패가 파이프라인을 막지 않는다
+        pass
     return 0
 
 
