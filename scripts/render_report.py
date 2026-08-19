@@ -256,6 +256,28 @@ def build_entry_gate(r: dict) -> str:
             f'<ul class="gate-ul">{rows}</ul></div>')
 
 
+def build_hypotheses(r: dict) -> str:
+    """가설·해석(P1-11) — 관측 사실과 **분리**해 표시. 각 가설에 근거·반증조건 병기.
+
+    '기관 -7,951억'은 팩트지만 '개인 매수의 질이 낮다'는 해석이다. 둘을 섞지 않도록,
+    해석은 이 카드에만 담고 '사실 아님·반증조건 있음'을 명시한다.
+    """
+    hy = (r.get("narrative", {}) or {}).get("hypotheses") or []
+    if not hy:
+        return ""
+    rows = ""
+    for h in hy:
+        if not isinstance(h, dict):
+            rows += f'<li>{esc(str(h))}</li>'
+            continue
+        rows += (f'<li><div class="hyp-claim">가설: {esc(h.get("claim",""))}</div>'
+                 f'<div class="muted">근거: {esc(h.get("basis",""))}</div>'
+                 f'<div class="muted">반증: {esc(h.get("counter",""))}</div></li>')
+    return (f'<div class="card"><h2>가설·해석 <span class="badge badge-warn">해석 · 사실 아님</span></h2>'
+            f'<div class="note muted">관측 사실·모델 판정과 구분되는 추론. 반증 조건이 나오면 폐기.</div>'
+            f'<ul class="hyp-ul">{rows}</ul></div>')
+
+
 def build_lineage(r: dict) -> str:
     """데이터 계보(P0-2) — 각 수치의 출처·기준시각·잠정/확정·시장범위.
 
@@ -942,6 +964,7 @@ def render_report_view(r: dict, date: str) -> str:
     {build_lineage(r)}
     {build_index_chart(r)}
     {build_risks(r)}
+    {build_hypotheses(r)}
     {build_materials(r)}
     {build_accuracy(r)}
     {build_reopen(r)}"""
@@ -1169,6 +1192,8 @@ TEMPLATE = r"""<!doctype html>
   .cd-b{color:var(--muted)} .cd-a{font-weight:800} .cd-arrow{color:var(--muted);text-align:center}
   .ov-trans{font-size:1rem;margin:2px 0 6px} .ov-trans b{font-weight:800}
   .gate-ul{list-style:none;margin-left:-24px} .gate-ul li{padding:3px 0;font-size:.92rem}
+  .hyp-ul{list-style:none;margin-left:-24px} .hyp-ul li{padding:6px 0;border-bottom:1px solid var(--border)}
+  .hyp-claim{font-weight:700}
   .chk-ok{color:var(--good);font-weight:800;margin-right:4px} .chk-no{color:var(--down);font-weight:800;margin-right:4px}
   .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:14px}
   .headline{font-size:1.06rem;font-weight:600;line-height:1.7}

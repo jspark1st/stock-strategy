@@ -70,6 +70,7 @@ class Narrative:
     conclusion: str = ""                # 한 줄 매매 결론(매수/분할/관망/현금)
     risks: list = field(default_factory=list)          # 실시간 주의 신호(경계 리스크)
     materials: list = field(default_factory=list)      # 주요 재료(호재/악재, 실시간)
+    hypotheses: list = field(default_factory=list)     # 가설·해석(사실 아님): {claim,basis,counter}
     reopen_review: list = field(default_factory=list)  # 익일 개장전 재검토 체크리스트
     sources: list = field(default_factory=list)        # [{title,url}]
     engine_trace: list = field(default_factory=list)   # 어떤 LLM 이 돌았는지(투명성)
@@ -81,6 +82,7 @@ class Narrative:
             "conclusion": self.conclusion,
             "risks": self.risks,
             "materials": self.materials,
+            "hypotheses": self.hypotheses,
             "reopen_review": self.reopen_review,
             "sources": self.sources,
             "engine_trace": self.engine_trace,
@@ -268,6 +270,9 @@ _CLAUDE_SYS = (
     ' "conclusion": str(한 줄 매매 결론, 근거 수치 포함),'
     ' "risks": [str,...](지금 경계할 실시간 주의 신호 2~4개),'
     ' "materials": [{"tag":"호재|악재","text":str},...](주요 재료 2~5개),'
+    ' "hypotheses": [{"claim":str(가설),"basis":str(근거),"counter":str(반증 조건)},...]'
+    '(관측 사실이 아니라 해석·가설 1~3개. 예: 개인 매수의 완충 한계, 반등 가능성. 각각 근거와 '
+    '무엇이 나오면 이 가설이 틀리는지 반증조건을 반드시 붙인다),'
     ' "reopen_review": [str,...](익일 개장 전 재검토 체크 3~5개)}')
 
 
@@ -332,6 +337,24 @@ def _parse_json(text: str) -> dict | None:
         return json.loads(s[i:j + 1])
     except Exception:  # noqa
         return None
+
+
+def _fallback_hypotheses(ctx: dict) -> list:
+    """LLM 없이 확정 수치로 만드는 해석 가설(근거·반증 포함). 사실 아님."""
+    fl = ctx.get("flows") or {}
+    out = []
+    fn, inn, rn = fl.get("foreign_net"), fl.get("inst_net"), fl.get("retail_net")
+    if (fn is not None and inn is not None and rn is not None
+            and fn < 0 and inn < 0 and rn > 0):
+        out.append({"claim": "개인 순매수의 하방 완충은 한계일 수 있음",
+                    "basis": "외국인·기관 동반 순매도 + 개인만 순매수",
+                    "counter": "외국인 현·선물 순매수 전환 또는 기관 매도 급감"})
+    ov = ctx.get("overnight") or {}
+    if ov.get("tilt", 0) < -0.02:
+        out.append({"claim": "간밤 해외 약세가 익일 개장 갭하락으로 이어질 수 있음",
+                    "basis": "미국 반도체·나스닥 약세 반영",
+                    "counter": "장 시작 전 야간선물 반등 또는 환율 안정"})
+    return out
 
 
 # ── 결정론 폴백 ────────────────────────────────────────────────────────────
@@ -405,6 +428,7 @@ def fallback_narrative(ctx: dict) -> dict:
         "risks": [],
         "materials": [{"tag": h.get("tag", "중립"), "text": h.get("title", "")}
                       for h in (ctx.get("headlines") or [])[:5]],
+        "hypotheses": _fallback_hypotheses(ctx),
         "reopen_review": [
             "간밤 미국 증시·나스닥/SOX 방향과 야간선물 확인",
             "원달러 환율 급변 여부 확인",
@@ -448,6 +472,8 @@ def build_narrative(ctx: dict, env: dict | None = None) -> Narrative:
         n.risks = rk if isinstance(rk, list) else [str(rk)]
         mt = final.get("materials") or []
         n.materials = mt if isinstance(mt, list) else [str(mt)]
+        hy = final.get("hypotheses") or []
+        n.hypotheses = hy if isinstance(hy, list) else []
         rr = final.get("reopen_review") or []
         n.reopen_review = rr if isinstance(rr, list) else [str(rr)]
     if not n.character and draft:     # 폴백도 비면 Gemini 초안을 성격으로
@@ -473,6 +499,8 @@ _PREOPEN_SYS = (
     ' "conclusion": str(오늘 개장 대응 한 줄 — 전일 판단 유지/수정 명시),'
     ' "risks": [str,...](장중 경계 리스크 2~4개),'
     ' "materials": [{"tag":"호재|악재","text":str},...](간밤 주요 재료 2~5개),'
+    ' "hypotheses": [{"claim":str(가설),"basis":str(근거),"counter":str(반증 조건)},...]'
+    '(관측 사실이 아니라 해석·가설 1~3개, 각각 근거·반증조건 필수),'
     ' "reopen_review": [str,...](장중 확인 체크리스트 3~5개)}')
 
 
@@ -531,6 +559,7 @@ def build_preopen(ctx: dict, env: dict | None = None) -> Narrative:
         n.conclusion = final.get("conclusion", "")
         n.risks = final.get("risks") or []
         n.materials = final.get("materials") or []
+        n.hypotheses = final.get("hypotheses") or []
         n.reopen_review = final.get("reopen_review") or []
     if not n.character and draft:
         n.character = draft
