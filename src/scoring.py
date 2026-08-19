@@ -52,6 +52,7 @@ PROB_MIDPOINT = 55.0
 PROB_SCALE = 10.0
 PROB_CLIP_LO = 0.20
 PROB_CLIP_HI = 0.80
+DIRECTION_TILT_MAX = 0.12   # 방향 틸트(판별 신호) 절대 상한 — 심층 방어(전달값이 이미 유계여도 재클램프)
 
 
 # ── 헬퍼 ────────────────────────────────────────────────────────────────
@@ -228,11 +229,16 @@ def grade_and_gate(total: float) -> tuple[str, Gate]:
 
 # ── 오케스트레이션 (여전히 순수함수) ─────────────────────────────────────────
 
-def score_close(inputs: CloseInputs, calib: dict | None = None) -> ScoreResult:
+def score_close(inputs: CloseInputs, calib: dict | None = None,
+                direction_tilt: float | None = None) -> ScoreResult:
     """전체 마감 점수를 계산한다. 외부 IO 없음.
 
     calib: 적응형 캘리브레이션 {a,b,n,source}. 있으면 총점→확률을 데이터로 재보정하고,
     없으면 SoT 고정 시그모이드로 폴백(하위호환). 파이프라인이 store 학습치/부트스트랩을 주입.
+
+    direction_tilt: 판별 신호 유계 틸트(예: KOSDAQ 거래량비율 — 하네스 walk-forward 검증).
+    캘리브레이션된 p_up 에 가산하고 ±DIRECTION_TILT_MAX 로 재클램프. 시장별 적용 여부는
+    파이프라인이 결정(과최적 시장은 None). 게이트는 별도로 하방 보호.
     """
     subs: dict[str, SubScore] = {}
     missing: list[str] = []
@@ -367,6 +373,12 @@ def score_close(inputs: CloseInputs, calib: dict | None = None) -> ScoreResult:
     # p_up = 적응형 캘리브레이션(있으면) — 하네스 검증: 고정 시그모이드의 비관편향 제거.
     p_up_raw = raw_prob(total)
     p_up = calibration.apply(calib, total)
+    # 판별 틸트(유계): 캘리브레이션된 확률에 방향 신호를 가산(예: KOSDAQ 거래량비율).
+    if direction_tilt:
+        tilt = clamp(direction_tilt, -DIRECTION_TILT_MAX, DIRECTION_TILT_MAX)
+        p_up = p_up + tilt
+        warnings.append(
+            f"거래량 판별 신호 익일확률 {tilt*100:+.0f}%p (하네스 walk-forward 검증 · 레짐 주의)")
     # 대형주 착시: 지수 상승 + 시장폭 약함(adv_ratio<0.4) → 5%p 하향
     if chg_pct is not None and chg_pct > 0 and adv_ratio is not None and adv_ratio < 0.4:
         p_up -= 0.05

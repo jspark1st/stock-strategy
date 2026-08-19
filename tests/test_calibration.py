@@ -108,6 +108,38 @@ def test_score_close_applies_calibration():
     assert scoring.PROB_CLIP_LO <= d1["p_up"] <= scoring.PROB_CLIP_HI
 
 
+# ── 판별 틸트(유계) ──────────────────────────────────────────────────
+def test_vol_tilt_bounded_and_signed():
+    p = {"k": 0.20, "center": 1.0, "cap": 0.10}
+    assert cal.vol_tilt(None, 1.5) == 0.0            # params 없으면 무영향
+    assert cal.vol_tilt(p, None) == 0.0              # 입력 없으면 무영향
+    assert cal.vol_tilt(p, 1.0) == pytest.approx(0.0)   # 중립(=20일평균)
+    assert cal.vol_tilt(p, 1.3) == pytest.approx(0.06)  # 고거래량 → 상방
+    assert cal.vol_tilt(p, 0.7) == pytest.approx(-0.06)  # 저거래량 → 하방
+    assert cal.vol_tilt(p, 3.0) == 0.10              # cap 상한
+    assert cal.vol_tilt(p, 0.0) == -0.10             # cap 하한
+
+
+def test_load_vol_tilt(tmp_path):
+    table = {"KOSDAQ": {"close": {"a": 0.005, "b": -0.1, "n": 149, "source": "bootstrap"},
+                        "vol_tilt": {"k": 0.2, "center": 1.0, "cap": 0.1}},
+             "KOSPI": {"close": {"a": 0.01, "b": 0.03, "n": 149, "source": "bootstrap"}}}
+    p = tmp_path / "calibration.json"
+    cal.save_bootstrap(p, table)
+    assert cal.load_vol_tilt(p, "KOSDAQ") == {"k": 0.2, "center": 1.0, "cap": 0.1}
+    assert cal.load_vol_tilt(p, "KOSPI") is None      # 과최적 시장은 틸트 없음(가드)
+
+
+def test_score_close_applies_direction_tilt():
+    d0 = scoring.score_close(_inputs()).to_report_dict()
+    d1 = scoring.score_close(_inputs(), direction_tilt=0.06).to_report_dict()
+    # 틸트가 확률을 올리고(양수), 상한 재클램프·경고 노출
+    assert d1["p_up"] >= d0["p_up"]
+    assert any("거래량 판별" in w for w in d1["warnings"])
+    dbig = scoring.score_close(_inputs(), direction_tilt=0.99).to_report_dict()
+    assert scoring.PROB_CLIP_LO <= dbig["p_up"] <= scoring.PROB_CLIP_HI  # 심층방어 클램프
+
+
 # ── store.fit_calibrator: 채점이력 → 캘리브레이터 ────────────────────
 def test_store_fit_calibrator(tmp_path):
     conn = store.connect(tmp_path / "h.db")

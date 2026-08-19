@@ -374,7 +374,11 @@ def build_report(cfg: dict, ls, client, conn, env, session_of: dict,
     # (총점→p_up 을 데이터로 재보정 — 하네스 검증: 고정 시그모이드의 비관편향 제거.)
     calib_obj = calibration.resolve(conn, market, "close",
                                     bootstrap_path=CALIB_BOOTSTRAP, store_mod=store)
-    result = score_close(inputs, calib=calib_obj)
+    # 판별 틸트(가드): 시장별 거래량비율 신호. KOSDAQ 만 params 존재(walk-forward 검증),
+    # KOSPI 는 None → 틸트 0(과최적이라 제외). 게이트가 하방 별도 보호.
+    vr = (value.today_value / value.avg20_value) if (value and value.avg20_value) else None
+    tilt = calibration.vol_tilt(calibration.load_vol_tilt(CALIB_BOOTSTRAP, market), vr)
+    result = score_close(inputs, calib=calib_obj, direction_tilt=tilt)
     rep = result.to_report_dict(sources=sources)
     rep["id"] = cfg["id"]
     rep["group"] = "장 마감"

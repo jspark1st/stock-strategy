@@ -33,6 +33,13 @@ MARKETS = ["KOSPI", "KOSDAQ"]
 OUT = ROOT / "out"
 DEST = ROOT / "data" / "calibration.json"
 
+# 판별 틸트(유계) — walk-forward 검증분만 등재(scripts/exp_guarded.py). KOSDAQ 거래량비율:
+# 캘리브+틸트가 AUC 0.488→0.577·적중 +7.9%p·skill 음→양. KOSPI 는 과최적이라 제외(등재 안 함).
+VALIDATED_VOL_TILT = {
+    "KOSDAQ": {"k": 0.20, "center": 1.0, "cap": 0.10,
+               "source": "exp_guarded-walkforward", "note": "vol_ratio 판별 신호(레짐 주의)"},
+}
+
 
 def _samples(mk: str, count: int, client):
     cache = OUT / f"backtest_samples_{mk}.json"
@@ -72,6 +79,9 @@ def main() -> int:
                   f"기저상승={base:.2f} · 평균총점={tot_mid:.1f} → "
                   f"캘리브 {calibration.apply(calib, tot_mid):.2f} vs SoT "
                   f"{calibration.apply(None, tot_mid):.2f}")
+            if mk in VALIDATED_VOL_TILT:
+                table[mk]["vol_tilt"] = VALIDATED_VOL_TILT[mk]
+                print(f"  └ vol_tilt(가드): {VALIDATED_VOL_TILT[mk]}")
 
     calibration.save_bootstrap(DEST, table)
     print(f"\n저장: {DEST}")

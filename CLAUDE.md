@@ -109,16 +109,20 @@ scripts/auto_close.bat / auto_preopen.bat / setup_schedule.bat  [done] (대안) 
 scripts/make_sample_dashboard.py [done] 코스피/코스닥 시장레벨 데모 번들(sample_dashboard.json) 생성
 scripts/make_sample_charts.py    [done] (레거시) 단일 리포트용 OHLC → sample_close.json charts 주입
 scripts/probe_ls.py              [done] LS TR 응답 스펙 실측 프로브 (read-only)
-scripts/diag_factors.py          [done] 팩터 단독 판별력 진단(표본 캐시 → 팩터별 AUC·분포). 5차
-scripts/exp_calibrate.py         [done] 캘리브레이션/판별 후보 walk-forward 비교(캐시 사용, 무네트워크). 5차
-scripts/fit_calibration.py       [done] 재구성 이력 → 부트스트랩 캘리브레이션 프라이어(data/calibration.json). 5차
+scripts/diag_factors.py          [done] 4팩터 단독 판별력 진단(표본 캐시 → 팩터별 AUC·분포). 5차
+scripts/diag_features.py         [done] 원천 후보피처(반전·모멘텀·MA이격·변동성·거래량) 단독 AUC 스캔. 5차
+scripts/exp_calibrate.py         [done] 캘리브레이션/판별 후보 walk-forward 비교(무네트워크). 5차
+scripts/exp_features.py          [done] 원천피처 per-market 로지스틱 walk-forward(과최적 노출). 5차
+scripts/exp_guarded.py           [done] 가드된 vol_ratio 틸트 vs 캘리브 단독 walk-forward 검증. 5차
+scripts/fit_calibration.py       [done] 재구성 이력 → 부트스트랩 캘리브 + KOSDAQ vol_tilt(data/calibration.json). 5차
 src/models.py                    [done] input/output + collector dataclasses (pure)
 src/scoring.py                   [done] pure-function scoring engine (+신호 일치도·데이터 완전성)
 src/quant.py                     [done] 기술·퀀트 확장 서브스코어(0.15) + 마감 1시간봉 분석
 src/atr.py                       [done] ATR 매매 타점(정규화 ATR·변동성 국면·구조 손절·Kelly)
 src/store.py                     [done] SQLite 자가학습(예측→익일채점) + fit_calibrator(총점→확률 재적합)
 src/calibration.py               [done] 적응형 확률 캘리브레이션 sigmoid(a·total+b) — 비관편향 제거(5차)
-                                 store 학습치>부트스트랩>SoT 폴백. scoring.score_close(calib=)로 주입.
+                                 store 학습치>부트스트랩>SoT 폴백. + vol_tilt(유계 판별 틸트, KOSDAQ).
+                                 scoring.score_close(calib=, direction_tilt=)로 주입.
 src/remote.py                    [done] 원격 서버 DB/리포트 scp 동기화(서버선 자동 degrade)
 src/collectors/ls.py             [🔶] LS client: token cache + throttle + MTF candles + quote
 src/collectors/naver.py          [done] 네이버 우회 수집기: 지수 일/주/월봉 + 투자자 수급(억원)
@@ -339,13 +343,28 @@ Keep this section updated as work advances. Status legend: ✅ done · 🔶 part
   - ⚠️ **주의(정직)**: 단일 레짐(2026 상반기 상승, 기저상승 60%) 8개월·소표본. 캘리브레이션은 견고하나
     (양 시장 Brier 개선), 판별 향상은 미미(AUC ~0.54). 부트스트랩 총점(코어4팩터)은 라이브 총점(시장폭·
     재료 포함)과 스케일이 약간 달라 **근사** — store 학습치가 쌓이면 대체됨.
+  - ✅ **판별력(AUC) — 가드된 KOSDAQ 거래량 틸트**(사용자 선택: 게이트 보호 반영). 피처 헤드룸 스캔
+    (`diag_features.py`) + walk-forward(`exp_features.py`) 결과: **KOSPI 는 원천피처가 전부 과최적**
+    (in-sample 0.59→OOS 0.50), 캘리브레이션이 유일한 승리. **KOSDAQ 은 `vol_ratio`(거래량비율)가 견고**
+    (vol_only walk-forward AUC 0.648). 가드 통합 검증(`exp_guarded.py`): 유계 틸트
+    `clamp(0.2·(vol_ratio−1), ±0.10)` 를 캘리브 p_up 에 가산 → **KOSDAQ AUC 0.488→0.577·적중 +7.9%p·
+    skill 음→양**, **KOSPI 는 틸트0 로 불변**(자기검증). 라이브 반영: `scoring.score_close(direction_tilt=)`
+    (±DIRECTION_TILT_MAX 재클램프·경고 노출), 파라미터는 `data/calibration.json` 의 시장별 `vol_tilt`
+    (**KOSDAQ 만 등재** — KOSPI 는 과최적이라 제외). 게이트가 하방 별도 보호. 라이브 dry-run: KOSDAQ
+    저거래량일 −7%p 반영 확인, KOSPI 무영향. 테스트 119.
+    - **가드 이유**: vol_ratio 는 모멘텀성 신호라 상승레짐 과최적 위험 → 유계(±0.10)·KOSDAQ한정·투명경고·
+      게이트보호. 다레짐 표본 쌓이면 재검증(open#0).
 
 ### 이어서 할 곳 (open items)
-0. **[최우선] 방향예측 — 판별력(AUC) 향상** — 캘리브레이션(비관편향)은 5차에서 처리(라이브 반영).
-   남은 본질은 **판별**(현재 AUC ~0.54). 검증된 방향: ⓐ **시장별 팩터 처리**(KOSDAQ flow 역전 확인됨 —
-   `diag_factors.py` AUC 0.453, logit4 계수 −0.15. 단 단일레짐이라 부호 뒤집기 전 다레짐 재측정 필요),
-   ⓑ 신규 피처(간밤 반영·레짐 조건부), ⓒ store 학습치 축적 후 캘리브레이터 재적합. 개선은 항상
-   `run_backtest.py`/`exp_calibrate.py` walk-forward 로 측정. 과최적화는 train/test·다레짐으로 방어.
+0. **[최우선] 방향예측 — 판별력(AUC) 계속** — 5차 처리분: 캘리브레이션(비관편향, 양시장) + **가드된
+   KOSDAQ 거래량 틸트**(walk-forward AUC 0.488→0.577). 남은 것:
+   ⓐ **다레짐 재검증**(핵심) — 캘리브레이터·vol_tilt·KOSDAQ flow 역전 모두 2026 상반기 **단일 상승레짐**
+      위 결과. 하락/횡보 표본이 쌓이면 `exp_guarded.py`/`exp_calibrate.py` 로 재측정. vol_tilt 는 모멘텀성
+      이라 하락장에서 부호가 약해지거나 역전될 수 있음 — cap(±0.10)이 손상은 제한하나 재적합 필요.
+   ⓑ **KOSPI 판별** — 원천피처 전부 과최적(OOS≈0.50). 새 각도 필요(간밤 반영·레짐 조건부·비선형).
+   ⓒ **store 학습치 축적 후 재적합** — 라이브 채점이 N≥40 쌓이면 `fit_calibrator` 가 부트스트랩을 대체.
+      그때 vol_tilt 도 라이브 총점 기준으로 재적합(현재 부트스트랩 근사).
+   개선은 항상 `run_backtest.py`/`exp_*.py` walk-forward 로 측정. 과최적화는 train/test·다레짐 방어.
 1. **첫 라이브 15:00 회차 확인** — 코드는 장중 경로를 모두 갖췄지만 *실제 장중* 응답으로는 아직 미검증.
    확인할 것: ①네이버 일봉이 장중 오늘 봉을 주는가(아니면 실시간 지수 경로로 자동 폴백) ②
    `investorDealTrendTime` 이 장중 행을 주는가 ③`out/auto_close.log` 에 '거래일/장중 스냅샷' 라인이 찍히는가.

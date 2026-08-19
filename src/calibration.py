@@ -82,6 +82,20 @@ def fit(pairs: list[tuple[float, int]], l2: float = 1.0, iters: int = 5000,
     return {"a": round(a_c, 6), "b": round(b, 6), "n": n, "source": source}
 
 
+# ── 판별 틸트(유계) — 시장별 거래량비율 신호 (하네스 walk-forward 검증분만) ──
+def vol_tilt(params: dict | None, vol_ratio: float | None) -> float:
+    """clamp(k·(vol_ratio−center), −cap, +cap). params 없거나 입력 없으면 0(무영향).
+
+    KOSDAQ 만 params 를 갖는다(KOSPI 는 walk-forward 에서 신호가 과최적 → params 없음 → 0).
+    """
+    if not params or vol_ratio is None:
+        return 0.0
+    k = params.get("k", 0.0)
+    center = params.get("center", 1.0)
+    cap = params.get("cap", 0.10)
+    return max(-cap, min(cap, k * (vol_ratio - center)))
+
+
 # ── 부트스트랩 프라이어(JSON) — store 채점이력이 쌓이기 전 즉시 적용 ────────
 def save_bootstrap(path: str | Path, table: dict) -> None:
     """{market: {report_type: calib}} 를 JSON 으로 저장."""
@@ -99,6 +113,18 @@ def load_bootstrap(path: str | Path, market: str, report_type: str = "close") ->
         return None
     c = (table.get(market) or {}).get(report_type)
     return c if c and "a" in c and "b" in c else None
+
+
+def load_vol_tilt(path: str | Path, market: str) -> dict | None:
+    """부트스트랩 JSON 에서 시장의 판별 틸트 params 를 읽는다(KOSDAQ 만 존재, 없으면 None)."""
+    p = Path(path)
+    if not p.exists():
+        return None
+    try:
+        table = json.loads(p.read_text(encoding="utf-8"))
+    except (ValueError, OSError):
+        return None
+    return (table.get(market) or {}).get("vol_tilt")
 
 
 def resolve(conn=None, market: str = "", report_type: str = "close",

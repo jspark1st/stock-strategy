@@ -13,6 +13,13 @@
       "b": -0.100721,
       "n": 149,
       "source": "bootstrap"
+    },
+    "vol_tilt": {
+      "k": 0.2,
+      "center": 1.0,
+      "cap": 0.1,
+      "source": "exp_guarded-walkforward",
+      "note": "vol_ratio 판별 신호(레짐 주의)"
     }
   }
 }
