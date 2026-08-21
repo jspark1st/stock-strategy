@@ -9,6 +9,15 @@
     "href": "/archive/btc/2026-08-22-0930.html"
   },
   {
+    "date": "2026-08-22",
+    "slot": "0854",
+    "as_of": "2026-08-22 08:54 KST",
+    "total": 56.7,
+    "p_long": 0.5371,
+    "kind": "manual",
+    "href": "/archive/btc/2026-08-22-0854.html"
+  },
+  {
     "date": "2026-08-21",
     "slot": "2200",
     "as_of": "2026-08-21 22:50 KST",
