@@ -47,6 +47,13 @@ fi
 "$PY" scripts/probe_investor_map.py >> "$LOG" 2>&1 || \
   echo "[$(date '+%F %T')] (참고) t1601 매핑 프로브 실패 — 무시하고 진행" >> "$LOG"
 
+# 크로스트랙 배포 직렬화(공유 락, 대기 120s — auto_close.sh 주석 참조).
+exec 8>"out/.deploy.lock"
+if ! flock -w 120 8; then
+  echo "[$(date '+%F %T')] 배포 락 대기 초과(다른 트랙 배포 중) — 이번 배포 보류" >> "$LOG"
+  exit 0
+fi
+
 git add public/index.html
 if git diff --cached --quiet; then
   echo "[$(date '+%F %T')] 변경 없음 — 배포 생략" >> "$LOG"

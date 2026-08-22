@@ -62,3 +62,26 @@ def test_paper_short_direction_inverts_gross():
     res = store.record_paper_exit(conn, "KOSDAQ", "2026-08-18", 99.0, "open", 0.1, "t1")
     assert res["gross_pct"] == 1.0   # 숏은 가격 하락이 이익
     conn.close(); os.remove(db)
+
+
+def test_close_due_paper_trades_exits_at_next_open():
+    """L1 배선: 열린 paper 를 '진입일 다음 거래일 시가'로 청산(오버나이트=종가매수→익일시가)."""
+    from src.models import Candle
+    db = tempfile.mktemp(suffix=".db")
+    conn = store.connect(db)
+    # 08-14 종가 100 매수(롱). 다음 거래일 08-17 시가 102 → gross +2%, 비용 0.115 차감.
+    store.record_paper_entry(conn, "KOSPI", "20260814", "long", "KODEX 200", 100.0, "t0")
+    cds = [Candle("20260814", 100, 101, 99, 100, 10),
+           Candle("20260817", 102, 104, 99, 103, 12)]
+    # 다음날(08-17)이 pending 이면 청산 안 함(미확정 시가로 청산 금지)
+    none_yet = store.close_due_paper_trades(conn, "KOSPI", cds, 0.115, "t1",
+                                            exclude_dates={"20260817"})
+    assert none_yet == []
+    # 확정되면 08-17 시가 102 로 청산
+    done = store.close_due_paper_trades(conn, "KOSPI", cds, 0.115, "t1")
+    assert len(done) == 1
+    assert done[0]["gross_pct"] == 2.0
+    assert done[0]["net_pct"] == round(2.0 - 0.115, 3)
+    s = store.paper_summary(conn, "KOSPI")
+    assert s["n"] == 1 and s["cum_net_pct"] == round(2.0 - 0.115, 3)
+    conn.close(); os.remove(db)

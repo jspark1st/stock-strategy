@@ -345,16 +345,6 @@ def _apply_grade(conn: sqlite3.Connection, prev, outcome_date: str, outcome_chg_
             "overnight_correct": overnight_correct}
 
 
-def latest_prediction(conn: sqlite3.Connection, market: str,
-                      report_type: str = "close") -> dict | None:
-    """가장 최근 기록된 예측 1건(개장 전 재검토의 앵커)."""
-    cur = conn.execute(
-        "SELECT * FROM daily WHERE market=? AND report_type=? "
-        "ORDER BY trade_date DESC, id DESC LIMIT 1", (market, report_type))
-    row = cur.fetchone()
-    return dict(row) if row else None
-
-
 def accuracy(conn: sqlite3.Connection, market: str, report_type: str = "close",
              window: int = 20, slots: tuple | None = None) -> dict:
     """최근 window 채점건의 성적 요약(자가학습 지표)."""
@@ -527,6 +517,36 @@ def record_paper_exit(conn: sqlite3.Connection, market: str, trade_date: str,
     return {"gross_pct": round(gross, 3), "net_pct": round(net, 3)}
 
 
+def close_due_paper_trades(conn: sqlite3.Connection, market: str, candles: list,
+                           cost_pct: float, closed_at: str,
+                           exclude_dates: set | None = None) -> list[dict]:
+    """열린 paper 를 '진입일 다음 거래일 **시가**'로 청산한다(오버나이트=종가매수→익일시가매도).
+
+    다음 거래일 봉이 아직 확정 아니면(exclude_dates=오늘 장중) 건너뛰고 다음 실행에 청산 →
+    미완성 시가로 청산하지 않는다(채점과 동일 규율). exit_rule='next_open'.
+    """
+    exclude_dates = exclude_dates or set()
+    dates = [c.date for c in candles]
+    by_date = {c.date: c for c in candles}
+    rows = conn.execute(
+        "SELECT trade_date FROM paper_trades WHERE market=? AND state='OPEN' "
+        "ORDER BY trade_date ASC", (market,)).fetchall()
+    out = []
+    for r in rows:
+        t = (r["trade_date"] or "").replace("-", "")
+        nxt = next((d for d in dates if d > t and d not in exclude_dates), None)
+        if nxt is None:
+            continue
+        nxt_open = by_date[nxt].open
+        if not nxt_open:
+            continue
+        res = record_paper_exit(conn, market, r["trade_date"], nxt_open,
+                                "next_open", cost_pct, closed_at)
+        if res:
+            out.append(res)
+    return out
+
+
 def paper_summary(conn: sqlite3.Connection, market: str) -> dict:
     """Paper 성적 요약(비용차감 순수익 기준)."""
     rows = conn.execute(
@@ -539,21 +559,6 @@ def paper_summary(conn: sqlite3.Connection, market: str) -> dict:
     return {"n": len(nets), "win_rate": round(wins / len(nets), 3),
             "avg_net_pct": round(sum(nets) / len(nets), 3),
             "cum_net_pct": round(sum(nets), 3)}
-
-
-def calibration_shift(conn: sqlite3.Connection, market: str,
-                      report_type: str = "close", window: int = 20,
-                      min_n: int = 8, max_shift: float = 0.08) -> float:
-    """누적 성적 기반 p_up 보정치(자가학습).
-
-    calibration_bias = 평균예측p_up − 실제상승빈도. 양수면 과대낙관 → 다음 p_up 을
-    그만큼(절반, 상한 max_shift) 낮춘다. 표본 min_n 미만이면 0(학습 대기).
-    """
-    acc = accuracy(conn, market, report_type, window)
-    if acc["n"] < min_n or acc["calibration_bias"] is None:
-        return 0.0
-    shift = -acc["calibration_bias"] * 0.5   # 편향의 절반만 반영(과보정 방지)
-    return round(max(-max_shift, min(max_shift, shift)), 4)
 
 
 # ── 장중 거래량 완성계수 자가학습 ─────────────────────────────────────────

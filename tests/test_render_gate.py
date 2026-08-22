@@ -43,6 +43,31 @@ def test_atr_card_respects_full_entry_gate():
     assert ">0%<" in html
 
 
+def test_reconcile_atr_gates_data_at_source():
+    """F3-1: entry.allow=False 면 rep['atr'] 자체(번들·LLM 소비)가 비중 0%·게이트정합 comment 로.
+    가장자리(render)뿐 아니라 데이터 레이어에서 정합화되는지 — 반복 재발한 누출의 근원 수정."""
+    import run_close as rc
+    rep = {
+        "gate": {"new_entry_blocked": False},
+        "entry": {"allow": False, "blocked_reasons": ["방향 확률 임계", "신뢰도 임계"]},
+        "atr": {"direction": "long", "instrument": "KODEX 200",
+                "comment": "매수 자격 통과(edge +8.6%) · 권장비중 4%(Half Kelly, 상한 25%)",
+                "primary": {"entry": 100, "stop": 98, "target": 104, "kelly_pct": 4.3},
+                "variants": [{"label": "스윙", "kelly_pct": 12.0}]},
+    }
+    rc._reconcile_atr_with_entry(rep)
+    assert rep["atr"]["entry_allow"] is False
+    assert rep["atr"]["primary"]["kelly_pct"] == 0       # 데이터 자체가 0%
+    assert rep["atr"]["variants"][0]["kelly_pct"] == 0
+    assert "매수 자격 통과" not in rep["atr"]["comment"]  # comment 도 정합
+    assert "진입 게이트 차단" in rep["atr"]["comment"]
+    # 통과면 원본 유지(회귀 방지)
+    ok = {"gate": {"new_entry_blocked": False}, "entry": {"allow": True},
+          "atr": {"primary": {"kelly_pct": 4.3}, "comment": "매수 자격 통과"}}
+    rc._reconcile_atr_with_entry(ok)
+    assert ok["atr"]["primary"]["kelly_pct"] == 4.3 and ok["atr"]["entry_allow"] is True
+
+
 def test_atr_comment_not_buy_when_entry_blocked():
     """compute_plan 의 comment('매수 자격 통과…')가 entry.allow=False 면 화면에 새지 않는다."""
     html = rr.build_atr_plan(_report(entry_allow=False, grade_blocked=False))
@@ -233,3 +258,12 @@ def test_preopen_order_card_renders_reference_table():
     assert "KODEX 200" in html
     assert "전일 마감 앵커 환산" in html
     assert "고급매도설정 추천" not in html
+
+
+def test_build_paper_hidden_when_no_trades():
+    """Paper 카드는 가상체결 0회면 숨김, 있으면 비용차감 순손익 표시."""
+    assert rr.build_paper({"paper": {"n": 0}}) == ""
+    assert rr.build_paper({}) == ""
+    html = rr.build_paper({"paper": {"n": 3, "win_rate": 0.67,
+                                     "avg_net_pct": 0.4, "cum_net_pct": 1.2}})
+    assert "Paper 성적" in html and "누적 순손익" in html and "비용 차감" in html

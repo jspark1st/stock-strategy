@@ -38,6 +38,42 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - ✅ **[소] vol_tilt 노이즈밴드 노출** — KOSDAQ 거래량 틸트 경고에 'AUC 0.577·n≈89·CI가 0.5 걸침·미확정'
   명시(참고 신호로 격하 표기).
 
+### 2026-08-22 (오후·6차) — 학습 루프 폐쇄 + Paper L1 가동 (테스트 232→235)
+플로우 점검이 지목한 두 갭을 닫음(로드맵 L0→L1 진입). **소스 커밋됨 fd639c7 이후의 미커밋 변경.**
+- ✅ **개장전 학습 루프 폐쇄**: `run_preopen` 이 간밤틸트 반영 p_up 을 report_type='preopen',
+  trade_date=anchor_date 로 DB 기록. `run_close` 가 그날 확정 일봉으로 채점(grade_with_candles의
+  'preopen' 슬롯). 마감 close 예측과 **같은 target·별도 슬롯** → 간밤틸트 유무 성적 비교 가능
+  = 유일한 검증된 엣지(간밤신호)를 라이브 검증하는 경로 확보. dry-run 이면 미기록.
+- ✅ **Paper L1 가동**(store.paper_* 배선): 확정 회차(16:30)에서 entry.allow 통과면 **종가 가상 매수**,
+  다음 거래일 **시가 청산**(오버나이트, 지수 프록시), `config.cost_bp`(11.5bp) 왕복비용 차감 순손익
+  누적. `store.close_due_paper_trades` 신설(미확정 시가로 청산 금지 — 채점과 동일 pending 규율).
+  렌더 `build_paper` 카드(체결 0회면 숨김). '실제로 돈이 되나'를 라이브 추적.
+- 회귀 +3(preopen 루프·close_due·build_paper). 실 DB 복사본으로 두 흐름 end-to-end 검증.
+
+### 2026-08-22 (오후·5차) — 플로우 레벨 점검(2에이전트) 후 개선 (테스트 231→232, 소스 커밋됨 fd639c7 이후)
+end-to-end 플로우(상태머신·학습루프·스코어링 파이프·크로스트랙) 추적. 상태머신 핸드오프는 견고 확인.
+- ✅ **[중대·근원] F3-1 ATR 데이터 정합화**: `rep["atr"]` 가 compute_plan(등급게이트만) 뒤 entry.allow
+  차단이어도 '권장비중 X%·매수 자격 통과'로 남아 번들 JSON·LLM ctx 가 배지와 모순 → **반복 재발한
+  게이트 누출의 근원**. `_reconcile_atr_with_entry` 로 entry 계산 직후 데이터 레이어에서 primary·
+  variants 비중 0%·comment 정합화(가장자리 render 패치는 방어로 잔존). `test_render_gate.py` +1.
+- ✅ **[중] F3-3 히어로 오귀속**: `p_up_raw→p_up` 델타 전체를 '자가학습 보정'으로 라벨했으나 실제론
+  캘리브레이션+판별틸트+대형주착시+신호수축 종합 → '원시 X% → 최종 Y% · 종합' 으로 정정.
+- ✅ **[중·운영] F4-1 크로스트랙 배포 락**: 러너별 flock 은 자기 중복만 막고 주식↔BTC 는 미직렬화 →
+  공유 `.deploy.lock`(대기 120s)로 git add~push 직렬화(4러너). 대기 초과면 배포 보류(다음 회차).
+- ✅ **죽은 코드 제거**: `store.latest_prediction`(주석은 개장전 앵커라지만 미호출)·`calibration_shift`
+  (fit_calibrator 로 대체됨). 둘 다 참조 0 확인.
+
+### ⏳ 플로우 개선 — 결정 필요(프로덕션 DB/로드맵 영향, 미실행)
+- **개장전 학습 루프 폐쇄(FLOW2 최대 갭)**: `run_preopen` 이 예측을 기록·채점 안 해 간밤 틸트(유일한
+  검증된 엣지)를 라이브 검증할 방법이 없다. 닫으려면 preopen 이 DB 에 report_type='preopen',
+  trade_date=anchor_date 로 기록 + run_close 가 그걸 채점. **채점 trade_date 의미가 틀리면 학습 DB
+  오염**이라 신중히 — 사용자 승인 후.
+- **paper L1 미가동**: `store.paper_*` 인프라·테스트는 있으나 어떤 러너도 구동 안 함(로드맵 L1 미착수).
+  게이트 통과 시 가상 진입·익일 청산을 배선할지 결정 필요.
+- **overnight_correct → 결정 미반영**: 실거래 지평 정답률을 측정·표시하나 캘리브/게이트엔 안 씀(open #1 설계).
+- **저우선(설계/관측)**: grade(원시 total) vs 방향·헤드라인(캘리브 p_up) 분리는 '게이트가 확률을 이긴다'
+  설계 본질(F3-2). 미도달 라이프사이클 상태 3개, orphaned provisional 파일, 크론 배포 매틱 재배포 등.
+
 ### 2026-08-22 (오후·4차) — 전면 점검(3에이전트 적대감사) 후 결함 수정 (테스트 228→231)
 게이트 정합·정합성 결함을 3축 병렬 감사로 다시 훑어 발견·수정. 내 최근 변경분은 전부 기능적으로 정확 확인.
 - ✅ **[중] ATR comment 게이트 누출**: `atr.compute_plan` 의 comment('매수 자격 통과·권장비중 X%')가

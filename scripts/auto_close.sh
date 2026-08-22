@@ -43,6 +43,15 @@ if [ $RC -ne 0 ]; then
   exit $RC
 fi
 
+# 크로스트랙 배포 직렬화 — 주식·BTC 러너가 같은 public/index.html·git 인덱스를 동시에
+# 커밋/rebase/push 하지 않게 공유 락(대기 120s). 정상 스케줄은 안 겹치나 한 러너가 지연되면
+# 겹칠 수 있고, 그 경우 git 충돌·엉킨 커밋을 유발한다. 대기 초과면 이번 배포만 보류(다음 회차 반영).
+exec 8>"out/.deploy.lock"
+if ! flock -w 120 8; then
+  echo "[$(date '+%F %T')] 배포 락 대기 초과(다른 트랙 배포 중) — 이번 배포 보류" >> "$LOG"
+  exit 0
+fi
+
 git add public/index.html
 if git diff --cached --quiet; then
   echo "[$(date '+%F %T')] 변경 없음(휴장일 등) — 배포 생략" >> "$LOG"

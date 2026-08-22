@@ -266,6 +266,51 @@ def _index_charts(market: str, client, session: Session, intraday_series) -> dic
     return {"name": market, "frames": frames, "default": "D"}
 
 
+def _paper_step(conn, market: str, cfg: dict, rep: dict, session: Session,
+                candles: list, appcfg: dict) -> None:
+    """Paper L1(L0→L1): 확정 종가로 가상 진입 / 익일 시가로 청산(오버나이트, 지수 프록시).
+    실주문 아님 — 비용차감 순손익을 누적해 '이 전략이 실제로 돈이 되나'를 라이브 추적한다.
+    확정 회차(16:30)에서만 호출한다(15:00 잠정가로 진입/청산하지 않게)."""
+    cost_pct = config.cost_bp(appcfg) / 100.0     # 왕복 bp → %
+    # 1) 만기 도래 청산: 열린 paper 를 앵커 다음 거래일 시가로(오늘 미확정분은 pending 제외).
+    store.close_due_paper_trades(conn, market, candles, cost_pct, _now(),
+                                 exclude_dates=session.pending_dates)
+    # 2) 신규 진입: 진입판정(entry.allow) 통과면 확정 종가 매수(방향 ETF).
+    entry = rep.get("entry") or {}
+    if entry.get("allow") and candles and candles[-1].close:
+        direction = (rep.get("atr") or {}).get("direction") or "long"
+        instrument = (cfg.get("etf_inv") if direction == "short" else cfg.get("etf")) or market
+        store.record_paper_entry(conn, market, session.trade_ymd, direction,
+                                 instrument, candles[-1].close, _now())
+    rep["paper"] = store.paper_summary(conn, market)
+
+
+def _reconcile_atr_with_entry(rep: dict) -> None:
+    """진입 게이트(등급 or entry.allow)가 차단이면 rep["atr"] 를 한 곳에서 정합화한다:
+    primary·variants 권장비중 0%, entry 차단 사유를 comment 에 반영. compute_plan 은 entry.allow
+    를 모른 채 계산되므로(그 뒤에 정해짐), 이 정규화가 없으면 번들·LLM 이 배지와 모순된 ATR 을 담는다."""
+    atr = rep.get("atr")
+    if not atr:
+        return
+    entry = rep.get("entry") or {}
+    grade_blocked = bool((rep.get("gate") or {}).get("new_entry_blocked"))
+    entry_blocked = ("allow" in entry) and (entry.get("allow") is False)
+    atr["entry_allow"] = not (grade_blocked or entry_blocked)
+    if not (grade_blocked or entry_blocked):
+        return
+    prim = atr.get("primary")
+    if isinstance(prim, dict):
+        prim["kelly_pct"] = 0
+    for v in (atr.get("variants") or []):
+        if isinstance(v, dict):
+            v["kelly_pct"] = 0
+    # 등급 차단 comment 는 compute_plan 이 이미 정합하게 썼다. 등급통과·entry 차단만 여기서 덮는다.
+    if entry_blocked and not grade_blocked:
+        reasons = " / ".join(entry.get("blocked_reasons") or []) or "진입 조건 미충족"
+        atr["comment"] = (f"진입 게이트 차단 — {reasons}. 권장비중 0%(관망/현금). "
+                          "아래 타점은 보유분 관리·참고용 수치일 뿐 신규 베팅 근거가 아니다.")
+
+
 def _llm_ctx(cfg, rep, atr_dict, materials, session: Session) -> dict:
     return {
         "label": f"{cfg['label']} 마감", "trade_date": rep["trade_date"],
@@ -448,6 +493,14 @@ def build_report(cfg: dict, ls, client, conn, env, session_of: dict,
             # 채점 실패를 조용히 삼키면 정확도 누적이 영구히 멈춰도 아무도 모른다 → 경보.
             graded = []
             _alert(f"{cfg['label']} 예측 채점 실패({type(e).__name__}: {e}) — 자가학습 누적 중단 가능")
+        # 개장전(preopen) 예측도 같은 확정 일봉으로 채점 — 간밤 틸트 검증 루프 폐쇄.
+        # preopen 예측은 trade_date=anchor_date 로 기록되므로 anchor 다음 거래일(=그날) 종가로
+        # 채점된다(close 예측과 동일 grader·pending 로직 재사용, 별도 report_type). best-effort.
+        try:
+            store.grade_with_candles(conn, market, "preopen", candles, _now(),
+                                     session.pending_dates)
+        except Exception:  # noqa — 개장전 채점 실패가 마감 리포트를 막지 않는다
+            pass
         acc = store.accuracy(conn, market, "close")
         try:
             perf = store.performance(conn, market, "close")
@@ -511,6 +564,19 @@ def build_report(cfg: dict, ls, client, conn, env, session_of: dict,
     rep["entry"] = strategy.entry_decision(rep, appcfg)
     rep["lifecycle"] = strategy.resolve_lifecycle(
         now.hour * 100 + now.minute, "close", session.intraday)
+
+    # F3-1: entry.allow(6조건 AND)는 atr.compute_plan 이후에 정해진다. compute_plan 은 등급게이트만
+    # 알아서, 등급통과·allow=False 면 rep["atr"]가 '권장비중 X%·매수 자격 통과'로 남아 번들 JSON·
+    # LLM ctx 가 배지(0%·차단)와 모순된다(반복 재발한 게이트 누출의 **근원**). 여기서 데이터 레이어를
+    # 한 번에 정합화한다 → 렌더·LLM·모든 소비자가 일관된 atr 를 읽는다(가장자리 패치는 방어로 잔존).
+    _reconcile_atr_with_entry(rep)
+
+    # ── Paper L1: 확정 회차(16:30)에서만 가상 진입/청산(비용차감 순손익 라이브 추적) ──
+    if conn is not None and not dry_run and not session.intraday:
+        try:
+            _paper_step(conn, market, cfg, rep, session, candles, appcfg)
+        except Exception:  # noqa — paper 실패가 리포트/배포를 막지 않는다
+            pass
 
     # ── 서술(3-LLM) — entry.allow(6조건 AND) 반영 후 ──
     ctx = _llm_ctx(cfg, rep, atr_dict, materials, session)

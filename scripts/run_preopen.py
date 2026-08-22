@@ -30,12 +30,13 @@ try:
 except Exception:
     pass
 
-from src import btc_bundle, config, notify, overnight, remote, strategy
+from src import btc_bundle, config, notify, overnight, remote, store, strategy
 from src.collectors import llm, naver
 from src.collectors.ls import load_env
 from render_report import render
 
 KST = timezone(timedelta(hours=9))
+DB_LOCAL = ROOT / "data" / "history.db"   # 자가학습 DB(정본은 서버) — run_close 와 동일 경로
 # 앵커가 이보다 오래되면 '전일 마감'이라 부를 수 없다 → 경고를 띄운다(연휴 최대 폭 고려).
 ANCHOR_STALE_DAYS = 5
 
@@ -209,6 +210,25 @@ def main() -> int:
         print(f"[{prep['label']} 개장 전] {' / '.join(n.get('engine_trace', []))}")
         if n.get("conclusion"):
             print(f"    결론: {n['conclusion'][:80]}")
+
+    # ── 개장전 예측 기록(학습 루프 폐쇄): 간밤 틸트가 실제로 방향을 맞혔는지 채점하기 위해
+    #    report_type='preopen', trade_date=anchor_date 로 기록한다. anchor_date 로 두면 run_close 의
+    #    grade_with_candles 가 '앵커 다음 거래일(=오늘) 종가 vs 앵커 종가'로 채점한다(마감 close 예측과
+    #    동일 target, 별도 슬롯 → 간밤 틸트 유무 성적 비교 가능). dry-run 이면 DB 미기록. ──
+    if not dry_run and anchor_date:
+        conn = None
+        try:
+            conn = store.connect(DB_LOCAL)
+            for prep in preopen_reports:
+                rec = dict(prep)
+                rec["trade_date"] = anchor_date   # 채점 대상 = 앵커 다음 거래일(오늘) 종가
+                store.record_prediction(conn, rec, now.isoformat(timespec="seconds"),
+                                        report_type="preopen")
+        except Exception as e:  # noqa — 기록 실패가 리포트/배포를 막지 않는다
+            print(f"[preopen] 예측 기록 실패({type(e).__name__}: {e})")
+        finally:
+            if conn is not None:
+                conn.close()
 
     out_dir = ROOT / "out"
     out_dir.mkdir(exist_ok=True)

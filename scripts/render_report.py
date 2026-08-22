@@ -162,8 +162,11 @@ def build_hero(r: dict) -> str:
             calib = (f'<div class="hero-note">불일치 수축 전 {raw*100:.0f}% '
                      f'→ 수축 후 {p_up*100:.0f}% · 자가학습 보정 아님</div>')
         else:
-            calib = (f'<div class="hero-note">자가학습 보정 전 {raw*100:.0f}% '
-                     f'→ 보정 후 {p_up*100:.0f}%</div>')
+            # raw(=SoT 원시 시그모이드) → 최종은 캘리브레이션뿐 아니라 판별틸트·대형주착시·
+            # 신호일치 수축까지 다 접은 값이다. 델타 전체를 '자가학습 보정'으로 귀속하면 오독 →
+            # '종합 조정'으로 표기하고 세부는 주의 신호로 넘긴다.
+            calib = (f'<div class="hero-note">원시 {raw*100:.0f}% → 최종 {p_up*100:.0f}% '
+                     f'· 캘리브레이션·판별신호·신호수축 종합(세부는 아래 주의 신호)</div>')
     elif p_up is not None:
         # 점추정임을 명시 — 신뢰구간 없는 단일 확률을 4자리로 과신하지 않도록.
         n_acc = (r.get("accuracy") or {}).get("n") or 0
@@ -928,6 +931,29 @@ def build_accuracy(r: dict) -> str:
   </div>"""
 
 
+def build_paper(r: dict) -> str:
+    """Paper 성적(L1) — 게이트 통과 시 가상 진입(종가)→익일 시가 청산, 비용차감 순손익 누적.
+    L0 리포트가 '실제로 돈이 되나'를 라이브 추적. 체결 0회면 숨김."""
+    p = r.get("paper") or {}
+    n = p.get("n") or 0
+    if n == 0:
+        return ""
+    cum, avg, wr = p.get("cum_net_pct"), p.get("avg_net_pct"), p.get("win_rate")
+    col = "var(--up)" if (cum or 0) >= 0 else "var(--down)"
+    tiles = "".join([
+        _tile("가상 체결", f"{n}회"),
+        _tile("누적 순손익", (signed(cum) + "%") if cum is not None else "—", col, sub="비용 차감"),
+        _tile("평균 순손익", (signed(avg) + "%") if avg is not None else "—"),
+        _tile("승률", pct(wr) if wr is not None else "—"),
+    ])
+    return f"""
+  <div class="card">
+    <h2>Paper 성적 <span class="pill pill-ghost">가상체결·비용차감(L1)</span></h2>
+    <div class="tiles">{tiles}</div>
+    <div class="note muted">종가 매수→익일 시가 매도(오버나이트, 지수 프록시) · 실주문 아님 · 왕복비용 차감.</div>
+  </div>"""
+
+
 def build_reopen(r: dict) -> str:
     rr = (r.get("narrative", {}) or {}).get("reopen_review") or []
     if not rr:
@@ -1165,6 +1191,7 @@ def render_btc_view(r: dict, date: str) -> str:
     {build_hypotheses(r)}
     {build_materials(r)}
     {build_accuracy(r)}
+    {build_paper(r)}
     {build_reopen(r)}"""
 
 
@@ -1455,6 +1482,7 @@ def render_report_view(r: dict, date: str) -> str:
     {build_hypotheses(r)}
     {build_materials(r)}
     {build_accuracy(r)}
+    {build_paper(r)}
     {build_reopen(r)}"""
 
 

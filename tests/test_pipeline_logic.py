@@ -223,6 +223,27 @@ def test_short_direction_grading_is_mirrored():
     assert got[0]["hit_target"] == 0 and got[0]["hit_stop"] == 0
 
 
+def test_preopen_learning_loop_closes():
+    """개장전 예측(report_type='preopen', trade_date=anchor)이 기록→채점→성적까지 닫힌다.
+
+    간밤 틸트가 실제로 방향을 맞혔는지 라이브 검증하는 유일한 경로. close 예측과 별도 슬롯이라
+    같은 target(앵커 다음날 종가)을 놓고 성적을 나란히 비교할 수 있다.
+    """
+    conn = _db()
+    # 앵커(2026-08-14) 기준 개장전 예측: 간밤 신호로 상승 우위(p_up 0.7)
+    prep = {"id": "kospi-preopen", "report_type": "preopen", "trade_date": "2026-08-14",
+            "p_up": 0.7, "grade": "우호", "total": 60,
+            "atr": {"direction": "long", "primary": {}}, "market": {}}
+    store.record_prediction(conn, prep, "t", report_type="preopen")
+    # 마감 파이프라인이 확정 일봉으로 채점(앵커 다음 거래일 08-17 종가 103 > 100 → 상승, 적중)
+    got = store.grade_with_candles(conn, "KOSPI", "preopen", _candles(), "t")
+    assert len(got) == 1 and got[0]["correct"] == 1
+    acc = store.accuracy(conn, "KOSPI", "preopen")
+    assert acc["n"] == 1 and acc["hit_rate"] == 1.0
+    # close 예측과 슬롯이 분리돼 서로 간섭하지 않는다
+    assert store.accuracy(conn, "KOSPI", "close")["n"] == 0
+
+
 def test_accuracy_hit_rate_excludes_ungradeable_rows():
     """p_up=None(데이터부족) 채점행은 correct=None → 적중률 분모에서 제외(적중률 왜곡 방지)."""
     conn = _db()

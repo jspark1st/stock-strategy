@@ -53,6 +53,14 @@ else
   fi
 fi
 
+# 크로스트랙 배포 직렬화(공유 락, 대기 120s — auto_close.sh 주석 참조). BTC 는 주식 크론과
+# 스케줄이 다르지만 지연 시 겹칠 수 있어 같은 락을 쓴다. git add(로컬 인덱스)부터 락 안에서.
+exec 8>"out/.deploy.lock"
+if ! flock -w 120 8; then
+  echo "[$(date '+%F %T')] 배포 락 대기 초과(다른 트랙 배포 중) — 이번 배포 보류" >> "$LOG"
+  exit 0
+fi
+
 git add public/index.html public/archive public/vendor 2>/dev/null || git add public/index.html
 if git diff --cached --quiet; then
   echo "[$(date '+%F %T')] 변경 없음 — 배포 생략" >> "$LOG"

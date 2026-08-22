@@ -445,7 +445,9 @@ def test_btc_hero_shrink_is_not_self_learn():
         "p_up": 0.66, "p_down": 0.34, "p_up_raw": 0.70,
         "calibration": {"n": 149, "source": "bootstrap"},
     })
-    assert "자가학습 보정 전 70%" in stock
+    # 델타 전체를 '자가학습 보정'으로 귀속하지 않는다(캘리브+틸트+수축 종합).
+    assert "원시 70% → 최종 66%" in stock
+    assert "자가학습 보정 전" not in stock
 
 
 def test_core_align_label_is_count_vs_needed():
