@@ -31,6 +31,25 @@ def test_evaluate_perfect_separation_high_auc():
     assert m["hit_rate"] == 1.0
 
 
+def test_evaluate_reports_auc_ci_and_significance():
+    """AUC 점추정과 함께 SE·95%CI·유의성을 낸다(소표본 오독 방지)."""
+    m = backtest.evaluate(_samples())
+    assert m["roc_auc_se"] is not None
+    ci = m["roc_auc_ci95"]
+    assert isinstance(ci, list) and ci[0] <= m["roc_auc"] <= ci[1]
+    assert m["auc_significant"] is True     # 완전분리 → CI 하한이 0.5 초과
+
+
+def test_noise_auc_not_significant():
+    """방향과 무관한 노이즈 표본은 CI 가 0.5 를 걸쳐 유의하지 않다고 보고."""
+    noise = [{"date": f"2026{i:04d}",
+              "scores": {"close": 50, "flow": 50, "amt": 50, "quant": 50},
+              "chg_pct": 0.0, "next_ret": 0.0, "label": i % 2}
+             for i in range(30)]
+    m = backtest.evaluate(noise)
+    assert m["auc_significant"] is False
+
+
 def test_evaluate_empty():
     assert backtest.evaluate([])["n"] == 0
 

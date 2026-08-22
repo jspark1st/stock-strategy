@@ -24,6 +24,7 @@ IO 담당. scoring 은 순수함수라 이 모듈에 의존하지 않는다.
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
@@ -50,6 +51,9 @@ _CR = ["유상증자", "전환사채", "CB 발행", "신주인수권", "감자",
 _DOMESTIC_WORDS = ["코스피", "코스닥", "국내 증시", "국내증시", "국내 주식", "주식시장",
                    "유가증권시장", "지수"]
 _MKT_WORDS = _DOMESTIC_WORDS + ["증시", "뉴욕증시", "나스닥", "다우", "S&P", "SOX", "니케이"]
+# 해외 증시 마커 — classify_kind 에서 시황 오분류를 막고 '재료'(외생 선행정보)로 유지한다.
+_OVERSEAS_WORDS = ["뉴욕", "뉴욕증시", "나스닥", "다우", "S&P", "SOX", "필라델피아",
+                   "니케이", "상하이", "홍콩", "항셍", "유럽", "미국 증시", "미 증시", "미국증시"]
 _SESSION_WORDS = ["마감", "마쳐", "출발", "개장", "장중", "종가", "상승 마감", "하락 마감",
                   "약보합", "강보합", "혼조", "반등 마감", "시황", "휘청", "급등락"]
 # 수급 서술도 이미 flow(0.25) 서브스코어에 들어가 있다 → 재료로 이중 계상 금지.
@@ -79,7 +83,7 @@ class Material:
     published_kst: datetime | None  # 발행시각(KST)
     fresh: bool                     # 거래일 기준 당일 여부(팩트체크 통과)
     source: str = ""
-    kind: str = "재료"              # "재료"(점수 반영) | "시황"(가격/수급 서술 → 점수 제외)
+    kind: str = "재료"              # "재료" | "시황" | "참고"(오락·리스트형 → 점수 제외)
     scope: str = "시장"             # "시장"(지수 점수 반영) | "종목"(개별 종목 이슈 → 제외)
 
     @property
@@ -127,8 +131,14 @@ class MaterialsAssessment:
         않는다(평가 지적: 화면 호재2·악재3 vs 점수 호재0·악재1 불일치 해소)."""
         items = []
         for m in self.fresh[:limit]:
-            reason = ("" if m.scored else
-                      ("시황(가격·수급 항목과 중복)" if m.kind == "시황" else "개별종목 이슈"))
+            if m.scored:
+                reason = ""
+            elif m.kind == "시황":
+                reason = "시황(가격·수급 항목과 중복)"
+            elif m.kind == "참고":
+                reason = "오락·리스트형(점수 제외)"
+            else:
+                reason = "개별종목 이슈"
             items.append({"tag": m.tag, "title": m.title, "url": m.url,
                           "hhmm": m.hhmm(), "scored": m.scored, "reason": reason})
         return {"fact_check": self.fact_check_line(),
@@ -145,6 +155,8 @@ class MaterialsAssessment:
                 mark = ""
             elif m.kind == "시황":
                 mark = " · 시황(가격·수급 항목과 중복 → 점수 제외)"
+            elif m.kind == "참고":
+                mark = " · 오락·리스트형(점수 제외)"
             else:
                 mark = " · 개별종목(지수 점수 제외)"
             out.append({"title": f"{icon.get(m.tag, '⚪')} [{m.hhmm()}] {m.title}{mark}",
@@ -177,6 +189,10 @@ def search(query: str, api_key: str, max_results: int = 5, days: int = 2,
                    json={"query": query, "max_results": max_results, "topic": "news", "days": days})
         r.raise_for_status()
         return r.json().get("results", []) or []
+    except Exception as e:  # noqa — Tavily 장애가 파이프라인 전체를 죽이지 않게 빈 결과로 degrade.
+        import sys                        # (뉴스는 0.10 비핵심 팩터 → 결과 없으면 '제외·재배분')
+        print(f"[news.search] Tavily 조회 실패({type(e).__name__}: {e}) → 빈 결과", file=sys.stderr)
+        return []
     finally:
         if own:
             c.close()
@@ -217,6 +233,11 @@ def classify_kind(title: str) -> str:
     유상증자/CB 류는 시황어가 섞여 있어도 항상 '재료'로 남긴다(단독 -25 규칙 대상).
     """
     if any(k in title for k in _CR):
+        return "재료"
+    # 해외 증시 마감(뉴욕/나스닥/니케이…)은 국내 지수와 중복이 아니라 익일 국내장 외생 선행정보
+    # → 항상 '재료'. 특히 "뉴욕 지수 급락 마감" 처럼 국내어 '지수'+세션어에 걸려 시황으로
+    # 오분류되는 것을 막는다(generic '지수' 가 해외 헤드라인에도 매칭되던 버그).
+    if any(k in title for k in _OVERSEAS_WORDS):
         return "재료"
     if any(k in title for k in _FLOW_WORDS):
         return "시황"
@@ -276,6 +297,255 @@ def market_materials(as_of: str, api_key: str | None = None, queries: list[str] 
                              -(m.published_kst.timestamp() if m.published_kst else 0)))
     return MaterialsAssessment(as_of=as_of, materials=mats, good_count=good, bad_count=bad,
                                capital_raise_titles=cr_titles)
+
+
+_BTC_QUERIES = [
+    "Bitcoin ETF SEC approval flow",
+    "Bitcoin exchange hack security",
+    "Fed FOMC Bitcoin crypto regulation",
+    "Bitcoin ETF inflows outflows",
+]
+_BTC_RECAP = ["bitcoin jumps", "bitcoin drops", "bitcoin surges", "bitcoin plunges",
+              "btc jumps", "btc drops", "비트코인 급등", "비트코인 급락",
+              "비트코인 상승", "비트코인 하락", "btc price"]
+
+# BTC 재료는 영문 헤드라인이 대부분이다. 한국어 _POS/_NEG 는 여기서 전부 중립으로
+# 떨어지므로(실측: 호재 0·악재 0 고정) 영문 세트를 따로 둔다.
+#
+# **부분문자열 매칭 금지.** `"ban" in "bank"` 가 참이라 은행 언급만으로 악재가 붙고,
+# outflow/outflows 처럼 한쪽이 다른쪽의 부분문자열이면 같은 단어를 두 번 센다.
+# 그래서 어간 + 단어경계 정규식으로 매칭하고, **매칭된 패턴 개수**(중복 제거)를 센다.
+_BTC_POS_STEMS = [
+    r"approv\w*", r"inflow\w*", r"adopt\w*", r"green\s?light", r"etf\s+launch",
+    r"listing", r"record\s+high", r"all[\s-]time\s+high", r"bullish",
+    r"rall(?:y|ies|ied)", r"surg\w*", r"breakout", r"accumulat\w*",
+    r"treasur\w*", r"reserve\w*", r"institutional\s+demand", r"rate\s+cut\w*",
+    r"dovish", r"easing", r"upgrade\w*", r"partnership\w*", r"settle[sd]?",
+    r"dismiss\w*", r"legali[sz]\w*", r"halving", r"clarity", r"inflow",
+]
+_BTC_NEG_STEMS = [
+    r"outflow\w*", r"hack\w*", r"exploit\w*", r"breach\w*", r"stolen",
+    r"drain\w*", r"lawsuit\w*", r"sue[sd]?", r"indict\w*", r"probe[sd]?",
+    r"investigat\w*", r"subpoena\w*", r"crackdown\w*", r"ban(?:s|ned|ning)?",
+    r"restrict\w*", r"delist\w*", r"reject\w*", r"den(?:y|ies|ied)",
+    r"bearish", r"sell[\s-]?off", r"plung\w*", r"crash\w*", r"liquidat\w*",
+    r"capitulat\w*", r"rate\s+hike\w*", r"hawkish", r"tighten\w*", r"fraud\w*",
+    r"bankrupt\w*", r"insolven\w*", r"seiz\w*", r"sanction\w*", r"warn\w*",
+    r"risk[\s-]off", r"downgrade\w*", r"tariff\w*", r"sec\s+charges",
+]
+_BTC_POS_RE = [re.compile(rf"\b{s}\b", re.I) for s in _BTC_POS_STEMS]
+_BTC_NEG_RE = [re.compile(rf"\b{s}\b", re.I) for s in _BTC_NEG_STEMS]
+
+
+def _tag_btc(title: str, content: str = "") -> str:
+    """BTC 재료 호재/악재 — 영문 + 한국어 순(net) 판정. 제목 우선, 중립일 때만 본문."""
+    def _count(text: str) -> tuple[int, int]:
+        pos = (sum(1 for rx in _BTC_POS_RE if rx.search(text))
+               + sum(1 for k in _POS if k in text))
+        neg = (sum(1 for rx in _BTC_NEG_RE if rx.search(text))
+               + sum(1 for k in _NEG if k in text))
+        return pos, neg
+
+    pos, neg = _count(title)
+    if pos > neg:
+        return "호재"
+    if neg > pos:
+        return "악재"
+    if pos == 0 and neg == 0 and content:
+        cpos, cneg = _count(content)
+        if cpos > cneg:
+            return "호재"
+        if cneg > cpos:
+            return "악재"
+    return "중립"
+
+
+# 가격 재서술 일반형: 가격 동사 + 퍼센트. "Algorand Surges 3.23% Amid Crypto Rally"
+# 같은 알트 시황이 커뮤니티 극성으로 들어가면 차트·펀딩과 이중 계상된다.
+_PRICE_VERB_RE = re.compile(
+    r"\b(?:surge[sd]?|spike[sd]?|jump[sd]?|drop[sd]?|plunge[sd]?|soar[sd]?|"
+    r"tumble[sd]?|slide[sd]?|climb[sd]?|rall(?:y|ies|ied)|dip[s]?|slump[sd]?|"
+    r"rebound[sd]?|surpass\w*|hit[s]?\s+new|gain[sd]?|loss(?:es)?|"
+    r"lag(?:s|ged)?|outperform\w*|underperform\w*)\b", re.I)
+_PCT_RE = re.compile(r"\d+(?:[.,]\d+)?\s?%")
+# 차트·타점 해설도 시황이다. 이미 기술 팩터(0.22)가 같은 정보를 쓴다.
+_PRICE_TALK_RE = re.compile(
+    r"(?:price\s+prediction|short\s+squeeze|long\s+squeeze|fib(?:onacci)?\s+level|"
+    r"support\s+level|resistance\s+level|technical\s+analysis|make[\s-]or[\s-]break|"
+    r"weekly\s+gain|price\s+target|chart\s+(?:pattern|signal)|death\s+cross|"
+    r"golden\s+cross|overbought|oversold)", re.I)
+_BTC_SPECIFIC_RE = re.compile(r"\b(?:bitcoin|btc)\b|비트코인", re.I)
+_MATERIAL_KEYS = ("etf", "sec", "hack", "fed", "fomc", "cpi", "regulation",
+                  "lawsuit", "custody", "해킹", "규제", "현물 etf")
+
+
+_BTC_SKIP_HOST = ("listverse.com", "boredpanda.com", "buzzfeed.com", "ranker.com")
+_BTC_SKIP_RE = re.compile(
+    r"(?:straight out of hollywood|heists?(?:\s+and|\s+that)|"
+    r"history of (?:the )?(?:biggest|greatest)|listicle|clickbait)",
+    re.I)
+
+
+def _is_btc_entertainment(title: str, url: str = "") -> bool:
+    """리스트형·강도·영화화 기사는 표시만 하고 점수에 넣지 않는다."""
+    host = (url or "").lower()
+    if any(h in host for h in _BTC_SKIP_HOST):
+        return True
+    return bool(_BTC_SKIP_RE.search(title or ""))
+
+
+def classify_kind_btc(title: str, url: str = "") -> str:
+    """가격 재서술 시황은 점수에서 뺀다(이미 차트·펀딩에 들어 있음).
+    리스트형·오락 기사는 '참고' — 화면에 보이되 점수 제외."""
+    if _is_btc_entertainment(title, url):
+        return "참고"
+    t = title.lower()
+    if any(k in t for k in _MATERIAL_KEYS):
+        return "재료"
+    if any(k in t or k in title for k in _BTC_RECAP):
+        return "시황"
+    if _PRICE_VERB_RE.search(title) and _PCT_RE.search(title):
+        return "시황"
+    if _PRICE_TALK_RE.search(title):
+        return "시황"
+    return "재료"
+
+
+def btc_materials(as_of: str, api_key: str | None = None, hours: int = 48,
+                  client: httpx.Client | None = None) -> MaterialsAssessment:
+    """BTC 재료. fresh = 최근 hours시간(24–72h). 시황 헤드라인은 점수 제외."""
+    api_key = api_key or _tavily_key()
+    if not api_key:
+        raise RuntimeError("tavily_api_key 없음 — .env 확인")
+    now = datetime.now(KST)
+    own = client is None
+    c = client or httpx.Client(timeout=20)
+    seen: set[str] = set()
+    mats: list[Material] = []
+    try:
+        for q in _BTC_QUERIES:
+            for res in search(q, api_key, max_results=5, days=3, client=c):
+                url = res.get("url", "")
+                title = (res.get("title", "") or "").strip()
+                if not url or url in seen or not title:
+                    continue
+                seen.add(url)
+                pub = _parse_kst(res.get("published_date"))
+                fresh = bool(pub and (now - pub).total_seconds() <= hours * 3600)
+                tag = _tag_btc(title, res.get("content", "") or "")
+                mats.append(Material(title=title, url=url, tag=tag, published_kst=pub,
+                                     fresh=fresh, source=res.get("source", "") or "",
+                                     kind=classify_kind_btc(title, url), scope="시장"))
+    finally:
+        if own:
+            c.close()
+    scored_mats = [m for m in mats if m.scored]
+    good = min(sum(1 for m in scored_mats if m.tag == "호재"), 3)
+    bad = min(sum(1 for m in scored_mats if m.tag == "악재"), 3)
+    order = {"악재": 0, "호재": 1, "중립": 2}
+    mats.sort(key=lambda m: (not m.scored, not m.fresh, order.get(m.tag, 3),
+                             -(m.published_kst.timestamp() if m.published_kst else 0)))
+    return MaterialsAssessment(as_of=as_of, materials=mats, good_count=good, bad_count=bad)
+
+
+_BTC_SNS_QUERIES = [
+    "bitcoin reddit r/bitcoin sentiment",
+    "BTC crypto twitter community",
+]
+_CRYPTO_WORDS = ("bitcoin", "btc", "crypto", "비트코인", "코인", "digital asset",
+                 "ethereum", "eth", "stablecoin", "onchain", "on-chain")
+_AD_WORDS = ("webinar", "how to", "beginner", "novice", "guide", "sponsored",
+             "giveaway", "promo code", "airdrop bonus", "sign up", "course")
+
+
+MIN_COMMUNITY_TOPICS = 3  # 표본이 이보다 적으면 극성을 내지 않는다(결측)
+
+
+def _is_crypto(title: str, content: str = "") -> bool:
+    """BTC·크립토 무관 기사와 광고·강좌성 콘텐츠를 극성 집계에서 뺀다(스킬3 제외 규칙)."""
+    low = f"{title} {content}".lower()
+    if any(k in title.lower() for k in _AD_WORDS):
+        return False
+    return any(k in low for k in _CRYPTO_WORDS)
+
+
+def _is_btc_specific(title: str) -> bool:
+    """제목이 BTC 를 직접 다루는가. 알트코인(SHIB·ALGO·PancakeSwap) 기사가
+    'BTC 커뮤니티 심리'로 집계되면 신호가 아니라 노이즈다."""
+    return bool(_BTC_SPECIFIC_RE.search(title))
+
+
+def btc_community(as_of: str, api_key: str | None = None, hours: int = 48,
+                  client: httpx.Client | None = None) -> dict:
+    """Tavily 커뮤니티 검색 → 극성 bias(-1~+1) + 토픽. 뉴스 점수와 분리(SNS 0.08).
+
+    수집 0건이거나 방향어가 하나도 없으면 bias=None(결측). 0.0 을 돌려주면 스코어링이
+    '중립 실데이터'로 오인해 가중치 재배분이 일어나지 않는다.
+    """
+    api_key = api_key or _tavily_key()
+    if not api_key:
+        return {"bias": None, "topics": [], "pos": 0, "neg": 0, "n": 0}
+    now = datetime.now(KST)
+    own = client is None
+    c = client or httpx.Client(timeout=20)
+    seen: set[str] = set()
+    topics: list[dict] = []
+    try:
+        for q in _BTC_SNS_QUERIES:
+            for res in search(q, api_key, max_results=5, days=2, client=c):
+                url = res.get("url", "")
+                title = (res.get("title", "") or "").strip()
+                if not url or url in seen or not title:
+                    continue
+                seen.add(url)
+                pub = _parse_kst(res.get("published_date"))
+                fresh = bool(pub and (now - pub).total_seconds() <= hours * 3600) if pub else True
+                if not fresh:
+                    continue
+                body = res.get("content", "") or ""
+                kind = classify_kind_btc(title, url)
+                if kind == "시황":
+                    reason = "가격·차트 재서술(기술·펀딩 팩터와 중복)"
+                elif kind == "참고":
+                    reason = "오락·리스트형(점수 제외)"
+                elif not _is_btc_specific(title):
+                    reason = "BTC 비직접(알트·일반)"
+                elif not _is_crypto(title, body):
+                    reason = "크립토 무관·광고"
+                else:
+                    reason = ""
+                topics.append({
+                    "tag": _tag_btc(title, body), "title": title, "url": url,
+                    "kind": kind, "counted": not reason, "reason": reason,
+                    "hhmm": pub.strftime("%m/%d %H:%M") if pub else "시각미상"})
+    finally:
+        if own:
+            c.close()
+    scored = [t for t in topics if t["counted"]]
+    pos = sum(1 for t in scored if t["tag"] == "호재")
+    neg = sum(1 for t in scored if t["tag"] == "악재")
+    polar = pos + neg
+    enough = len(scored) >= MIN_COMMUNITY_TOPICS
+    bias = round((pos - neg) / polar, 3) if (polar and enough) else None
+    topics.sort(key=lambda t: (not t["counted"], t["tag"] == "중립"))
+    return {"bias": bias, "topics": topics[:10], "pos": pos, "neg": neg,
+            "n": len(topics), "counted": len(scored),
+            "min_topics": MIN_COMMUNITY_TOPICS}
+
+
+def fear_greed(client: httpx.Client | None = None) -> int | None:
+    """alternative.me Fear & Greed 0–100. 실패하면 None."""
+    own = client is None
+    c = client or httpx.Client(timeout=10)
+    try:
+        r = c.get("https://api.alternative.me/fng/?limit=1")
+        r.raise_for_status()
+        return int((r.json().get("data") or [{}])[0]["value"])
+    except Exception:  # noqa
+        return None
+    finally:
+        if own:
+            c.close()
 
 
 def _demo() -> None:

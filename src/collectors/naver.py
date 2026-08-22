@@ -201,10 +201,16 @@ def market_flows(market: str, trade_date: str, client: httpx.Client | None = Non
         hist = [_flows_from(market, ymd, vals)
                 for ymd, vals in _fetch_rows(c, market, trade_date)]
         if hist and hist[0].date == trade_date:
-            return hist[0], hist
+            cur = hist[0]
+            if not _identity_ok(cur):        # 매핑 밀림 의심 → 결측(재배분)
+                _flow_integrity_warn(cur)
+                return None, hist
+            return cur, hist
         live = investor_flows_intraday(market, trade_date, client=c)
-        if live is not None:
+        if live is not None and _identity_ok(live):
             return live, [live] + hist
+        if live is not None:                 # 잠정치도 항등식 깨지면 신뢰 불가
+            _flow_integrity_warn(live)
         return None, hist
     finally:
         if own:
@@ -435,6 +441,29 @@ def _flows_from(market: str, ymd: str, vals: list[float]) -> InvestorFlows:
         etc_corp_net=vals[9] if len(vals) > 9 else 0.0,
         inst_breakdown=dict(zip(_INST_KEYS, vals[3:9])),
     )
+
+
+# 시장 항등식: 개인+외국인+기관계+기타법인 ≈ 0 (모든 체결은 매수·매도 짝이므로 KRX 원천에서
+# 성립, 장중 누적도 동일). 크게 어긋나면 네이버가 표 컬럼을 바꿔 **위치기반 매핑이 밀렸다**는
+# 신호 → 그 수급은 오매핑이므로 점수에 쓰지 않고 결측(None)으로 돌린다.
+# ※ 주의: flow 결측은 scoring 에서 miss=2 로 취급돼 **총점 전체가 미산출(억제)**된다(재배분 아님).
+#   오매핑 데이터로 점수 내는 것보다 그 회차 미산출이 안전한 실패 모드 — 의도된 동작이다.
+_FLOW_IDENTITY_ABS = 300.0    # 억원, 반올림·미분류 잔차 여유
+_FLOW_IDENTITY_FRAC = 0.03    # gross 대비 3%
+
+
+def _identity_ok(f: InvestorFlows) -> bool:
+    gross = (abs(f.retail_net) + abs(f.foreign_net)
+             + abs(f.inst_net) + abs(f.etc_corp_net))
+    tol = max(_FLOW_IDENTITY_ABS, _FLOW_IDENTITY_FRAC * gross)
+    return abs(f.identity_sum()) <= tol
+
+
+def _flow_integrity_warn(f: InvestorFlows) -> None:
+    import sys
+    print(f"[naver.flows] 시장 항등식 위반 {f.market} {f.date} "
+          f"합계={f.identity_sum():+,.0f}억 (개인·외국인·기관·기타법인 매핑 의심) "
+          f"→ 수급 결측 처리", file=sys.stderr)
 
 
 def _demo() -> None:

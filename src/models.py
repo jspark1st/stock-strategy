@@ -92,7 +92,7 @@ class InvestorFlows:
 class IndexSnapshot:
     """지수(업종) 스냅샷 (t1511). 지수 OHLC + 시장 폭(등락 종목수)을 함께 담는다.
 
-    upcode: '001'=코스피 종합, '101'=KOSPI200 (KOSDAQ 종합 코드는 확인 필요).
+    upcode: '001'=코스피 종합, '301'=코스닥 종합, '101'=KOSPI200 (라이브 확정).
     필드 매핑은 LS 공식 예제로 확정: highjo=상승·lowjo=하락·unchgjo=보합·upjo=상한·downjo=하한.
     """
     code: str
@@ -140,7 +140,9 @@ class CloseStrengthInput:
 
     @property
     def chg_pct(self) -> float:
-        return (self.close - self.prev_close) / self.prev_close * 100
+        # prev_close 가 0/결측이면 크래시 대신 0.0(변화 없음). 상류의 0 가격이 파이프라인 전체를
+        # ZeroDivisionError 로 죽이지 않게 방어(정상 데이터에선 영향 없음).
+        return (self.close - self.prev_close) / self.prev_close * 100 if self.prev_close else 0.0
 
 
 @dataclass
@@ -204,7 +206,7 @@ class CallAuctionInput:
 
     @property
     def drift_pct(self) -> float:
-        return (self.close - self.price_1520) / self.price_1520 * 100
+        return (self.close - self.price_1520) / self.price_1520 * 100 if self.price_1520 else 0.0
 
 
 @dataclass
@@ -256,6 +258,7 @@ class CloseInputs:
     as_of: str | None = None               # 데이터 기준시각 'YYYY-MM-DD HH:MM KST'
     intraday_snapshot: bool = False        # True면 지수·거래량이 장중 스냅샷(잠정)
     call_not_applicable: bool = False      # 실행시점에 동시호가 미발생 -> 결측 아닌 제외
+    news_not_applicable: bool = False      # 당일 검증된 시장 재료 0건 -> 중립 50 고정 대신 제외·재배분
 
 
 # ── 출력 ────────────────────────────────────────────────────────────────

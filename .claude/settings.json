@@ -1,0 +1,55 @@
+{
+  "effortLevel": "high",
+  "fallbackModel": ["claude-sonnet-5", "haiku"],
+  "env": {
+    "PYTHONUTF8": "1",
+    "LC_ALL": "C.UTF-8",
+    "ANTHROPIC_CUSTOM_MODEL_OPTION": "claude-opus-4-8",
+    "ANTHROPIC_CUSTOM_MODEL_OPTION_NAME": "Opus 4.8",
+    "ANTHROPIC_CUSTOM_MODEL_OPTION_DESCRIPTION": "Opus 4.8 · 이전 세대 (명시 선택)",
+    "ANTHROPIC_CUSTOM_MODEL_OPTION_SUPPORTED_CAPABILITIES": "effort,thinking"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(.venv/bin/python -m pytest *)",
+      "Bash(.venv/bin/python -m pytest)",
+      "Bash(.venv/bin/python scripts/test_connection.py*)",
+      "Bash(.venv/bin/python scripts/run_close.py --dry-run*)",
+      "Bash(.venv/bin/python scripts/run_preopen.py --dry-run*)",
+      "Bash(.venv/bin/python scripts/run_backtest.py *)",
+      "Bash(.venv/bin/python scripts/diag_*)",
+      "Bash(.venv/bin/python scripts/exp_*)",
+      "Bash(.venv/bin/python scripts/fit_calibration.py*)",
+      "Bash(.venv/bin/python scripts/probe_ls.py*)",
+      "Bash(.venv/bin/python scripts/render_report.py*)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git fetch*)",
+      "Bash(git rev-parse *)",
+      "Bash(git show *)",
+      "Read(//home/jspark1st/overnight_report/**)"
+    ],
+    "ask": [
+      "Bash(.venv/bin/python scripts/run_close.py)",
+      "Bash(.venv/bin/python scripts/run_preopen.py)",
+      "Bash(.venv/bin/python scripts/run_close.py --auto*)",
+      "Bash(.venv/bin/python scripts/run_preopen.py --auto*)",
+      "Bash(.venv/bin/python scripts/run_close.py --write*)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(git pull *)"
+    ],
+    "deny": [
+      "Read(.env)",
+      "Read(.env.*)",
+      "Read(data/.ls_token.json)",
+      "Read(data/.ls_investor_map.json)",
+      "Bash(git push --force*)",
+      "Bash(git push -f *)",
+      "Bash(git reset --hard*)",
+      "Bash(git checkout -- *)"
+    ]
+  }
+}

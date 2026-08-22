@@ -104,12 +104,15 @@ def score_breadth(inp: BreadthInput) -> SubScore:
 
 
 def score_flow(inp: FlowInput) -> SubScore:
+    # SoT(scoring-close.md §3): +10 은 **3일 연속** 순매수(+1)/순매도(-1) 플래그에만 준다.
+    # (이전 구현은 clamp(streak,-1,1)로 1일 연속에도 +10 을 줘 가장 무거운 팩터를 과대평가했다.)
+    streak_flag = 1 if inp.foreign_streak >= 3 else -1 if inp.foreign_streak <= -3 else 0
     score = (
         50
         + 12 * clamp(inp.foreign_net / 3000, -2, 2)
         + 8 * clamp(inp.inst_net / 3000, -2, 2)
         + 5 * clamp((inp.program_net or 0.0) / 3000, -2, 2)
-        + 10 * clamp(inp.foreign_streak, -1, 1)
+        + 10 * streak_flag
     )
     # 개인만 순매수(외국인·기관 동반 순매도 + 개인 순매수)는 추가 -8
     retail_only = inp.foreign_net < 0 and inp.inst_net < 0 and (inp.retail_net or 0) > 0
@@ -141,6 +144,12 @@ def score_value(inp: ValueInput, chg_pct: float | None) -> SubScore:
     amt_mult = inp.today_value / inp.avg20_value if inp.avg20_value else 1.0
     score = 50 + 30 * math.log2(clamp(amt_mult, 0.4, 4))
     # 거래대금은 방향성이 없다. 하락일이면 50 기준 반전 (대금급증+하락=투매 감점).
+    # ⚠ 이중계상 주의: 같은 vol_ratio 가 calibration.vol_tilt(KOSDAQ, 방향무관 +가점)에도 쓰인다.
+    #   여기(하락일 반전)와 부호가 충돌한다. 경험 측정(scripts/exp_vol_interaction.py)은 고거래량이
+    #   **방향무관 강세**(고vol×하락일도 익일상승률 기저 이상)임을 보여 vol_tilt 부호를 지지한다.
+    #   그러나 (a) 이건 SoT(scoring-close.md) 정의된 '거래대금 품질' 서브스코어이고 총점·등급에도
+    #   쓰이며, (b) 측정이 2026 단일 상승레짐·소표본이라, **부호를 뒤집지 않는다**. vol_tilt 증분은
+    #   이 반전을 포함한 total 캘리브레이션 위에서 측정됐다(exp_guarded). 다레짐 표본 후 재검토(open #6).
     reversed_ = chg_pct is not None and chg_pct < 0
     if reversed_:
         score = 100 - score
@@ -289,10 +298,17 @@ def score_close(inputs: CloseInputs, calib: dict | None = None,
     else:
         missing.append("call")
 
-    if inputs.news is not None:
+    if inputs.news is not None and not inputs.news_not_applicable:
         subs["news"] = score_news(inputs.news)
         if inputs.news.capital_raise_disclosure:
             warnings.append("마감 후 유상증자/CB 공시 — 해당 종목 후보 제외, 익일 갭하락 주의")
+    elif inputs.news_not_applicable:
+        # 당일 검증된(fresh·scored) 재료가 0건이면 뉴스는 '없는 이벤트'다. 10% 가중을 중립 50 에
+        # 고정하면 실제 신호(가격·수급)를 그만큼 희석한다(감사 지적: 죽은 10% 가중). 동시호가처럼
+        # '제외'로 두어 완전성 100% 유지 + 가중을 실제 팩터로 재배분한다. 검증된 재료(호재·악재≥1)가
+        # 있으면 위 분기에서 정상 스코어. 뉴스 수집 실패(materials=None)도 중립 50 위조보다 제외가 정직.
+        excluded.append("news")
+        warnings.append("당일 검증된 시장 재료 없음 — 뉴스 항목 제외, 가중치 재배분")
     else:
         missing.append("news")
 
@@ -374,11 +390,13 @@ def score_close(inputs: CloseInputs, calib: dict | None = None,
     p_up_raw = raw_prob(total)
     p_up = calibration.apply(calib, total)
     # 판별 틸트(유계): 캘리브레이션된 확률에 방향 신호를 가산(예: KOSDAQ 거래량비율).
-    if direction_tilt:
+    if direction_tilt is not None and direction_tilt != 0:
         tilt = clamp(direction_tilt, -DIRECTION_TILT_MAX, DIRECTION_TILT_MAX)
         p_up = p_up + tilt
         warnings.append(
-            f"거래량 판별 신호 익일확률 {tilt*100:+.0f}%p (하네스 walk-forward 검증 · 레짐 주의)")
+            f"거래량 판별 신호 익일확률 {tilt*100:+.0f}%p (walk-forward AUC 0.577 · "
+            f"단일 상승레짐 표본 n≈89, 신뢰구간이 0.5를 걸쳐 통계적으로 미확정 — 참고 신호, "
+            f"하락장 표본 쌓이면 재검증 필요)")
     # 대형주 착시: 지수 상승 + 시장폭 약함(adv_ratio<0.4) → 5%p 하향
     if chg_pct is not None and chg_pct > 0 and adv_ratio is not None and adv_ratio < 0.4:
         p_up -= 0.05

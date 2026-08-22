@@ -22,9 +22,13 @@ def _report(entry_allow, grade_blocked, kelly=8.5):
                   "checks": []},
         "atr": {"direction": "long", "gate_blocked": grade_blocked,
                 "instrument": "KODEX 코스닥150", "position_scale": 0.5,
+                # compute_plan 은 등급게이트만 보고 comment 를 만든다(매수 문구 포함).
+                "comment": f"매수 자격 통과(edge +5.0%) · 권장비중 {kelly:.0f}%(Half Kelly, 상한 25%)",
                 "primary": {"entry": 100.0, "stop": 98.0, "target": 104.0, "rr": 2.0,
                             "edge": 0.05, "kelly_pct": kelly, "qualified": True,
-                            "p_breakeven": 0.33}},
+                            "p_breakeven": 0.33},
+                "variants": [{"label": "스윙(2~5일)", "stop": 96.0, "target": 112.0,
+                              "rr": 6.0, "edge": 0.12, "kelly_pct": 12.0}]},
         "narrative": {"conclusion": "관망 우위."},
     }
 
@@ -37,6 +41,25 @@ def test_atr_card_respects_full_entry_gate():
     assert "실제 체결 수단" not in html           # 차단 시 체결수단 미표시
     # 권장비중 0%(등급 배수 50% × 켈리로 8.5% 였으나 진입 차단이므로 실효 0)
     assert ">0%<" in html
+
+
+def test_atr_comment_not_buy_when_entry_blocked():
+    """compute_plan 의 comment('매수 자격 통과…')가 entry.allow=False 면 화면에 새지 않는다."""
+    html = rr.build_atr_plan(_report(entry_allow=False, grade_blocked=False))
+    assert "매수 자격 통과" not in html          # 게이트 차단 배지 옆 매수 문구 금지
+    assert "진입 게이트 차단" in html
+    # 통과 시엔 comment 가 그대로 보인다(회귀 방지)
+    ok = rr.build_atr_plan(_report(entry_allow=True, grade_blocked=False))
+    assert "매수 자격 통과" in ok
+
+
+def test_atr_variants_zero_kelly_when_entry_blocked():
+    """진입 게이트 차단이면 variants(다일 R배수) 표의 비중도 0% — primary 와 정합."""
+    html = rr.build_atr_plan(_report(entry_allow=False, grade_blocked=False))
+    assert ">12%<" not in html          # 변형 켈리 12% 노출 금지
+    # 통과 시엔 변형 비중이 그대로 보인다(회귀 방지)
+    ok = rr.build_atr_plan(_report(entry_allow=True, grade_blocked=False))
+    assert ">12%<" in ok
 
 
 def test_conclusion_respects_full_entry_gate():
@@ -96,3 +119,117 @@ def test_order_card_shows_hts_when_allowed():
     html = rr.build_order_card(_order_card_report(entry_allow=True))
     assert "고급매도설정 추천" in html
     assert "손실제한" in html and "가능수량 100%" in html
+
+
+# ── LLM facts_block 게이트 정합(서술 레이어) ───────────────────────────────────
+# 화면 4곳은 entry.allow 를 따르는데 마감 LLM facts_block 만 등급게이트만 봐서, 등급통과·
+# allow=False(코스닥) 케이스에서 LLM 이 '매수' 결론을 낼 수 있었다 → facts_block 이 entry.allow
+# 를 반영하고 [진입판정]·[포지션 정책] 가드 라인을 넣는지 회귀 고정.
+from src.collectors.llm import facts_block
+
+
+def _llm_ctx(entry_allow, grade_blocked=False):
+    return {
+        "label": "코스닥 마감", "trade_date": "2026-08-22", "as_of": "2026-08-22 15:00 KST",
+        "index_close": 800.0, "index_chg_pct": -0.5, "total": 52.0, "grade": "약세",
+        "p_up": 0.44, "p_down": 0.56,
+        "gate": {"new_entry_blocked": grade_blocked, "position_scale": 0.5,
+                 "max_candidates": 2, "close_betting": True},
+        "entry": {"allow": entry_allow,
+                  "blocked_reasons": ([] if entry_allow else ["방향 확률 임계", "신뢰도 임계"])},
+        "atr": {"direction": "long", "instrument": "KODEX 코스닥150",
+                "am_sigma_pct": 0.8,
+                "primary": {"entry": 800.0, "stop": 792.0, "target": 808.0, "rr": 1.0,
+                            "edge": 0.05, "kelly_pct": 8.5}},
+    }
+
+
+def test_facts_block_blocks_entry_when_allow_false():
+    """등급 통과·entry.allow=False → 진입판정 차단 명시 + 실행수단 미노출 + 관망 가드."""
+    txt = facts_block(_llm_ctx(entry_allow=False, grade_blocked=False))
+    assert "[진입판정] 신규진입 차단" in txt
+    assert "관망·현금만" in txt                     # 포지션 정책 가드 라인
+    assert "실행수단 KODEX 코스닥150" not in txt     # 차단 시 실행수단 숨김
+    assert "방향 확률 임계" in txt                   # 차단 사유 전달
+    assert "권장비중 0%" in txt                      # 차단 시 비중도 0% 로 전달(8% 아님)
+    assert "권장비중 8.5%" not in txt
+
+
+def test_fallback_narrative_respects_entry_gate():
+    """결정론 폴백(LLM 실패 시)도 entry.allow=False 면 매수 결론을 내지 않는다."""
+    from src.collectors.llm import fallback_narrative
+    ctx = {
+        "label": "코스닥 마감", "trade_date": "2026-08-22",
+        "total": 52.0, "grade": "약세", "p_up": 0.44, "p_down": 0.56,
+        "gate": {"new_entry_blocked": False},
+        "entry": {"allow": False, "blocked_reasons": ["방향 확률 임계", "신뢰도 임계"]},
+        "atr": {"direction": "long", "instrument": "KODEX 코스닥150",
+                "primary": {"entry": 800.0, "stop": 792.0, "target": 808.0,
+                            "edge": 0.05, "kelly_pct": 8.5, "qualified": True}},
+        "subscores": [],
+    }
+    concl = fallback_narrative(ctx).get("conclusion", "")
+    assert "신규 진입 차단" in concl and "관망" in concl
+    assert "매수 자격 통과" not in concl
+
+
+def test_facts_block_allows_when_entry_allow_true():
+    """진입 게이트 통과면 실행수단 노출·차단 문구 없음(회귀 방지)."""
+    txt = facts_block(_llm_ctx(entry_allow=True, grade_blocked=False))
+    assert "[진입판정] 신규진입 차단" not in txt
+    assert "실행수단 KODEX 코스닥150" in txt
+
+
+def test_sidebar_groups_by_market_then_stage():
+    html = rr.build_sidebar([
+        {"id": "kosdaq-close", "group": "코스닥", "label": "장 마감",
+         "ph": False, "total": 32.3, "grade": "위험"},
+        {"id": "kospi-preopen", "group": "코스피", "label": "개장 전",
+         "ph": False, "total": 66.2, "grade": "우호"},
+        {"id": "btc-perp", "group": "비트코인 선물", "label": "BTCUSDT",
+         "ph": False, "total": 57.6, "grade": "중립"},
+        {"id": "kospi-close", "group": "코스피", "label": "장 마감",
+         "ph": False, "total": 54.8, "grade": "약세"},
+        {"id": "kosdaq-preopen", "group": "코스닥", "label": "개장 전",
+         "ph": False, "total": 56.6, "grade": "중립"},
+    ])
+    assert html.index("nav-title\">코스피") < html.index("nav-title\">코스닥")
+    assert html.index("nav-title\">코스닥") < html.index("비트코인 선물")
+    k = html[html.index("코스피"):html.index("코스닥")]
+    assert k.index("장 마감") < k.index("개장 전")
+
+
+def test_normalize_remaps_legacy_nav():
+    b = rr.normalize_bundle({
+        "reports": [
+            {"id": "kospi-close", "group": "장 마감", "label": "코스피", "total": 1},
+            {"id": "kospi-preopen", "group": "개장 전", "label": "코스피", "total": 2},
+        ]
+    })
+    assert b["reports"][0]["group"] == "코스피" and b["reports"][0]["label"] == "장 마감"
+    assert b["reports"][1]["group"] == "코스피" and b["reports"][1]["label"] == "개장 전"
+
+
+def test_preopen_order_card_copied_from_close_on_normalize():
+    """예전 개장전 번들에 카드가 없어도 같은 시장 마감 카드를 붙인다."""
+    oc = {"etf_price": 109980, "instrument": "KODEX 200", "shcode": "069500"}
+    b = rr.normalize_bundle({
+        "reports": [
+            {"id": "kospi-close", "group": "코스피", "label": "장 마감",
+             "order_card": oc},
+            {"id": "kospi-preopen", "group": "코스피", "label": "개장 전",
+             "report_type": "preopen"},
+        ]
+    })
+    assert b["reports"][1]["order_card"]["shcode"] == "069500"
+
+
+def test_preopen_order_card_renders_reference_table():
+    r = _order_card_report(entry_allow=False)
+    r["id"] = "kospi-preopen"
+    r["report_type"] = "preopen"
+    html = rr.build_order_card(r)
+    assert "상품 주문 카드" in html
+    assert "KODEX 200" in html
+    assert "전일 마감 앵커 환산" in html
+    assert "고급매도설정 추천" not in html

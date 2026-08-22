@@ -82,10 +82,15 @@ def reconstruct(market: str, count: int = 250, client=None) -> list[dict]:
                 foreign_net=f.foreign_net, inst_net=f.inst_net, retail_net=f.retail_net,
                 program_net=None, foreign_streak=_streak(desc))).score
             next_ret = (nxt.close - cd.close) / cd.close * 100
+            # 실제 거래 지평(종가매수→익일 시가매도, close→open) 레이블도 나란히 —
+            # exp_paper 가 드러낸 지평 불일치를 evaluate 가 두 지평 동시 측정하게 한다.
+            open_ret = ((nxt.open - cd.close) / cd.close * 100) if getattr(nxt, "open", None) else None
             out.append({"date": cd.date,
                         "scores": {"close": close_s, "flow": flow_s, "amt": amt_s, "quant": quant_s},
                         "chg_pct": round(chg, 2), "next_ret": round(next_ret, 3),
-                        "label": 1 if next_ret > 0 else 0})
+                        "label": 1 if next_ret > 0 else 0,
+                        "open_ret": (round(open_ret, 3) if open_ret is not None else None),
+                        "overnight_label": (1 if open_ret > 0 else 0) if open_ret is not None else None})
         return out
     finally:
         if own:
@@ -111,13 +116,24 @@ def evaluate(samples: list[dict], weights: dict | None = None) -> dict:
     hit = sum(1 for p, l in preds if (p >= 0.5) == bool(l)) / n
     brier = sum((p - l) ** 2 for p, l in preds) / n
     brier_base = base * (1 - base)                 # 항상 기저확률 예측 시 Brier
-    # AUC (Mann-Whitney)
+    # AUC (Mann-Whitney) + 신뢰구간(Hanley-McNeil). 소표본에서 0.53↔0.55 를 신호로
+    # 오독하지 않게 SE·95%CI 를 함께 낸다(감사 지적: CI 없이 점추정만 보고하던 문제).
     ups = [p for p, l in preds if l == 1]
     dns = [p for p, l in preds if l == 0]
-    auc = None
+    auc = auc_se = None
+    auc_ci95 = None
     if ups and dns:
+        n1, n2 = len(ups), len(dns)
         wins = sum((1 if u > d else 0.5 if u == d else 0) for u in ups for d in dns)
-        auc = round(wins / (len(ups) * len(dns)), 3)
+        a = wins / (n1 * n2)
+        auc = round(a, 3)
+        # Hanley-McNeil SE
+        q1 = a / (2 - a) if (2 - a) else 0.0
+        q2 = 2 * a * a / (1 + a) if (1 + a) else 0.0
+        var = (a * (1 - a) + (n1 - 1) * (q1 - a * a) + (n2 - 1) * (q2 - a * a)) / (n1 * n2)
+        auc_se = round(var ** 0.5, 3) if var > 0 else 0.0
+        auc_ci95 = [round(max(0.0, a - 1.96 * auc_se), 3),
+                    round(min(1.0, a + 1.96 * auc_se), 3)]
     # 캘리브레이션 구간
     bins = []
     for lo in (0.2, 0.3, 0.4, 0.5, 0.6, 0.7):
@@ -127,10 +143,29 @@ def evaluate(samples: list[dict], weights: dict | None = None) -> dict:
             bins.append({"range": f"{int(lo*100)}~{int(hi*100)}%", "n": len(seg),
                          "pred": round(sum(p for p, _ in seg) / len(seg), 3),
                          "actual": round(sum(l for _, l in seg) / len(seg), 3)})
+    # 실제 거래 지평(close→open) 동시 측정 — 같은 예측 p_up 을 오버나이트 갭 방향에 대해 채점.
+    ov = [(predict(s, weights)[1], s["overnight_label"]) for s in samples
+          if s.get("overnight_label") is not None]
+    overnight = None
+    if ov:
+        ob = sum(l for _, l in ov) / len(ov)
+        oh = sum(1 for p, l in ov if (p >= 0.5) == bool(l)) / len(ov)
+        oups = [p for p, l in ov if l == 1]
+        odns = [p for p, l in ov if l == 0]
+        oauc = None
+        if oups and odns:
+            owins = sum((1 if u > d else 0.5 if u == d else 0) for u in oups for d in odns)
+            oauc = round(owins / (len(oups) * len(odns)), 3)
+        overnight = {"n": len(ov), "base_up_rate": round(ob, 3),
+                     "hit_rate": round(oh, 3), "roc_auc": oauc}
     return {"n": n, "base_up_rate": round(base, 3), "hit_rate": round(hit, 3),
             "brier": round(brier, 4), "brier_baseline": round(brier_base, 4),
             "brier_skill": round(1 - brier / brier_base, 3) if brier_base else None,
-            "roc_auc": auc, "calibration_bins": bins}
+            "roc_auc": auc, "roc_auc_se": auc_se, "roc_auc_ci95": auc_ci95,
+            # 0.5(동전)가 CI 안에 들어오면 판별력이 통계적으로 미확정. 단 완전분리 극소표본은
+            # SE=0 이라 CI 가 [a,a] 로 붕괴해 거짓 유의가 나오므로 최소표본(n>=30)을 함께 요구한다.
+            "auc_significant": (auc_ci95 is not None and auc_ci95[0] > 0.5 and n >= 30),
+            "calibration_bins": bins, "overnight_close_to_open": overnight}
 
 
 def tune_weights(samples: list[dict], grid=None, metric: str = "brier") -> dict:

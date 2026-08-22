@@ -12,10 +12,15 @@
 **성공의 유일한 척도:** **총점·상승/하락 확률의 '방향 예측 정확도'.** 다음날 종가가 오를지 내릴지를
 정확히 맞히는 것. 그 이상도 이하도 아니다.
 
+> **별도 트랙 존재:** 같은 서버·같은 대시보드 셸에 **BTCUSDT 무기한 선물 리포트**가 따로 돈다.
+> 이 파일의 전략(오버나이트 롱)과 **무관하며 섞지 않는다.** 스코어링·크론·팩터·DB 슬롯이
+> 전부 분리돼 있다. 그쪽 작업은 → **HANDOFF_BTC.md**
+
 ## 절대 규칙 (섞지 마라)
 
 1. **다른 전략을 추가하지 않는다.** 숏 단독 전략·데이트레이딩·스캘핑·목표도달(path) 트레이딩 등은
    이 프로젝트의 범위가 **아니다.** 오버나이트 롱 방향예측 하나만 최고로 만든다.
+   (BTC 선물 트랙은 예외가 아니라 **별도 트랙**이다 — `src/scoring.py` 를 공유하지 않는다.)
 2. **표현이 아니라 검증으로 발전한다.** 문구·UI를 다듬는 것보다 **방향예측 정확도를 실제로 올리는 것**이
    항상 우선이다. 개선은 `scripts/run_backtest.py`(하네스)로 **측정 → 개선 → 재측정**한다.
 3. **정확 수치는 API.** 점수·확률·가격·수급은 LS/네이버 API 값만. LLM 은 서술 전용, 수치 생성 금지.
@@ -69,14 +74,16 @@ cron(평일): `0 8` preopen · `0 15` close · `30 16` final. 자동 push→Verc
 PYTHONUTF8=1 python scripts/run_backtest.py --count 250 --tune   # 방향예측 성적·튜닝(개발 중심)
 PYTHONUTF8=1 python scripts/run_close.py                          # 마감 파이프라인
 PYTHONUTF8=1 python scripts/run_preopen.py                        # 개장전 재평가
-PYTHONUTF8=1 python -m pytest tests/ -q                           # 106개 테스트
+PYTHONUTF8=1 .venv/bin/python -m pytest tests/ -q                  # 212 passed (2026-08-22)
 ```
 
 ## 문서 지도 (이 순서로 파고든다)
 1. **AGENTS.md** (이 파일) — 북극성·규칙·로드맵
-2. **CLAUDE.md** — 상세 운영(서버·cron·배포), 데이터 소스, 코드맵, 진행 로그
+2. **CLAUDE.md** — 상세 운영·코드맵·진행 로그. **Claude Code는 맨 위「인수인계 2026-08-22」부터.**
 3. **guide_docs/index.md** — 참조 스펙(SoT)·외부 평가·계획서 인덱스
 4. 폴더: `guide_docs/sample/`(SoT 공식 스펙) · `guide_docs/source/`(외부 평가) · `plan/`(로드맵) · `docs/PLAN.md`
+5. **HANDOFF_BTC.md** — BTCUSDT 선물 트랙(별도). 이 전략과 섞지 않는다
+6. **HANDOFF.md** — 서버 이전 인수인계(2026-08-19)
 
 ## 작업할 때 체크
 - [ ] 이 변경이 **방향예측 정확도**를 올리거나, 그걸 측정·검증·자동화하는 데 기여하는가?

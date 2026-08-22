@@ -10,11 +10,10 @@
 - `sample/market-close-review/references/atr-risk-sizing.md` — ATR 손절/목표·edge/Kelly(참고 타점용)
 - `sample/market-close-review/references/review-playbook.md` — 후보 필터·진입 유형
 - `sample/market-open-sentiment/references/broker-api.md` — LS 토큰 발급 스펙
-- **easystock 분기(SoT와 다른 확장):** ATR 정규화·신호 일치도·quant 확장·게이트 우선 사이징·뉴스 시황 제외·
-  간밤 정량 재평가·데이터 계보·상태머신·백테스트 하네스·**적응형 확률 캘리브레이션**(5차: 고정
-  `sigmoid((total-55)/10)` → 데이터 적합 `sigmoid(a·total+b)`, store 학습치>부트스트랩>SoT 폴백 —
-  하네스 walk-forward 로 비관편향 제거 검증)·**가드된 KOSDAQ 거래량 판별 틸트**(5차: 유계 ±0.10,
-  KOSDAQ 한정, walk-forward AUC 0.488→0.577). (plan/ 및 CLAUDE.md 진행 로그 참조)
+- **easystock 분기(SoT와 다른 확장):** → **`guide_docs/DIVERGENCES.md`** (전수 대조표: SoT vs 코드 ·
+  근거·검증상태·파일). 11개 분기(적응형 캘리브레이션·가드된 vol_tilt·σ_AM 타점·게이트 우선 사이징·
+  뉴스 시황/결측 처리·간밤 재평가·quant 확장 등)를 감사 가능하게 정리. **미등재 스코어링 차이는 버그로
+  간주하고 SoT 에 맞춘다.**
 
 ## 2. `source/` — 외부 평가 (개선 이력)
 제3자 평가. 지적 → 반영 이력의 근거.

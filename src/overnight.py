@@ -13,6 +13,13 @@
 """
 from __future__ import annotations
 
+import datetime as _dt
+
+# 간밤 지수 세션 신선도 상한(일). 개장전(KST D)에 쓰는 미국 세션은 보통 localTradedAt D-1,
+# 월요일 개장이면 금요일(D-3), 미국 공휴일이 끼면 최대 D-4. 그보다 오래면 간밤 값이 아니라
+# 오래된/잘못된 세션이므로 보정에서 제외한다(스킬 없는 신호로 방향을 흔들지 않게).
+WORLD_MAX_STALE_DAYS = 5
+
 # 간밤 지수 → 시장별 가중(합=1.0). SOX·나스닥 중심, 코스닥이 더 민감.
 WEIGHTS = {
     "KOSPI":  {".SOX": 0.30, ".IXIC": 0.30, ".INX": 0.25, ".DJI": 0.15},
@@ -32,17 +39,40 @@ def _clip(x: float, lo: float, hi: float) -> float:
     return max(lo, min(hi, x))
 
 
-def overnight_tilt(world: dict, usdkrw_chg: float | None, market: str) -> dict:
+def _as_of_date(s) -> _dt.date | None:
+    try:
+        return _dt.date.fromisoformat(str(s)[:10])
+    except Exception:
+        return None
+
+
+def overnight_tilt(world: dict, usdkrw_chg: float | None, market: str,
+                   today: str | None = None) -> dict:
     """간밤 지수+환율 → 방향확률 보정량(tilt)과 근거.
 
-    world: {code: {'chg_pct': float, ...}} (naver.world_indices() 출력)
+    world: {code: {'chg_pct': float, 'as_of': 'YYYY-MM-DD HH:MM', ...}} (naver.world_indices()).
+    today: 개장전 거래일 'YYYY-MM-DD'. 주면 as_of 신선도(≤WORLD_MAX_STALE_DAYS)를 검증해
+      오래된 세션은 보정에서 제외한다(없으면 신선도 게이트 없이 기존과 동일 — 하위호환).
     반환: {blend_pct, tilt, tilt_market, tilt_fx, drivers[], note}. drivers 는 표시용.
     """
     w = WEIGHTS.get(market.upper(), WEIGHTS["KOSPI"])
-    have = {k: world[k]["chg_pct"] for k in w if k in world and world[k].get("chg_pct") is not None}
+    ref = _as_of_date(today) if today else None
+    have: dict = {}
+    stale: list[str] = []
+    for k in w:
+        if k not in world or world[k].get("chg_pct") is None:
+            continue
+        if ref is not None:
+            d = _as_of_date(world[k].get("as_of"))
+            if d is not None and (ref - d).days > WORLD_MAX_STALE_DAYS:
+                stale.append(k)          # 오래된 세션 — 간밤 값이 아님, 제외
+                continue
+        have[k] = world[k]["chg_pct"]
     if not have:
+        note = ("간밤 지수 신선도 미달(오래된 세션) — 방향 보정 없음(전일 마감 유지)"
+                if stale else "간밤 지수 미확보 — 방향 보정 없음(전일 마감 유지)")
         return {"blend_pct": None, "tilt": 0.0, "tilt_market": 0.0, "tilt_fx": 0.0,
-                "drivers": [], "note": "간밤 지수 미확보 — 방향 보정 없음(전일 마감 유지)"}
+                "drivers": [], "note": note}
 
     # 확보된 지수만으로 가중 재정규화(일부 실패해도 편향 없이)
     wsum = sum(w[k] for k in have) or 1.0

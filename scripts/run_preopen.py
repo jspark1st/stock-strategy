@@ -30,7 +30,7 @@ try:
 except Exception:
     pass
 
-from src import config, notify, overnight, remote, strategy
+from src import btc_bundle, config, notify, overnight, remote, strategy
 from src.collectors import llm, naver
 from src.collectors.ls import load_env
 from render_report import render
@@ -72,7 +72,8 @@ def build_preopen(close_rep: dict, today: str, env: dict, anchor_date: str,
                   stale_note: str | None, as_of: str, fx: dict | None,
                   world: dict | None = None, macro: dict | None = None) -> dict:
     mk = _mk_of(close_rep)
-    market_ko = close_rep.get("label", "코스피")
+    market_ko = {"kospi": "코스피", "kosdaq": "코스닥"}.get(
+        mk, close_rep.get("group") or close_rep.get("label") or "코스피")
     ms = dict(close_rep.get("market", {}))
     if fx:
         ms["usdkrw"] = fx.get("price")
@@ -80,7 +81,7 @@ def build_preopen(close_rep: dict, today: str, env: dict, anchor_date: str,
     # ── 간밤 정량 재평가: 전일 마감 p_up 을 간밤 미국장·환율로 보정(총점/구조는 앵커 유지) ──
     anchor_p_up = close_rep.get("p_up")
     fx_chg = (fx or {}).get("chg_pct")
-    tilt_info = overnight.overnight_tilt(world or {}, fx_chg, mk.upper())
+    tilt_info = overnight.overnight_tilt(world or {}, fx_chg, mk.upper(), today=today)
     p_up = overnight.apply_to_p_up(anchor_p_up, tilt_info["tilt"])
     p_down = round(1 - p_up, 4) if p_up is not None else None
 
@@ -127,7 +128,7 @@ def build_preopen(close_rep: dict, today: str, env: dict, anchor_date: str,
             f"앵커가 된 마감 리포트는 {close_rep.get('as_of') or '장중'} 스냅샷 기준이었다 "
             "— 실제 종가와 다를 수 있으니 오늘 시가 대응 시 재확인.")
     return {
-        "id": f"{mk}-preopen", "group": "개장 전", "label": market_ko,
+        "id": f"{mk}-preopen", "group": market_ko, "label": "개장 전",
         "report_type": "preopen", "trade_date": today, "anchor_date": anchor_date,
         "as_of": as_of,
         "total": close_rep.get("total"), "grade": close_rep.get("grade"),
@@ -136,6 +137,7 @@ def build_preopen(close_rep: dict, today: str, env: dict, anchor_date: str,
         # 전날 진입 판정(entry.allow 6조건 AND)을 그대로 전달 — 요약/카드가 등급 게이트만
         # 보고 오판하지 않도록(개장전 요약이 'NO_TRADE'인데 '진입 검토'로 뜨던 모순 방지).
         "entry": close_rep.get("entry"),
+        "order_card": close_rep.get("order_card"),
         "narrative": narrative, "overnight": ov, "preopen_state": state,
         "lifecycle": strategy.resolve_lifecycle(None, "preopen", False),
         "sources": narrative.get("sources", []),
@@ -165,7 +167,7 @@ def main() -> int:
     today = _today()
     as_of = now.strftime("%Y-%m-%d %H:%M KST")
     anchor_date = str(close_bundle.get("trade_date") or "")
-    close_reports = [r for r in close_bundle["reports"] if r.get("group") == "장 마감"]
+    close_reports = [r for r in close_bundle["reports"] if btc_bundle._is_stock_close(r)]
     if not close_reports:
         print("⚠ 번들에 장 마감 리포트가 없음 — 중단")
         return 2
@@ -219,7 +221,7 @@ def main() -> int:
             encoding="utf-8")
 
     bundle = {"trade_date": today, "as_of": as_of,
-              "reports": close_reports + preopen_reports}
+              "reports": btc_bundle.merge(close_reports + preopen_reports, btc_bundle.load_btc())}
     out_path = out_dir / (f"report_{today}.dryrun.html" if dry_run else f"report_{today}.html")
     html = render(bundle)
     out_path.write_text(html, encoding="utf-8")

@@ -142,9 +142,19 @@ def facts_block(ctx: dict) -> str:
             f"비중배수 {g.get('position_scale')} · 후보 최대 {g.get('max_candidates')}종목 · "
             f"종가베팅 {'가능' if g.get('close_betting') else '불가'}")
     g = m.get("gate") or {}
-    blocked = bool(g.get("new_entry_blocked"))
+    entry = m.get("entry") or {}
+    grade_blocked = bool(g.get("new_entry_blocked"))
     st = (m.get("preopen_state") or {}).get("state")
-    no_position = blocked or st == "NO_TRADE"
+    # 권위 판정은 entry_decision.allow(6조건 AND)다. 등급게이트를 통과해도 방향확률·신뢰도·
+    # 신선도·이벤트락 중 하나라도 미달이면 진입 불가 — 서술도 이걸 따라야 한다(코스닥
+    # 등급통과·allow=False 케이스에서 LLM 이 '매수'라고 결론내던 정합성 버그 방지).
+    entry_blocked = ("allow" in entry) and (entry.get("allow") is False)
+    no_position = grade_blocked or entry_blocked or st == "NO_TRADE"
+    # 등급은 통과했지만 진입판정이 막은 경우, LLM 에 사유를 명시해 준다.
+    if entry_blocked and not grade_blocked:
+        reasons = " / ".join(entry.get("blocked_reasons") or []) or "임계 미달"
+        lines.append(f"[진입판정] 신규진입 차단(6조건 AND 미충족: {reasons}) — "
+                     "등급은 통과했으나 관망·현금. 매수 결론 금지.")
     atr = m.get("atr") or {}
     if atr:
         p = atr.get("primary") or {}
@@ -154,10 +164,12 @@ def facts_block(ctx: dict) -> str:
             f" · 실행수단 {atr.get('instrument')}" if atr.get("instrument") else "")
         am = (f" · 지평 오버나이트(익일 오전) ±{atr.get('am_sigma_pct')}%(σ_AM)"
               if atr.get("am_sigma_pct") is not None else "")
+        # 차단 시엔 화면·결론과 동일하게 비중 0% 로 전달한다(모델에 8%·0% 상충 숫자를 주지 않게).
+        kelly_disp = 0 if no_position else p.get("kelly_pct")
         lines.append(
             f"[ATR타점(참고)] 방향 {atr.get('direction')} · 진입 {p.get('entry')} · "
             f"손절 {p.get('stop')} · 목표 {p.get('target')} · 손익비 1:{p.get('rr')} · "
-            f"edge {p.get('edge')} · 권장비중 {p.get('kelly_pct')}%" + am + instr)
+            f"edge {p.get('edge')} · 권장비중 {kelly_disp}%" + am + instr)
         lines.append("[지평 규율] 목표·손절은 익일 오전(오버나이트 1회) 예상 변동폭 기준이다. "
                      "'며칠에 걸쳐'·'중장기 목표' 등 다일 보유를 전제한 서술 금지. 기본 청산은 "
                      "08:50 장전 재평가(시간청산).")
@@ -215,7 +227,8 @@ def perplexity_research(ctx: dict, env: dict) -> dict | None:
 
 
 # ── 2) Gemini 1차 초안 + 교차검증 ─────────────────────────────────────────
-def gemini_draft(ctx: dict, research: dict | None, env: dict) -> str | None:
+def gemini_draft(ctx: dict, research: dict | None, env: dict,
+                 facts_fn=None) -> str | None:
     key = env.get("google_gemini_api")
     if not key:
         return None
@@ -223,7 +236,7 @@ def gemini_draft(ctx: dict, research: dict | None, env: dict) -> str | None:
            "정량 분석한다. 새 수치·가격·확률을 만들지 마라(확정 수치 인용만). "
            "리서치에 나오는 수치는 참고만 하고 본문 수치로 쓰지 마라(수급/점수/가격은 확정 수치만). 한국어.")
     prompt = (
-        "확정 수치:\n" + facts_block(ctx) +
+        "확정 수치:\n" + (facts_fn or facts_block)(ctx) +
         ("\n\n[Perplexity 실시간 리서치]\n" + research["text"] if research else "") +
         "\n\n[계산·검증]\n"
         "A) 수치 정합성 점검: p_up vs 총점, ATR edge vs p_up·손익비, 항목점수 vs 등급이 "
@@ -265,8 +278,10 @@ _CLAUDE_SYS = (
     "③ 투자 권유가 아니라 판단 참고임을 전제로, 그러나 명확한 매매 결론(매수/분할/관망/현금)을 낸다. "
     "④ 사용자는 '장마감 리포트로 결정→익일 개장 재검토' 워크플로우를 쓴다. "
     "⑤ risks(실시간 주의 신호)와 materials(주요 재료)는 Perplexity 리서치의 실시간 정보 위주로 구성. "
-    "⑥ **등급게이트가 최우선이다.** '신규진입 차단'이면 매수든 숏이든 신규 베팅을 권하지 말고 "
-    "결론은 관망/현금이어야 한다(권장비중 0%). 비중배수가 0.5면 그만큼 줄여 말한다. "
+    "⑥ **진입판정(게이트)이 최우선이다.** '[진입판정] 신규진입 차단' 또는 '[등급게이트] 신규진입 "
+    "차단' 또는 '[포지션 정책] … 관망·현금만'이 하나라도 있으면 매수든 숏이든 신규 베팅을 권하지 "
+    "말고 결론은 관망/현금이어야 한다(권장비중 0%). 등급이 통과해도 진입판정이 막았으면(확률·신뢰도·"
+    "신선도 미달) 마찬가지로 매수 결론을 내지 마라. 비중배수가 0.5면 그만큼 줄여 말한다. "
     "ATR 타점은 그 경우 '보유분 관리·참고 수치'로만 언급한다. "
     "⑦ 확정 수치에 '장 종료 전 스냅샷'이라고 적혀 있으면 그 지수는 **종가가 아니다**. "
     "'종가/마감했다'로 쓰지 말고 '현재 지수/장중 기준'으로 쓰고, 동시호가에서 바뀔 수 있음을 "
@@ -284,7 +299,7 @@ _CLAUDE_SYS = (
 
 
 def claude_synthesize(ctx: dict, research: dict | None, draft: str | None,
-                      env: dict, sys: str | None = None) -> dict | None:
+                      env: dict, sys: str | None = None, facts_fn=None) -> dict | None:
     key = env.get("claude_api")
     if not key:
         return None
@@ -292,7 +307,7 @@ def claude_synthesize(ctx: dict, research: dict | None, draft: str | None,
         import anthropic
     except ImportError:
         return None
-    user = ("확정 수치(이 값만 인용):\n" + facts_block(ctx) +
+    user = ("확정 수치(이 값만 인용):\n" + (facts_fn or facts_block)(ctx) +
             ("\n\n[Perplexity 리서치]\n" + research["text"] if research else "") +
             ("\n\n[Gemini 초안]\n" + draft if draft else "") +
             "\n\n위 규칙대로 JSON 하나만 출력.")
@@ -400,8 +415,14 @@ def fallback_narrative(ctx: dict) -> dict:
                  + ", ".join(f"{s['label']} {s['score']:.0f}" for s in strong)
                  + " 이다.") if subs else head
 
-    if gate.get("new_entry_blocked"):
-        concl = (f"신규 진입 차단(등급 {grade}) — 관망·현금 유지. 권장비중 0%. "
+    # 진입판정(entry.allow)이 권위. 등급게이트뿐 아니라 확률·신뢰도·신선도 미달도 차단이다 —
+    # 결정론 폴백도 화면 배지·facts_block 과 동일하게 이걸 따라야 '차단 배지 옆 매수 결론' 모순을 안 낸다.
+    entry = ctx.get("entry") or {}
+    entry_blocked = ("allow" in entry) and (entry.get("allow") is False)
+    if gate.get("new_entry_blocked") or entry_blocked:
+        why = (f"등급 {grade}" if gate.get("new_entry_blocked")
+               else " / ".join(entry.get("blocked_reasons") or []) or "진입 조건 미충족")
+        concl = (f"신규 진입 차단({why}) — 관망·현금 유지. 권장비중 0%. "
                  "보유분은 손절 라인 점검만.")
     elif prim.get("qualified"):
         d = "매수" if atr.get("direction") != "short" else "하락 대응"
@@ -573,3 +594,215 @@ def build_preopen(ctx: dict, env: dict | None = None) -> Narrative:
     elif not n.character and research:
         n.character = research["text"]
     return n
+
+
+# ── BTC 선물 서술 ──────────────────────────────────────────────────────────
+def btc_facts_block(ctx: dict) -> str:
+    lines = []
+    if ctx.get("is_manual"):
+        lines.append("[발행유형] 수동·긴급 시황")
+    lines.append(f"[시장] BTCUSDT 무기한 · {ctx.get('trade_date')} · 슬롯 {ctx.get('slot')}")
+    lines.append(f"[기준시각] {ctx.get('as_of') or '—'}")
+    mk = ctx.get("mark")
+    if mk is not None:
+        lines.append(f"[마크가격] {mk}")
+    tot, grade = ctx.get("total"), ctx.get("grade")
+    lines.append(f"[총점] {tot} / 100 · 등급 {grade}" if tot is not None else "[총점] 미산출")
+    pl, ps = ctx.get("p_long"), ctx.get("p_short")
+    if pl is not None:
+        lines.append(f"[세션확률(다음 발행까지)] LONG {pl*100:.0f}% · SHORT {ps*100:.0f}%")
+    else:
+        lines.append("[세션확률] 산출 안 됨(데이터 부족·NO_TRADE)")
+    lines.append(f"[결론] {ctx.get('verdict')}")
+    if ctx.get("quadrant"):
+        lines.append(f"[사분면] {ctx.get('quadrant')} · 펀딩 {ctx.get('funding_txt')} · OI {ctx.get('oi_txt')}")
+    if ctx.get("ls_txt"):
+        lines.append(f"[LS비율] {ctx.get('ls_txt')} — 글로벌=계정수, 탑=탑트레이더 포지션. 섞지 마라.")
+    if ctx.get("mtf_txt"):
+        lines.append(f"[MTF확정] {ctx.get('mtf_txt')} — 이 줄에 없는 RSI/Stoch 시간축 숫자를 쓰지 마라.")
+    if ctx.get("nasdaq_txt"):
+        lines.append(f"[나스닥] {ctx.get('nasdaq_txt')}")
+    g = ctx.get("gate") or {}
+    lines.append(
+        f"[게이트] 신규진입 {'차단' if g.get('new_entry_blocked') else '허용'} · "
+        f"등급배수 {g.get('position_scale')} (계좌 위험·확신 배수 아님) · "
+        f"NO_TRADE={bool(g.get('no_trade'))}")
+    atr = ctx.get("atr") or {}
+    p = atr.get("primary") or {}
+    if p.get("entry") and not g.get("new_entry_blocked"):
+        lines.append(
+            f"[세션타점] 진입 {p.get('entry')} · 손절 {p.get('stop')} · 목표 {p.get('target')} · RR 1:{p.get('rr')}")
+    else:
+        lines.append("[세션타점] 숨김 — 품질 게이트 미통과. 타점·사이즈를 권하지 마라.")
+    sz = ctx.get("binance_size") or {}
+    if sz and not g.get("new_entry_blocked"):
+        if sz.get("usable"):
+            lines.append(
+                f"[바이낸스입력·사용자오버레이] {sz.get('leverage')}x · 증거금 {sz.get('margin')} USDT · "
+                f"Size {sz.get('notional')} · SL PnL {sz.get('sl_pnl')} · TP PnL {sz.get('tp_pnl')} · "
+                f"격리청산가 {sz.get('liq_isolated')} · 트리거 Last. "
+                f"배수는 모델 권고가 아니다. 본문에 레버리지를 추천하지 마라.")
+        else:
+            lines.append(f"[바이낸스입력] 사용불가 — {sz.get('reason')}")
+    elif g.get("new_entry_blocked"):
+        lines.append("[바이낸스입력] 숨김 — 레버리지·사이즈를 언급하지 마라.")
+    if ctx.get("news_txt"):
+        lines.append(f"[Tavily] {ctx.get('news_txt')}")
+    if ctx.get("sns_txt"):
+        lines.append(f"[SNS] {ctx.get('sns_txt')} · 극단은 역행 입력")
+    if ctx.get("conv_txt"):
+        lines.append(f"[수렴/괴리] {ctx.get('conv_txt')}")
+    if ctx.get("warnings"):
+        lines.append("[주의] " + " / ".join((ctx.get("warnings") or [])[:4]))
+    lines.append("[지평] 다음 정규 발행까지(~12h). 다일 스윙 서술 금지.")
+    lines.append("[수치 규율] 이 블록에 없는 숫자를 만들지 마라. 리서치 수치는 (언론 집계).")
+    return "\n".join(lines)
+
+
+_BTC_CLAUDE_SYS = (
+    "너는 바이낸스 BTCUSDT 무기한 선물 데스크 브리핑의 최종 편집자다. "
+    "예측 지평은 다음 리포트 발행까지(~12시간) LONG vs SHORT 이다. 한국 주식 오버나이트 롱과 섞지 마라. "
+    "규칙: ① 모든 수치는 '확정 수치'만. 새 가격·확률·PnL 금지. 리서치 수치는 '(언론 집계)'. "
+    "② 게이트가 최우선. NO_TRADE/신규진입 차단이면 결론은 관망이고 타점·바이낸스 입력·레버리지를 권하지 마라. "
+    "방향확률 58% 미만·가중 일치도 60% 미만·괴리·확신도 Low 는 관망이다. "
+    "배수는 사용자 오버레이이지 모델 추천이 아니다. 등급배수는 계좌 위험이 아니다. "
+    "RSI·Stoch 는 [MTF확정]에 있는 시간축만 써라. LS 글로벌과 탑을 한 숫자로 섞지 마라. "
+    "③ 시나리오는 LONG / SHORT / FLAT. ④ 엔진 이름(Claude 등)을 본문에 쓰지 마라. "
+    "수동·긴급 시황이면 정규 세션 브리핑 톤 금지. '오늘은 우호 구간'류 금지. "
+    "출력은 JSON 하나만:\n"
+    '{"character": str(2~3문장 헤드라인),'
+    ' "scenarios": {"up": str(LONG), "down": str(SHORT), "trigger": str(다음 세션 트리거)},'
+    ' "conclusion": str(LONG|SHORT|NO_TRADE 한 줄),'
+    ' "risks": [str,...],'
+    ' "materials": [{"tag":"호재|악재","text":str},...],'
+    ' "hypotheses": [{"claim":str,"basis":str,"counter":str},...],'
+    ' "reopen_review": [str,...](다음 발행까지 체크리스트)}'
+)
+
+
+def _btc_perplexity(ctx: dict, env: dict) -> dict | None:
+    key = env.get("perplexity_api")
+    if not key:
+        return None
+    manual = ctx.get("is_manual")
+    sys = ("너는 크립토 선물 데스크 애널리스트다. 웹 실시간으로 BTCUSDT 무기한 시황을 조사한다. "
+           "한국어, 사실 위주. 확인 안 된 수치는 지어내지 마라.")
+    if manual:
+        user = (f"{ctx.get('as_of')} 기준 BTCUSDT 긴급 시황:\n"
+                "1) 방금 시장을 움직인 이벤트\n2) 펀딩/청산 내러티브\n"
+                "3) 다음 12시간 리스크(FOMC/CPI/나스닥)\n4) 실시간 주의신호\n간결히.")
+    else:
+        user = (f"{ctx.get('as_of')} 기준 BTCUSDT 세션 브리핑:\n"
+                "1) 지금 시장을 움직인 헤드라인\n2) 펀딩·청산 내러티브\n"
+                "3) 다음 세션 이벤트\n4) 실시간 주의신호\n간결히.")
+    body = {"model": resolve_models(env)["perplexity"], "temperature": 0.2, "max_tokens": 900,
+            "messages": [{"role": "system", "content": sys}, {"role": "user", "content": user}]}
+    try:
+        r = httpx.post(PPLX_URL, headers={"Authorization": f"Bearer {key}"},
+                       json=body, timeout=TIMEOUT)
+        r.raise_for_status()
+        data = r.json()
+        text = data["choices"][0]["message"]["content"]
+        sources = [{"title": sr.get("title", ""), "url": sr.get("url", "")}
+                   for sr in (data.get("search_results") or [])]
+        return {"text": text, "sources": sources}
+    except Exception as e:  # noqa
+        _LAST_ERROR["perplexity"] = type(e).__name__
+        return None
+
+
+def _btc_gemini_sys(ctx: dict) -> str:
+    return ("너는 BTC 선물 리포트의 계산·검증 담당이다. 확정 수치만 근거로 한다. "
+            "새 확률·가격·PnL 금지. p_long↔총점, 펀딩×OI 사분면 vs 서술, 게이트 vs 결론, "
+            "세션 타점 RR·PnL 정합을 점검한다.")
+
+
+def fallback_btc(ctx: dict) -> dict:
+    verdict = ctx.get("verdict") or "NO_TRADE"
+    tot, grade = ctx.get("total"), ctx.get("grade")
+    pl = ctx.get("p_long")
+    mark = ctx.get("mark")
+    head = f"BTCUSDT {ctx.get('as_of')} · 마크 {mark}"
+    if tot is not None:
+        head += f" · 총점 {tot}({grade})"
+    if pl is not None:
+        head += f" · LONG {pl:.0%}"
+    if ctx.get("is_manual"):
+        head = "긴급 시황. " + head
+    blocked = bool((ctx.get("gate") or {}).get("new_entry_blocked") or verdict == "NO_TRADE")
+    concl = ("데이터/게이트 차단 — 관망. 타점 없음." if blocked
+             else f"{verdict} 검토. 세션 타점은 확정 수치의 진입/손절/목표.")
+    nxt = "22:00" if str(ctx.get("slot")) == "0930" else "09:30"
+    return {
+        "character": head + ".",
+        "scenarios": {"up": "마크가 세션 목표 방향.", "down": "손절 무효화.",
+                      "trigger": f"다음 정규 발행 {nxt}"},
+        "conclusion": concl,
+        "risks": (ctx.get("warnings") or ["코어 데이터 점검"])[:3],
+        "materials": [],
+        "hypotheses": _fallback_hypotheses(ctx),
+        "reopen_review": [f"다음 발행({nxt}) 전 펀딩·OI 사분면 재확인",
+                          "청산 캐스케이드 시 페이드 금지",
+                          "게이트 해제 여부 확인"],
+    }
+
+
+def build_btc(ctx: dict, env: dict | None = None) -> Narrative:
+    """Perplexity → Gemini → Claude. is_manual 이면 긴급 톤. 수치는 팩트블록만."""
+    env = env or load_env()
+    trace, sources = [], []
+    research = _btc_perplexity(ctx, env)
+    if research:
+        trace.append("Perplexity 리서치 ✓")
+        sources.extend(research.get("sources", []))
+    else:
+        trace.append("Perplexity 미실행")
+    # Gemini: 임시로 ctx 를 주식 facts 가 아닌 btc facts 로 보게 커스텀 시스템
+    orig_sys_note = _btc_gemini_sys(ctx)
+    key = env.get("google_gemini_api")
+    draft = None
+    if key:
+        prompt = ("확정 수치:\n" + btc_facts_block(ctx)
+                  + (("\n\n[리서치]\n" + research["text"]) if research else "")
+                  + "\n\nA) p_long↔총점, 사분면 vs 서술, 게이트 vs 결론, RR·PnL 정합.\n"
+                  "B) LONG/SHORT/FLAT 시나리오 초안. 새 수치 금지.")
+        payload = {"contents": [{"role": "user", "parts": [{"text": prompt}]}],
+                   "systemInstruction": {"parts": [{"text": orig_sys_note}]},
+                   "generationConfig": {"temperature": 0.3, "maxOutputTokens": 1400}}
+        for model in resolve_models(env)["gemini"]:
+            try:
+                r = httpx.post(GEMINI_URL.format(model=model), params={"key": key},
+                               json=payload, timeout=TIMEOUT)
+                if r.status_code == 404:
+                    continue
+                r.raise_for_status()
+                parts = r.json()["candidates"][0]["content"]["parts"]
+                draft = "".join(p.get("text", "") for p in parts)
+                break
+            except Exception:  # noqa
+                continue
+    trace.append("Gemini 초안 ✓" if draft else "Gemini 미실행")
+    final = claude_synthesize(ctx, research, draft, env, sys=_BTC_CLAUDE_SYS,
+                              facts_fn=btc_facts_block)
+    trace.append("Claude 합성 ✓" if final
+                 else f"Claude 미실행({_LAST_ERROR.get('claude', 'no key')})")
+    if not final:
+        final = fallback_btc(ctx)
+        trace.append("결정론 폴백 적용")
+    n = Narrative(engine_trace=trace, sources=sources[:8])
+    if final:
+        n.character = final.get("character", "")
+        sc = final.get("scenarios") or {}
+        n.scenarios = {"up": sc.get("up", ""), "down": sc.get("down", ""),
+                       "trigger": sc.get("trigger", "")}
+        n.conclusion = final.get("conclusion", "")
+        n.risks = final.get("risks") or []
+        n.materials = final.get("materials") or []
+        n.hypotheses = final.get("hypotheses") or []
+        n.reopen_review = final.get("reopen_review") or []
+    if not n.character and draft:
+        n.character = draft
+    elif not n.character and research:
+        n.character = research["text"]
+    return n
+

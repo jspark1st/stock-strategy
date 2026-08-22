@@ -61,3 +61,32 @@ def test_won_strength_lifts_tilt_when_indices_present():
     weak = overnight.overnight_tilt(WORLD, usdkrw_chg=+1.0, market="KOSPI")
     assert strong["tilt_fx"] > weak["tilt_fx"]
     assert strong["tilt"] > weak["tilt"]
+
+
+# ── 간밤 세션 신선도 게이트(오래된 미국장 세션 제외) ─────────────────────────────
+def _dated(world, as_of):
+    return {k: {**v, "as_of": as_of} for k, v in world.items()}
+
+
+def test_fresh_overnight_session_is_used():
+    """as_of 가 개장전 하루 전(정상)이면 그대로 보정에 쓴다."""
+    w = _dated(WORLD, "2026-08-21 16:00")  # KST 8/22 개장전 → 미국 8/21 마감(정상)
+    t = overnight.overnight_tilt(w, usdkrw_chg=-0.37, market="KOSPI", today="2026-08-22")
+    assert t["tilt"] < 0
+    assert t["drivers"]
+
+
+def test_stale_overnight_session_is_excluded():
+    """as_of 가 5일 넘게 지난 세션이면 간밤 값이 아니므로 제외 → 보정 없음(전일 마감 유지)."""
+    w = _dated(WORLD, "2026-08-10 16:00")  # 개장전 8/22 대비 12일 전 = 오래됨
+    t = overnight.overnight_tilt(w, usdkrw_chg=-0.37, market="KOSPI", today="2026-08-22")
+    assert t["tilt"] == 0.0
+    assert t["blend_pct"] is None
+    assert "신선도" in t["note"]
+
+
+def test_no_today_keeps_backward_compatible():
+    """today 미지정이면 신선도 게이트 없이 기존과 동일(하위호환)."""
+    w = _dated(WORLD, "2000-01-01 00:00")
+    t = overnight.overnight_tilt(w, usdkrw_chg=-0.37, market="KOSPI")  # today 없음
+    assert t["tilt"] < 0

@@ -27,10 +27,13 @@ LWC_PATH = ROOT / "assets" / "vendor" / "lightweight-charts.standalone.productio
 FAVORABLE = {"강세", "우호", "매수우위", "긍정", "호전", "적극"}
 NEUTRAL = {"중립", "관망", "혼조", "보통"}
 
-# 사이드바: 그룹 헤더가 유형을 표시하므로 아이템은 시장명만("코스피"/"코스닥").
+# 사이드바: 시장이 그룹, 단계가 아이템. 같은 시장의 마감→개장 전을 한 덩어리로 본다.
+NAV_GROUP_ORDER = ("코스피", "코스닥", "비트코인 선물")
+NAV_ITEM_ORDER = ("장 마감", "개장 전")
 DEFAULT_PLACEHOLDERS = [
-    {"id": "kospi-preopen", "group": "개장 전", "label": "코스피", "note": "08:00 갱신"},
-    {"id": "kosdaq-preopen", "group": "개장 전", "label": "코스닥", "note": "08:00 갱신"},
+    {"id": "kospi-preopen", "group": "코스피", "label": "개장 전", "note": "08:00 갱신"},
+    {"id": "kosdaq-preopen", "group": "코스닥", "label": "개장 전", "note": "08:00 갱신"},
+    {"id": "btc-perp", "group": "비트코인 선물", "label": "BTCUSDT", "note": "09:30 · 22:00"},
 ]
 
 
@@ -138,22 +141,36 @@ def _donut(value, color: str, label: str) -> str:
 def build_hero(r: dict) -> str:
     total = r.get("total")
     grade = esc(r.get("grade", ""))
-    p_up = r.get("p_up")
-    p_down = r.get("p_down") if r.get("p_down") is not None else (
-        1 - p_up if p_up is not None else None)
+    p_up = r.get("p_up") if r.get("p_long") is None else r.get("p_long")
+    p_down = r.get("p_down") if r.get("p_short") is None else r.get("p_short")
+    if p_down is None:
+        p_down = (1 - p_up if p_up is not None else None)
     total_txt = fmt(total) if total is not None else "—"
     preopen = r.get("report_type") == "preopen"
+    btc = r.get("report_type") == "btc_perp"
     total_lbl = "전일 마감 총점 / 100" if preopen else "총점 / 100"
-    up_lbl, down_lbl = (("오늘 상승 확률", "오늘 하락 확률") if preopen
-                        else ("익일 상승 확률", "익일 하락 확률"))
+    if btc:
+        up_lbl, down_lbl = "세션 LONG 확률", "세션 SHORT 확률"
+    else:
+        up_lbl, down_lbl = (("오늘 상승 확률", "오늘 하락 확률") if preopen
+                            else ("익일 상승 확률", "익일 하락 확률"))
     raw = r.get("p_up_raw")
     calib = ""
     if raw is not None and p_up is not None and abs(raw - p_up) > 1e-9:
-        calib = (f'<div class="hero-note">자가학습 보정 전 {raw*100:.0f}% '
-                 f'→ 보정 후 {p_up*100:.0f}%</div>')
+        learned = (r.get("calibration") or {}).get("n") or 0
+        if btc and learned < 40:
+            calib = (f'<div class="hero-note">불일치 수축 전 {raw*100:.0f}% '
+                     f'→ 수축 후 {p_up*100:.0f}% · 자가학습 보정 아님</div>')
+        else:
+            calib = (f'<div class="hero-note">자가학습 보정 전 {raw*100:.0f}% '
+                     f'→ 보정 후 {p_up*100:.0f}%</div>')
     elif p_up is not None:
         # 점추정임을 명시 — 신뢰구간 없는 단일 확률을 4자리로 과신하지 않도록.
-        calib = '<div class="hero-note">방향 확률은 점추정(신뢰구간 없음) · 표본 누적 시 캘리브레이션</div>'
+        n_acc = (r.get("accuracy") or {}).get("n") or 0
+        if btc and n_acc < 40:
+            calib = '<div class="hero-note">방향 확률은 점추정 · 성적 n&lt;40 — 캘리브·성적 참고 금지</div>'
+        else:
+            calib = '<div class="hero-note">방향 확률은 점추정(신뢰구간 없음) · 표본 누적 시 캘리브레이션</div>'
     return f"""
     <div class="stat">
       <div class="big" style="color:var(--accent)">{total_txt}</div>
@@ -337,9 +354,12 @@ def build_order_card(r: dict) -> str:
                  '신규 진입·자동매도 설정 없음(관망/현금). 위 지수↔ETF 환산은 참고용이며, '
                  '보유분이 있을 때만 관리에 쓰세요.</div>'
                  if no_position else build_hts_sell(oc))
+    pre_note = (' · 전일 마감 앵커 환산 — 개장 후 시가·괴리 재확인'
+                if r.get("report_type") == "preopen"
+                or (r.get("id") or "").endswith("-preopen") else "")
     return (f'<div class="card"><h2>상품 주문 카드 '
             f'<span class="pill pill-ghost">{esc(oc.get("instrument",""))} {esc(oc.get("shcode",""))}</span></h2>'
-            f'<div class="note muted">지수 레벨을 베타로 ETF 가격에 변환 · {esc(" · ".join(meta))} · ETF 기준가 {fmt(oc.get("etf_price"),0)}</div>'
+            f'<div class="note muted">지수 레벨을 베타로 ETF 가격에 변환 · {esc(" · ".join(meta))} · ETF 기준가 {fmt(oc.get("etf_price"),0)}{pre_note}</div>'
             f'<table class="cd-table"><thead><tr><th>레벨</th><th style="text-align:right">지수</th>'
             f'<th></th><th style="text-align:right">ETF가</th></tr></thead><tbody>'
             f'{_row("entry","진입")}{_row("stop","손절")}{_row("target","목표")}</tbody></table>'
@@ -395,6 +415,13 @@ def build_performance(r: dict) -> str:
     if not p or not p.get("windows"):
         return ""
     min_sample = 250
+    # 표본 부족(n<40)이면 적중률·AUC·Brier 점추정을 숨긴다 — n 이 한 자리일 때 '적중률 100%',
+    # 'AUC 1.0' 이 실력으로 오인되는 것을 막는다(build_accuracy 와 동일 규율).
+    if (p.get("n_total") or 0) < 40:
+        return (f'<div class="card"><h2>모델 검증 성과 '
+                f'<span class="pill pill-ghost">측정 시작</span></h2>'
+                f'<p class="note muted">검증 표본 {p.get("n_total", 0)}회 — 적중률·AUC·Brier 를 '
+                f'표시하지 않는다. 40회(약 20일)가 쌓이기 전엔 성적으로 읽지 말 것.</p></div>')
     wins = p["windows"]
     wr = ""
     for w in ("20", "60", "120", "250"):
@@ -568,15 +595,24 @@ def build_atr_plan(r: dict) -> str:
         extra.append(f"눌림 참고 {fmt(atr.get('pullback_entry'),2)}")
     if atr.get("chandelier") is not None:
         extra.append(f"트레일링(Chandelier) {fmt(atr.get('chandelier'),2)}")
-    # variants 미니 테이블
+    # variants 미니 테이블 — 진입 차단(등급·진입게이트)이면 비중은 primary 와 동일하게 0% 강제.
+    # (atr.compute_plan 은 entry.allow 를 모른 채 계산되므로 여기서 게이트를 다시 적용한다.)
     rows = ""
     for v in atr.get("variants", []):
+        vk = 0 if (blocked or entry_blocked) else (v.get('kelly_pct') or 0)
         rows += (f"<tr><td>{esc(v.get('label'))}</td><td>{fmt(v.get('stop'),2)}</td>"
                  f"<td>{fmt(v.get('target'),2)}</td><td>1:{fmt(v.get('rr'),1)}</td>"
                  f"<td style='color:{'var(--up)' if (v.get('edge') or 0)>0 else 'var(--down)'}'>"
                  f"{signed(v.get('edge'),3)}</td>"
-                 f"<td style='color:{'var(--muted)' if not (v.get('kelly_pct') or 0) else 'var(--text)'}'>"
-                 f"{v.get('kelly_pct',0):.0f}%</td></tr>")
+                 f"<td style='color:{'var(--muted)' if not vk else 'var(--text)'}'>"
+                 f"{vk:.0f}%</td></tr>")
+    # atr["comment"] 은 atr.compute_plan 에서 **등급 게이트만** 보고 만들어져, 등급통과·
+    # entry.allow=False(코스닥) 케이스에 "매수 자격 통과 · 권장비중 X%" 를 담고 있다. 진입판정이
+    # 막았으면 이 문구가 배지(0%·차단)와 모순되므로 여기서 게이트 정합 문구로 덮는다.
+    obs_comment = atr.get("comment", "")
+    if entry_blocked and not blocked:
+        obs_comment = (f"진입 게이트 차단 — {entry_reasons or '조건 미충족'}. 권장비중 0%(관망/현금). "
+                       "아래 타점은 보유분 관리·참고용 수치일 뿐 신규 베팅 근거가 아니다.")
     warn = ('<div class="atr-warn">⚠ 변동성 과열 — 정규화 ATR 적용(스톱 과대 방지), 구조 손절 우선</div>'
             if atr.get("price_limit_warn") else "")
     regime = atr.get("regime")
@@ -593,7 +629,7 @@ def build_atr_plan(r: dict) -> str:
     <div class="tiles">{tiles}</div>
     <div class="atr-extra">{' · '.join(extra)}</div>
     {warn}
-    <div class="obs muted">{esc(atr.get('comment',''))}</div>
+    <div class="obs muted">{esc(obs_comment)}</div>
     <div class="sub-h" style="margin-top:10px">참고 · 다일 보유 시 R배수 타점
       <span class="pill pill-ghost">우리 전략은 오버나이트 1회</span></div>
     <div class="table-wrap">
@@ -731,7 +767,7 @@ def build_flows(r: dict) -> str:
     return f'<div class="card"><h2>투자주체 수급 {prov_badge}</h2>{legend}{"".join(rows)}</div>'
 
 
-_TF_LABEL = [("D", "일봉"), ("W", "주봉"), ("M", "월봉"), ("H", "1시간봉")]
+_TF_LABEL = [("D", "일봉"), ("W", "주봉"), ("M", "월봉"), ("4H", "4시간"), ("H", "1시간봉")]
 
 
 def build_index_chart(r: dict) -> str:
@@ -853,18 +889,37 @@ def build_accuracy(r: dict) -> str:
     acc = r.get("accuracy")
     if not acc or not acc.get("n"):
         return ""
+    n = acc.get("n") or 0
+    # 표본 부족(n<40)이면 적중률·Brier 숫자를 숨기고 '측정 시작'만 표시한다.
+    # n=3 적중률 100% 가 '실력'으로 오인되는 것을 막는 규율 — **주식·BTC 동일 적용**
+    # (과거 BTC 에만 걸려 있어 주식 라이브 성적이 그대로 노출되던 정직성 격차를 해소).
+    if n < 40:
+        return f"""
+  <div class="card">
+    <h2>자가학습 정확도 <span class="pill pill-ghost">측정 시작</span></h2>
+    <p class="muted">표본 {n}회 — 적중률·캘리브 숫자를 표시하지 않는다.
+      40회(약 20일)가 쌓이기 전엔 성적으로 읽지 말 것(가중치·확률 보정에도 쓰지 않는다).</p>
+  </div>"""
     hr = acc.get("hit_rate")
     hr_col = "var(--up)" if (hr or 0) >= 0.5 else "var(--down)"
     bias = acc.get("calibration_bias")
-    tiles = "".join([
+    tile_list = [
         _tile("표본", f"{acc.get('n')}일"),
-        _tile("방향 적중률", pct(hr) if hr is not None else "—", hr_col),
+        _tile("방향 적중률", pct(hr) if hr is not None else "—", hr_col,
+              sub="익일 종가 기준(라벨)"),
         _tile("Brier", fmt(acc.get('mean_brier'), 3), sub="낮을수록 정확"),
         _tile("예측 평균 p_up", pct(acc.get('pred_mean_p_up'))),
         _tile("실제 상승빈도", pct(acc.get('realized_up_rate'))),
         _tile("캘리브레이션 편향", signed(bias, 3) if bias is not None else "—",
               sub="+과대낙관/−과대비관"),
-    ])
+    ]
+    # 실제 거래 지평(종가매수→익일 시가매도) 정답률 — 라벨(익일 종가)과 다른 값. 나란히 표시.
+    ohr = acc.get("overnight_hit_rate")
+    if ohr is not None and (acc.get("overnight_n") or 0) > 0:
+        tile_list.append(_tile("실거래 지평 적중률", pct(ohr),
+                               "var(--up)" if ohr >= 0.5 else "var(--down)",
+                               sub="종가→익일 시가(실청산)"))
+    tiles = "".join(tile_list)
     return f"""
   <div class="card">
     <h2>자가학습 정확도 <span class="pill pill-ghost">최근 성적</span></h2>
@@ -894,6 +949,12 @@ def build_engine_trace(r: dict) -> str:
 
 
 def _status_badge(r: dict) -> str:
+    if r.get("report_type") == "btc_perp":
+        if r.get("kind") == "manual" or (r.get("slot") and r.get("slot") not in ("0930", "2200")):
+            return '<span class="badge badge-warn">수동</span>'
+        if r.get("data_status") == "core_missing":
+            return '<span class="badge badge-warn">데이터 부족 · 관망</span>'
+        return '<span class="badge badge-info">세션 스냅샷</span>'
     if r.get("report_type") == "preopen":
         return '<span class="badge badge-info" title="전일 마감 수치를 앵커로 재검토">개장 전 재검토</span>'
     if r.get("intraday_snapshot"):
@@ -1030,7 +1091,332 @@ def build_overnight(r: dict) -> str:
             f'<div class="note muted">총점·구조는 {anchor_lbl} 앵커, 방향확률만 간밤 반영(유계 보정).</div></div>')
 
 
+def render_btc_view(r: dict, date: str) -> str:
+    """BTCUSDT 전용 뷰. ETF/HTS/수급/3단계 루프 없음."""
+    nar = r.get("narrative", {}) or {}
+    headline = nar.get("character") or r.get("headline", "")
+    headline_html = (f'<div class="card"><p class="headline">{esc(headline)}</p></div>'
+                     if headline else "")
+    slot = esc(r.get("slot") or "")
+    as_of = esc(r.get("as_of") or "")
+    mark = r.get("mark") or (r.get("market") or {}).get("mark")
+    chg = (r.get("market") or {}).get("chg_pct")
+    chg_html = _sgn_pct(chg) if chg is not None else "—"
+    nxt = esc(r.get("next_session") or "")
+    picker = _btc_slot_picker(r, date)
+    conv_html = _btc_conv_card(r)
+    verdict = r.get("verdict") or "NO_TRADE"
+    blocked = bool((r.get("gate") or {}).get("new_entry_blocked") or verdict == "NO_TRADE")
+    vcol = {"LONG": "var(--up)", "SHORT": "var(--down)"}.get(verdict, "var(--neutral)")
+    concl = (f'<div class="card concl" style="border-left-color:{vcol}">'
+             f'<div class="concl-badge" style="background:{vcol}">{esc(verdict)}</div>'
+             f'<div class="concl-body"><div class="concl-text">{esc(nar.get("conclusion") or "")}</div>'
+             f'<div class="concl-gate">다음 세션 <b>{nxt}</b> · 사분면 {esc(str(r.get("quadrant") or "—"))}'
+             f'{" · 게이트 차단" if blocked else ""}'
+             f' · 등급배수 {esc(str((r.get("gate") or {}).get("position_scale", "—")))}'
+             f' <span class="muted">(계좌 위험·확신 배수 아님)</span></div></div></div>')
+    targets = ""
+    atr = r.get("atr") or {}
+    p = atr.get("primary") or {}
+    if blocked:
+        targets = '<div class="card"><h2>세션 타점</h2><p class="muted">게이트 차단 — 비중 0. 타점 숨김.</p></div>'
+    elif p.get("entry"):
+        rr = p.get("rr") or 1.5
+        targets = (
+            f'<div class="card"><h2>세션 타점 <span class="pill pill-ghost">다음 발행까지 RR 1:{rr:g}</span></h2>'
+            f'<table class="cd-table"><thead><tr><th></th><th style="text-align:right">가격</th></tr></thead><tbody>'
+            f'<tr><td>진입</td><td style="text-align:right;font-weight:800">{fmt(p.get("entry"),1)}</td></tr>'
+            f'<tr><td>손절</td><td style="text-align:right">{fmt(p.get("stop"),1)}</td></tr>'
+            f'<tr><td>목표</td><td style="text-align:right">{fmt(p.get("target"),1)}</td></tr>'
+            f'</tbody></table></div>')
+    bsz = _btc_size_card(r, blocked)
+    pos = _btc_pos_card(r)
+    sns = _btc_sns_card(r)
+    mtf = _btc_mtf_table(r)
+    lin = r.get("lineage") or {}
+    lin_html = ""
+    if lin:
+        rows = "".join(f'<li><span class="basis-k">{esc(k)}</span> {esc(str(v))}</li>'
+                       for k, v in lin.items())
+        lin_html = f'<div class="card"><h2>데이터 계보</h2><ul class="risk-ul">{rows}</ul></div>'
+    clip = ('<div class="note muted">확률 클립 발동 (20–80%). 3단계에서 완화 여부 측정.</div>'
+            if r.get("clip_bound") else "")
+    return f"""
+    <div class="view-head">
+      <div class="view-title">BTCUSDT <span class="view-sub">· 비트코인 선물 · {esc(r.get("trade_date", date))} {slot}</span> {_status_badge(r)}</div>
+      {picker}
+      <div class="basis"><span class="basis-k">기준</span> {as_of} · 마크 {fmt(mark,1)} ({chg_html})
+        · {esc(r.get("nasdaq_txt") or "")} · 실시간 아님</div>
+    </div>
+    {headline_html}
+    <div class="card hero">{build_hero(r)}</div>
+    {clip}
+    {conv_html}
+    {concl}
+    {targets}
+    {bsz}
+    {build_bars(r)}
+    {pos}
+    {sns}
+    {build_index_chart(r)}
+    {mtf}
+    {lin_html}
+    {build_risks(r)}
+    {build_hypotheses(r)}
+    {build_materials(r)}
+    {build_accuracy(r)}
+    {build_reopen(r)}"""
+
+
+def _btc_conv_card(r: dict) -> str:
+    c = r.get("convergence") or {}
+    items = c.get("items") or []
+    if not items and not c.get("sentence"):
+        return ""
+    chips = "".join(
+        f'<span class="conf-chip">{esc(i.get("label",""))} '
+        f'<b>{esc(i.get("side",""))}</b></span>'
+        for i in items)
+    pillars = c.get("pillars") or []
+    rows = ""
+    for p in pillars:
+        rows += (f'<tr><td>{esc(p.get("label",""))}</td>'
+                 f'<td style="font-weight:800">{esc(p.get("side",""))}</td></tr>')
+    conf = esc(c.get("conviction") or "—")
+    kind = esc(c.get("kind") or "")
+    pri = c.get("priority")
+    pri_html = f'<div class="note muted">우선순위: {esc(pri)}</div>' if pri else ""
+    ag = c.get("agreement")
+    sa = r.get("signal_agreement")
+    # 관점 다수결 · 코어 정렬(필요 n) · 가중 일치도는 분모가 다르다. 1/2 를 분수처럼 쓰지 않는다.
+    metrics = []
+    longs, shorts = c.get("longs", 0), c.get("shorts", 0)
+    directional = c.get("directional") or ((longs or 0) + (shorts or 0))
+    maj = c.get("majority")
+    if directional and maj:
+        metrics.append(f'관점 다수결 <b>{esc(maj)} {c.get("majority_n") or max(longs, shorts)}/{directional}</b>'
+                       f' ({longs}L / {shorts}S · 방향 낸 팩터)')
+    elif directional and longs == shorts and longs:
+        metrics.append(f'관점 다수결 동점 <b>{(ag or 0.5)*100:.0f}%</b> ({longs}L / {shorts}S · 방향 낸 팩터)')
+    elif ag is not None:
+        metrics.append(f'관점 다수결 {ag*100:.0f}% ({longs}L / {shorts}S)')
+    else:
+        metrics.append("방향 팩터 없음 — 다수결 산출 불가")
+    call = {"LONG": "Long", "SHORT": "Short"}.get(r.get("verdict") or "")
+    if call and directional:
+        match = longs if call == "Long" else shorts
+        metrics.append(f'추천 {call}과 같은 쪽 <b>{match}/{directional}</b>')
+    ca, need = r.get("core_aligned"), r.get("core_needed") or 2
+    side = r.get("core_side") or call
+    if ca is not None:
+        metrics.append(f'코어 정렬 <b>{ca}</b> (필요 {need}'
+                       f'{f" · {esc(side)} 기준" if side else ""} · 기술·파생·체결)')
+    if sa is not None:
+        metrics.append(f'가중 일치도 <b>{sa*100:.0f}%</b> (확률 수축용)')
+    met_html = '<div class="note muted">' + " · ".join(metrics) + "</div>"
+    return f"""
+    <div class="card">
+      <h2>수렴 / 괴리 <span class="pill pill-ghost">{kind} · 확신도 {conf}</span></h2>
+      <p class="headline">{esc(c.get("sentence") or "")}</p>
+      {pri_html}
+      {met_html}
+      <div class="conf-row" style="margin-top:10px">{chips}</div>
+      <table class="cd-table"><thead><tr><th>관점</th><th>신호</th></tr></thead><tbody>{rows}</tbody></table>
+      <div class="note muted">세 숫자는 분모가 다르다. 관점 다수결=방향 낸 팩터 · 코어 정렬=기술·파생·체결이 추천 방향과 같은 개수(필요 {need}) · 가중 일치도=확률 수축. 괴리면 차트·규제 &gt; 심리.</div>
+    </div>"""
+
+
+def _btc_sns_card(r: dict) -> str:
+    sns = r.get("sns") or {}
+    topics = sns.get("topics") or []
+    if not topics and r.get("fng") is None:
+        return ""
+    rows = ""
+    tag_col = {"호재": "var(--up)", "악재": "var(--down)"}
+    for t in topics[:8]:
+        tag = t.get("tag", "중립")
+        col = tag_col.get(tag, "var(--muted)")
+        title, url = esc(t.get("title", "")), t.get("url", "")
+        body = (f'<a href="{esc(url)}" target="_blank" rel="noreferrer">{title}</a>'
+                if url else title)
+        # 재료 카드와 같은 규율: 극성에 안 들어간 항목은 이유를 붙여 표시만 한다.
+        why = ("" if t.get("counted", True) else
+               f' <span class="badge badge-warn">제외 · {esc(t.get("reason") or "")}</span>')
+        rows += (f'<li><span class="mtag" style="background:{col}">{esc(tag)}</span>'
+                 f'<span class="mtime">{esc(t.get("hhmm",""))}</span> {body}{why}</li>')
+    ul = f'<ul class="mat-ul">{rows}</ul>' if rows else '<p class="muted">커뮤니티 토픽 없음</p>'
+    bias = sns.get("bias")
+    return f"""
+    <div class="card">
+      <h2>SNS 토픽 <span class="pill pill-ghost">참고 · 극단 역행 · 뉴스 점수와 분리</span></h2>
+      <div class="tiles">
+        {_tile("Fear&Greed", str(r.get("fng") if r.get("fng") is not None else "—"))}
+        {_tile("커뮤니티 극성", f"{bias:+.2f}" if bias is not None else "결측")}
+        {_tile("극성 집계", f"{sns.get('pos',0)}호/{sns.get('neg',0)}악 · {sns.get('counted',0)}/{sns.get('n',0)}건")}
+      </div>
+      {ul}
+      <div class="note muted">가격 재서술·BTC 무관 항목은 극성에서 제외한다(차트·펀딩과 이중 계상 방지).</div>
+    </div>"""
+
+
+def _btc_hhmm(slot: str) -> str:
+    sl = slot or ""
+    return f"{sl[:2]}:{sl[2:]}" if len(sl) == 4 else sl
+
+
+def _btc_is_manual(x: dict) -> bool:
+    sl = x.get("slot") or ""
+    return x.get("kind") == "manual" or sl not in ("0930", "2200")
+
+
+def _btc_slot_href(x: dict, viewing: dict) -> str:
+    sl = x.get("slot") or ""
+    href = x.get("href") or "/#btc-perp"
+    if (sl in ("0930", "2200") and x.get("date") == viewing.get("trade_date")
+            and viewing.get("kind") != "manual"):
+        href = "/#btc-perp"
+    if "#" not in href:
+        href = href + "#btc-perp"
+    return href
+
+
+def _btc_day_landing(day_items: list[dict], viewing: dict) -> str:
+    """날짜를 바꾸면 그날 정규 회차(22:00→09:30)로. 없으면 마지막 슬롯."""
+    by = {x.get("slot"): x for x in day_items}
+    for sl in ("2200", "0930"):
+        if sl in by and not _btc_is_manual(by[sl]):
+            return _btc_slot_href(by[sl], viewing)
+    latest = max(day_items, key=lambda z: z.get("slot") or "")
+    return _btc_slot_href(latest, viewing)
+
+
+def _btc_slot_picker(r: dict, date: str, items: list | None = None) -> str:
+    """날짜 선택 + 정규 2칩 + 수동 목록. 회차를 칩으로 전부 나열하지 않는다."""
+    if items is None:
+        try:
+            items = json.loads((ROOT / "public" / "archive" / "manifest.json")
+                               .read_text(encoding="utf-8"))
+        except Exception:  # noqa
+            items = []
+    d = r.get("trade_date") or date
+    if not items:
+        items = [{"date": d, "slot": r.get("slot"), "kind": r.get("kind"),
+                  "href": "/#btc-perp"}]
+    by_date: dict[str, list] = {}
+    for x in items:
+        by_date.setdefault(x.get("date") or "", []).append(x)
+    dates = sorted((k for k in by_date if k), reverse=True)
+    cur_slot = r.get("slot") or ""
+    day = by_date.get(d) or [{"date": d, "slot": cur_slot, "kind": r.get("kind"),
+                              "href": "/#btc-perp"}]
+
+    date_opts = []
+    for dd in dates:
+        land = _btc_day_landing(by_date[dd], r)
+        date_opts.append(f'<option value="{esc(land)}"{" selected" if dd == d else ""}>'
+                         f'{esc(dd)}</option>')
+    date_html = (f'<label class="slot-lab">날짜 <select class="slot-sel" '
+                 f'onchange="if(this.value) location=this.value">{"".join(date_opts)}</select></label>')
+
+    regs, manuals = [], []
+    for x in sorted(day, key=lambda z: z.get("slot") or ""):
+        (manuals if _btc_is_manual(x) else regs).append(x)
+
+    chips = []
+    for x in regs:
+        sl = x.get("slot") or ""
+        on = sl == cur_slot and not _btc_is_manual(r)
+        cls = "slot-chip" + (" active" if on else "")
+        chips.append(f'<a class="{cls}" href="{esc(_btc_slot_href(x, r))}">{esc(_btc_hhmm(sl))}</a>')
+    if not chips:
+        chips.append('<span class="slot-empty">정규 회차 없음</span>')
+
+    man_html = ""
+    if manuals:
+        opts = ['<option value="">수동 '
+                f'{len(manuals)}건</option>']
+        for x in reversed(manuals):  # 최신 위
+            sl = x.get("slot") or ""
+            sel = " selected" if sl == cur_slot and _btc_is_manual(r) else ""
+            opts.append(f'<option value="{esc(_btc_slot_href(x, r))}"{sel}>'
+                        f'{esc(_btc_hhmm(sl))}</option>')
+        man_html = (f'<label class="slot-lab">수동 <select class="slot-sel" '
+                    f'onchange="if(this.value) location=this.value">{"".join(opts)}</select></label>')
+
+    return (f'<div class="slot-pick">'
+            f'{date_html}'
+            f'<div class="slot-regs">{"".join(chips)}</div>'
+            f'{man_html}'
+            f'<span class="slot-hint">정규 하루 2회 · 수동은 목록</span>'
+            f'</div>')
+
+
+def _btc_size_card(r: dict, blocked: bool) -> str:
+    if blocked:
+        return ""
+    sz = r.get("binance_size") or {}
+    if not sz:
+        return ""
+    if not sz.get("usable"):
+        return (f'<div class="card"><h2>바이낸스 입력값</h2>'
+                f'<div class="atr-warn">{esc(sz.get("reason") or "사용 불가")}</div>'
+                f'<div class="note muted">{esc(sz.get("mode_note") or "")}</div></div>')
+    return f"""
+    <div class="card">
+      <h2>바이낸스 입력값 <span class="pill pill-ghost">사용자 오버레이 · 모델 권고 아님</span></h2>
+      <table class="cd-table"><thead><tr><th>창</th><th style="text-align:right">값</th></tr></thead><tbody>
+        <tr><td>지정가 Price</td><td style="text-align:right;font-weight:800">{fmt(sz.get("entry"),1)}</td></tr>
+        <tr><td>Size (USDT)</td><td style="text-align:right">{fmt(sz.get("notional"),2)}</td></tr>
+        <tr><td>Take Profit PnL</td><td style="text-align:right">{fmt(sz.get("tp_pnl"),2)}</td></tr>
+        <tr><td>Stop Loss PnL</td><td style="text-align:right">{fmt(sz.get("sl_pnl"),2)}</td></tr>
+        <tr><td>배수 · 증거금</td><td style="text-align:right">{sz.get("leverage")}x · {fmt(sz.get("margin"),2)} USDT</td></tr>
+        <tr><td>손절 시 증거금</td><td style="text-align:right">{fmt(sz.get("risk_pct"),1)}%</td></tr>
+        <tr><td>목표 시 ROE</td><td style="text-align:right">{fmt(sz.get("roe_pct"),1)}%</td></tr>
+        <tr><td>격리 추정 청산가</td><td style="text-align:right">{fmt(sz.get("liq_isolated"),1)}</td></tr>
+      </tbody></table>
+      <div class="note muted">{esc(sz.get("mode_note") or "")} · 트리거 {esc(sz.get("trigger") or "Last")}
+        · 배수·증거금은 TUI/설정값. 신호 품질과 무관하다. 계좌 순자산 기준 1회 손실은 0.25–1%를 넘기지 않는 것이 안전하다.</div>
+    </div>"""
+
+
+def _btc_pos_card(r: dict) -> str:
+    q = r.get("quadrant") or "—"
+    ls_g, ls_t = r.get("ls_global"), r.get("ls_top")
+    def _ls(v):
+        return f"{v:.4f}" if isinstance(v, (int, float)) else "—"
+    return (f'<div class="card"><h2>포지셔닝</h2>'
+            f'<div class="tiles">'
+            f'{_tile("사분면", str(q))}'
+            f'{_tile("LS 글로벌", _ls(ls_g), sub="계정 수 비율")}'
+            f'{_tile("LS 탑", _ls(ls_t), sub="탑 포지션 비율 · 점수에 우선")}'
+            f'{_tile("Fear&Greed", str(r.get("fng") if r.get("fng") is not None else "—"))}'
+            f'{_tile("나스닥", esc(r.get("nasdaq_txt") or "—"))}'
+            f'</div>'
+            f'<div class="note muted">LS 글로벌과 탑은 정의가 다르다. 한 숫자로 섞어 쓰지 않는다.</div></div>')
+
+
+def _btc_mtf_table(r: dict) -> str:
+    mtf = r.get("mtf") or {}
+    if not mtf:
+        return ""
+    keys = [("ema9", "EMA9"), ("ema21", "EMA21"), ("ema50", "EMA50"),
+            ("rsi", "RSI"), ("macd_hist", "MACD hist"), ("pctb", "%B"),
+            ("atr", "ATR"), ("adx", "ADX"), ("stoch_k", "Stoch %K"),
+            ("supertrend", "Supertrend"), ("mfi", "MFI"), ("cmf", "CMF")]
+    head = "<tr><th>지표</th>" + "".join(f"<th>{esc(tf)}</th>" for tf in mtf) + "</tr>"
+    rows = ""
+    for k, lab in keys:
+        rows += f"<tr><td>{lab}</td>"
+        for tf in mtf:
+            v = (mtf.get(tf) or {}).get(k)
+            rows += f'<td style="text-align:right">{fmt(v, 2) if isinstance(v, float) else (v if v is not None else "—")}</td>'
+        rows += "</tr>"
+    return f'<div class="card"><h2>MTF 지표</h2><table class="cd-table"><thead>{head}</thead><tbody>{rows}</tbody></table></div>'
+
+
 def render_report_view(r: dict, date: str) -> str:
+    if r.get("report_type") == "btc_perp" or r.get("id") == "btc-perp":
+        return render_btc_view(r, date)
     group = esc(r.get("group", "장 마감"))
     label = esc(r.get("label", "코스피"))
     view_date = esc(r.get("trade_date", date))
@@ -1083,6 +1469,52 @@ def render_placeholder_view(p: dict) -> str:
 
 
 # ── 셸 조립 ─────────────────────────────────────────────────────────────────
+_NAV_REMAP = {
+    ("장 마감", "코스피"): ("코스피", "장 마감"),
+    ("장 마감", "코스닥"): ("코스닥", "장 마감"),
+    ("장 마감", "코스피 마감"): ("코스피", "장 마감"),
+    ("장 마감", "코스닥 마감"): ("코스닥", "장 마감"),
+    ("개장 전", "코스피"): ("코스피", "개장 전"),
+    ("개장 전", "코스닥"): ("코스닥", "개장 전"),
+    ("개장 전", "개장 전 · 코스피"): ("코스피", "개장 전"),
+    ("개장 전", "개장 전 · 코스닥"): ("코스닥", "개장 전"),
+}
+
+
+def _remap_nav(d: dict) -> None:
+    key = (d.get("group"), d.get("label"))
+    if key in _NAV_REMAP:
+        d["group"], d["label"] = _NAV_REMAP[key]
+
+
+def _is_preopen_report(r: dict) -> bool:
+    return r.get("report_type") == "preopen" or (r.get("id") or "").endswith("-preopen")
+
+
+def _attach_preopen_order_cards(reports: list[dict]) -> None:
+    """개장 전 뷰에 상품 주문 카드가 없으면 같은 시장 마감 카드를 붙인다.
+
+    코스피·코스닥은 ETF 주문이 본거래라 개장 전에도 지수↔ETF 환산이 보여야 한다.
+    예전 번들(order_card 미복사)도 렌더만으로 살린다. 이미 있으면 덮지 않는다.
+    """
+    closes = {}
+    for r in reports:
+        rid = r.get("id") or ""
+        if rid.endswith("-close") or (r.get("label") == "장 마감" and not _is_preopen_report(r)):
+            mk = "kosdaq" if "kosdaq" in rid.lower() else "kospi"
+            if r.get("order_card"):
+                closes[mk] = r["order_card"]
+    for r in reports:
+        if not _is_preopen_report(r):
+            continue
+        if r.get("order_card"):
+            continue
+        rid = r.get("id") or ""
+        mk = "kosdaq" if "kosdaq" in rid.lower() else "kospi"
+        if closes.get(mk):
+            r["order_card"] = closes[mk]
+
+
 def normalize_bundle(data: dict) -> dict:
     if "reports" in data:
         b = dict(data)
@@ -1093,11 +1525,23 @@ def normalize_bundle(data: dict) -> dict:
         rep.setdefault("group", "장 마감")
         rep.setdefault("market", data.get("market", {}))
         b = {"trade_date": data.get("trade_date", ""), "reports": [rep]}
-    b.setdefault("placeholders", DEFAULT_PLACEHOLDERS)
+    have_ids = {p.get("id") for p in b.get("placeholders") or []}
+    merged = list(b.get("placeholders") or [])
+    for p in DEFAULT_PLACEHOLDERS:
+        if p["id"] not in have_ids:
+            merged.append(p)
+    b["placeholders"] = merged
+    for r in b["reports"]:
+        _remap_nav(r)
+    for p in b["placeholders"]:
+        _remap_nav(p)
+    _attach_preopen_order_cards(b["reports"])
     # 이미 실제 리포트가 있는 그룹/라벨의 placeholder 는 제거(중복 방지)
     present = {(r.get("group"), r.get("label")) for r in b["reports"]}
+    present_ids = {r.get("id") for r in b["reports"]}
     b["placeholders"] = [p for p in b["placeholders"]
-                         if (p.get("group"), p.get("label")) not in present]
+                         if (p.get("group"), p.get("label")) not in present
+                         and p.get("id") not in present_ids]
     for i, rep in enumerate(b["reports"]):
         rep.setdefault("id", f"report-{i}")
         rep.setdefault("group", "장 마감")
@@ -1113,8 +1557,13 @@ def build_sidebar(items: list[dict]) -> str:
             gmap[g] = []
             order.append(g)
         gmap[g].append(it)
+    known = [g for g in NAV_GROUP_ORDER if g in gmap]
+    rest = [g for g in order if g not in NAV_GROUP_ORDER]
+    order = known + rest
     out = []
     for g in order:
+        gmap[g].sort(key=lambda x: (NAV_ITEM_ORDER.index(x["label"])
+                                    if x.get("label") in NAV_ITEM_ORDER else 99))
         out.append(f'<div class="nav-group"><div class="nav-title">{esc(g)}</div>')
         for it in gmap[g]:
             cls = "nav-item" + (" ph" if it["ph"] else "")
@@ -1133,6 +1582,15 @@ def build_sidebar(items: list[dict]) -> str:
                 f'<span>{esc(it["label"])}</span>{badge}</a>')
         out.append("</div>")
     return "".join(out)
+
+
+def ensure_lwc_vendor() -> Path:
+    """아카이브 HTML 이 인라인하지 않도록 public/vendor 에 LWC 1회 복사."""
+    dst = ROOT / "public" / "vendor" / "lightweight-charts.js"
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    if LWC_PATH.exists():
+        dst.write_bytes(LWC_PATH.read_bytes())
+    return dst
 
 
 def load_lwc_js() -> str:
@@ -1155,7 +1613,7 @@ def _chart_payload(r: dict) -> dict:
     return {"name": idx.get("name", ""), "charts": charts}
 
 
-def render(data: dict) -> str:
+def render(data: dict, lwc_src: str | None = None) -> str:
     bundle = normalize_bundle(data)
     date = str(bundle.get("trade_date", ""))
 
@@ -1184,12 +1642,17 @@ def render(data: dict) -> str:
     chart_json = json.dumps({"views": chart_views}, ensure_ascii=False).replace("<", "\\u003c")
     has_charts = bool(chart_views)
 
+    if lwc_src:
+        lwc_script = f'<script src="{lwc_src}"></script>'
+    else:
+        js = load_lwc_js() if has_charts else "/* no charts — LWC not inlined */"
+        lwc_script = f"<script>{js}</script>"
     repl = {
         "{{DATE}}": esc(date),
         "{{SIDEBAR}}": sidebar,
         "{{VIEWS}}": views_html,
         "{{CHART_DATA_JSON}}": chart_json,
-        "{{LWC_JS}}": load_lwc_js() if has_charts else "/* no charts — LWC not inlined */",
+        "{{LWC_SCRIPT}}": lwc_script,
     }
     tpl = TEMPLATE
     for k, v in repl.items():
@@ -1386,6 +1849,17 @@ TEMPLATE = r"""<!doctype html>
   .tf-btn{border:1px solid var(--border);background:var(--surface2);color:var(--muted);
     border-radius:8px;padding:6px 14px;cursor:pointer;font:inherit;font-size:.82rem;font-weight:600;min-height:36px}
   .tf-btn.active{background:color-mix(in srgb,var(--accent) 20%,transparent);color:var(--accent);border-color:var(--accent)}
+  .slot-pick{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin:8px 0 10px}
+  .slot-lab{display:inline-flex;align-items:center;gap:6px;font-size:.78rem;color:var(--muted);font-weight:600}
+  .slot-sel{border:1px solid var(--border);background:var(--surface2);color:var(--text);
+    border-radius:8px;padding:6px 10px;font:inherit;font-size:.82rem;font-weight:600;min-height:36px;max-width:11rem}
+  .slot-regs{display:flex;gap:6px}
+  .slot-chip{border:1px solid var(--border);background:var(--surface2);color:var(--muted);
+    border-radius:8px;padding:6px 14px;font-size:.82rem;font-weight:600;min-height:36px;
+    display:inline-flex;align-items:center;text-decoration:none}
+  .slot-chip.active{background:color-mix(in srgb,var(--accent) 20%,transparent);color:var(--accent);border-color:var(--accent)}
+  .slot-empty,.slot-hint{font-size:.74rem;color:var(--muted)}
+  .slot-hint{margin-left:auto}
 
   /* 리스트/재료/체크 */
   .sub-h{font-weight:700;font-size:.86rem;margin:12px 0 6px;color:var(--text)}
@@ -1432,7 +1906,7 @@ TEMPLATE = r"""<!doctype html>
     .concl-text{font-size:.96rem}
   }
   @media print{
-    .sidebar,.topnav,.scrim,.tf-bar{display:none!important}
+    .sidebar,.topnav,.scrim,.tf-bar,.slot-pick{display:none!important}
     .view{display:block!important;break-after:page}
     .card{break-inside:avoid;border-color:#ccc}
     body{background:#fff;color:#000}
@@ -1465,7 +1939,7 @@ TEMPLATE = r"""<!doctype html>
   </main>
 </div>
 
-<script>{{LWC_JS}}</script>
+{{LWC_SCRIPT}}
 <script>window.__REPORT__ = {{CHART_DATA_JSON}};</script>
 <script>
 (function(){
@@ -1495,7 +1969,7 @@ TEMPLATE = r"""<!doctype html>
     borderDownColor:t.down, wickUpColor:t.up, wickDownColor:t.down, priceLineVisible:false }; }
 
   var sel={};  // 뷰별 선택된 타임프레임 기억(테마 토글 시 유지)
-  function tfLabel(t){ return {D:'일',W:'주',M:'월',H:'1시간'}[t]||''; }
+  function tfLabel(t){ return {D:'일',W:'주',M:'월','4H':'4시간',H:'1시간'}[t]||t; }
 
   function buildView(id){
     var sec=document.querySelector('.view[data-view="'+id+'"]'); if(!sec) return;
@@ -1514,7 +1988,8 @@ TEMPLATE = r"""<!doctype html>
       clearBuilt();
       var fr=frames[tf]; if(!fr){ return; }
       sel[id]=tf;
-      var t=theme(), isD=(tf==='D') && !fr.intraday;
+      var t=theme(), isD=(tf==='D' || tf==='4H') && !fr.intraday;
+      if(tf==='4H') isD = true;
       var opts=candleOpts(t);
       if(isD){ opts.autoscaleInfoProvider=function(orig){ var r=orig(); if(!r||!r.priceRange) return r;
         [levels.stop,levels.target,levels.entry].forEach(function(v){ if(v!=null){
@@ -1547,9 +2022,9 @@ TEMPLATE = r"""<!doctype html>
     }
 
     var start=sel[id] && frames[sel[id]] ? sel[id] : (frames[index.default]?index.default:Object.keys(frames)[0]);
-    sec.querySelectorAll('.tf-btn').forEach(function(btn){
+    sec.querySelectorAll('.tf-btn[data-tf]').forEach(function(btn){
       btn.classList.toggle('active', btn.getAttribute('data-tf')===start);
-      btn.onclick=function(){ sec.querySelectorAll('.tf-btn').forEach(function(b){ b.classList.remove('active'); });
+      btn.onclick=function(){ sec.querySelectorAll('.tf-btn[data-tf]').forEach(function(b){ b.classList.remove('active'); });
         btn.classList.add('active'); drawFrame(btn.getAttribute('data-tf')); };
     });
     drawFrame(start);

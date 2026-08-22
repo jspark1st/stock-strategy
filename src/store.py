@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS daily (
   report_type   TEXT NOT NULL DEFAULT 'close',
   trade_date    TEXT NOT NULL,
   created_at    TEXT,
+  slot          TEXT NOT NULL DEFAULT '',
   -- 예측
   total         REAL,
   grade         TEXT,
@@ -53,8 +54,10 @@ CREATE TABLE IF NOT EXISTS daily (
   brier         REAL,
   mfe_pct       REAL,
   mae_pct       REAL,
+  outcome_open_chg_pct REAL,   -- 실제 거래 지평(종가매수→익일 시가매도, close→open) 갭 수익률
+  overnight_correct INTEGER,   -- 위 지평의 방향 정오 (close→close correct 와 나란히)
   graded_at     TEXT,
-  UNIQUE(market, report_type, trade_date)
+  UNIQUE(market, report_type, trade_date, slot)
 );
 
 -- 장중 스냅샷 시점의 누적 거래량 vs 그날 종일 확정 거래량.
@@ -123,8 +126,14 @@ DIRECTION_LABEL = "next_close_return_sign"
 
 
 # 기존 DB에 나중에 추가된 컬럼 — CREATE TABLE IF NOT EXISTS 로는 안 붙으므로 명시 마이그레이션.
+# outcome_open_chg_pct / overnight_correct: 전략이 실제 거래하는 지평(종가매수→**익일 시가매도**,
+# close→open)의 실측을 close→close 라벨 옆에 **나란히** 기록한다(파괴 아님). 방향 라벨(캘리브레이션)
+# 은 여전히 next_close 이지만, 이 컬럼이 쌓이면 '실제 거래 지평'의 정답률을 별도로 측정·비교할 수
+# 있다(백테스트 exp_paper 가 드러낸 지평 불일치를 라이브 채점으로도 관측). open item #1.
 _MIGRATIONS = [("daily", "p_up_raw", "REAL"),
-               ("daily", "mfe_pct", "REAL"), ("daily", "mae_pct", "REAL")]
+               ("daily", "mfe_pct", "REAL"), ("daily", "mae_pct", "REAL"),
+               ("daily", "outcome_open_chg_pct", "REAL"),
+               ("daily", "overnight_correct", "INTEGER")]
 
 
 def connect(path: str | Path) -> sqlite3.Connection:
@@ -133,6 +142,9 @@ def connect(path: str | Path) -> sqlite3.Connection:
     conn = sqlite3.connect(str(path))
     conn.row_factory = sqlite3.Row
     conn.executescript(SCHEMA)
+    # slot-unique 재작성(daily_slot_mig 는 컬럼 목록이 고정)을 **_MIGRATIONS 앞에** 둔다 —
+    # 이후 _MIGRATIONS 로 추가하는 신규 컬럼을 daily_slot_mig 에 매번 반영하지 않아도 되게.
+    _ensure_slot_unique(conn)
     for table, col, decl in _MIGRATIONS:
         cols = {r[1] for r in conn.execute(f"PRAGMA table_info({table})")}
         if col not in cols:
@@ -141,19 +153,66 @@ def connect(path: str | Path) -> sqlite3.Connection:
     return conn
 
 
+def _ensure_slot_unique(conn: sqlite3.Connection) -> None:
+    """기존 UNIQUE(market,report_type,trade_date) → slot 포함 4키. 주식 행 slot=''."""
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(daily)")}
+    if "slot" not in cols:
+        conn.execute("ALTER TABLE daily ADD COLUMN slot TEXT NOT NULL DEFAULT ''")
+    sql = (conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='daily'"
+    ).fetchone() or [""])[0] or ""
+    compact = sql.replace(" ", "").replace("\n", "")
+    if "UNIQUE(market,report_type,trade_date,slot)" in compact:
+        return
+    conn.execute("""
+    CREATE TABLE daily_slot_mig (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      market TEXT NOT NULL, report_type TEXT NOT NULL DEFAULT 'close',
+      trade_date TEXT NOT NULL, created_at TEXT, slot TEXT NOT NULL DEFAULT '',
+      total REAL, grade TEXT, p_up REAL, p_up_raw REAL, p_down REAL, direction TEXT,
+      index_close REAL, index_chg_pct REAL, entry REAL, stop REAL, target REAL,
+      edge REAL, kelly_pct REAL, subscores_json TEXT, flows_json TEXT, narrative_json TEXT,
+      outcome_date TEXT, outcome_chg_pct REAL, realized_up INTEGER, hit_target INTEGER,
+      hit_stop INTEGER, correct INTEGER, brier REAL, mfe_pct REAL, mae_pct REAL,
+      outcome_open_chg_pct REAL, overnight_correct INTEGER,
+      graded_at TEXT,
+      UNIQUE(market, report_type, trade_date, slot)
+    )""")
+    old_cols = [r[1] for r in conn.execute("PRAGMA table_info(daily)")]
+    has_slot = "slot" in old_cols
+    sel = ", ".join("slot" if c == "slot" and has_slot else (
+        "COALESCE(slot,'')" if c == "slot" else c)
+                    for c in old_cols)
+    # Map into new table by name
+    common = [c for c in old_cols if c != "id"]
+    dest = ", ".join(common)
+    src = ", ".join(
+        ("COALESCE(slot,'')" if c == "slot" else c) for c in common)
+    conn.execute(f"INSERT INTO daily_slot_mig ({dest}) SELECT {src} FROM daily")
+    conn.execute("DROP TABLE daily")
+    conn.execute("ALTER TABLE daily_slot_mig RENAME TO daily")
+
+
 def record_prediction(conn: sqlite3.Connection, rep: dict, created_at: str,
                       report_type: str = "close") -> None:
     """리포트 dict(run_close 산출) 하나를 예측으로 upsert."""
     market = _market_of(rep)
     atr = (rep.get("atr") or {})
     prim = (atr.get("primary") or {})
+    slot = str(rep.get("slot") or "")
+    p_up = rep.get("p_up")
+    if p_up is None:
+        p_up = rep.get("p_long")
+    p_down = rep.get("p_down")
+    if p_down is None and rep.get("p_short") is not None:
+        p_down = rep.get("p_short")
     row = {
-        "market": market, "report_type": report_type,
+        "market": market, "report_type": report_type, "slot": slot,
         "trade_date": rep.get("trade_date"), "created_at": created_at,
         "total": rep.get("total"), "grade": rep.get("grade"),
-        "p_up": rep.get("p_up"), "p_down": rep.get("p_down"),
-        "p_up_raw": rep.get("p_up_raw", rep.get("p_up")),
-        "direction": atr.get("direction"),
+        "p_up": p_up, "p_down": p_down,
+        "p_up_raw": rep.get("p_up_raw", p_up),
+        "direction": atr.get("direction") or rep.get("direction"),
         "index_close": _index_close(rep), "index_chg_pct": _index_chg(rep),
         "entry": prim.get("entry"), "stop": prim.get("stop"),
         "target": prim.get("target"), "edge": prim.get("edge"),
@@ -165,10 +224,10 @@ def record_prediction(conn: sqlite3.Connection, rep: dict, created_at: str,
     cols = ",".join(row)
     ph = ",".join(f":{k}" for k in row)
     upd = ",".join(f"{k}=excluded.{k}" for k in row if k not in
-                   ("market", "report_type", "trade_date"))
+                   ("market", "report_type", "trade_date", "slot"))
     conn.execute(
         f"INSERT INTO daily ({cols}) VALUES ({ph}) "
-        f"ON CONFLICT(market,report_type,trade_date) DO UPDATE SET {upd}", row)
+        f"ON CONFLICT(market,report_type,trade_date,slot) DO UPDATE SET {upd}", row)
     conn.commit()
 
 
@@ -221,28 +280,38 @@ def grade_with_candles(conn: sqlite3.Connection, market: str, report_type: str,
         if not pc:
             continue
         chg = (c.close - pc) / pc * 100
+        # 실제 거래 지평(종가매수→익일 시가매도)의 갭 수익률. 시가 없으면 None.
+        open_chg = ((c.open - pc) / pc * 100) if getattr(c, "open", None) else None
         out.append(_apply_grade(conn, prev, f"{nxt[:4]}-{nxt[4:6]}-{nxt[6:8]}",
-                                chg, c.high, c.low, graded_at))
+                                chg, c.high, c.low, graded_at, open_chg))
     return [o for o in out if o]
 
 
 def _apply_grade(conn: sqlite3.Connection, prev, outcome_date: str, outcome_chg_pct: float,
-                 day_high: float, day_low: float, graded_at: str) -> dict:
+                 day_high: float | None, day_low: float | None, graded_at: str,
+                 outcome_open_chg_pct: float | None = None) -> dict:
     realized_up = 1 if outcome_chg_pct > 0 else 0
     p_up = prev["p_up"]
     correct = brier = None
     if p_up is not None:
         correct = 1 if (p_up >= 0.5) == bool(realized_up) else 0
         brier = round((p_up - realized_up) ** 2, 4)
+    # 오버나이트 지평(close→open) 방향 정오 — close→close 와 별개로 나란히 기록.
+    overnight_correct = None
+    if p_up is not None and outcome_open_chg_pct is not None:
+        overnight_correct = 1 if (p_up >= 0.5) == (outcome_open_chg_pct > 0) else 0
     # ATR 타점 도달. 롱/관망은 목표=고가·손절=저가, 숏은 방향이 뒤집힌다.
+    # 고/저가 없으면(경로 미지) 경로 지표는 전부 None — 종가를 고저 자리에 넣으면
+    # hit_* 가 '경로상 터치'가 아니라 '종가가 넘었나'로 변질되고 MFE=MAE 가 된다.
     hit_target = hit_stop = None
     direction = prev["direction"]
-    if direction in ("long", "watch"):
+    has_path = day_high is not None and day_low is not None
+    if has_path and direction in ("long", "watch"):
         if prev["target"] is not None:
             hit_target = 1 if day_high >= prev["target"] else 0
         if prev["stop"] is not None:
             hit_stop = 1 if day_low <= prev["stop"] else 0
-    elif direction == "short":
+    elif has_path and direction == "short":
         if prev["target"] is not None:
             hit_target = 1 if day_low <= prev["target"] else 0
         if prev["stop"] is not None:
@@ -250,7 +319,7 @@ def _apply_grade(conn: sqlite3.Connection, prev, outcome_date: str, outcome_chg_
     # MFE/MAE(최대 유리·불리 변동) — 예측일 종가 기준 익일 장중 고/저까지. 방향 반영.
     mfe_pct = mae_pct = None
     base = prev["index_close"]
-    if base:
+    if base and has_path:
         up_exc = (day_high - base) / base * 100
         down_exc = (day_low - base) / base * 100
         if direction == "short":
@@ -259,15 +328,21 @@ def _apply_grade(conn: sqlite3.Connection, prev, outcome_date: str, outcome_chg_
             mfe_pct, mae_pct = round(up_exc, 2), round(down_exc, 2)
     conn.execute(
         "UPDATE daily SET outcome_date=?, outcome_chg_pct=?, realized_up=?, "
-        "hit_target=?, hit_stop=?, correct=?, brier=?, mfe_pct=?, mae_pct=?, graded_at=? WHERE id=?",
+        "hit_target=?, hit_stop=?, correct=?, brier=?, mfe_pct=?, mae_pct=?, "
+        "outcome_open_chg_pct=?, overnight_correct=?, graded_at=? WHERE id=?",
         (outcome_date, round(outcome_chg_pct, 2), realized_up, hit_target,
-         hit_stop, correct, brier, mfe_pct, mae_pct, graded_at, prev["id"]))
+         hit_stop, correct, brier, mfe_pct, mae_pct,
+         (round(outcome_open_chg_pct, 2) if outcome_open_chg_pct is not None else None),
+         overnight_correct, graded_at, prev["id"]))
     conn.commit()
     return {"trade_date": prev["trade_date"], "p_up": p_up,
             "realized_up": realized_up, "correct": correct, "brier": brier,
             "hit_target": hit_target, "hit_stop": hit_stop,
             "outcome_date": outcome_date,
-            "outcome_chg_pct": round(outcome_chg_pct, 2)}
+            "outcome_chg_pct": round(outcome_chg_pct, 2),
+            "outcome_open_chg_pct": (round(outcome_open_chg_pct, 2)
+                                     if outcome_open_chg_pct is not None else None),
+            "overnight_correct": overnight_correct}
 
 
 def latest_prediction(conn: sqlite3.Connection, market: str,
@@ -281,32 +356,46 @@ def latest_prediction(conn: sqlite3.Connection, market: str,
 
 
 def accuracy(conn: sqlite3.Connection, market: str, report_type: str = "close",
-             window: int = 20) -> dict:
+             window: int = 20, slots: tuple | None = None) -> dict:
     """최근 window 채점건의 성적 요약(자가학습 지표)."""
+    extra, extra_args = "", []
+    if slots:
+        extra = " AND slot IN (" + ",".join("?" * len(slots)) + ")"
+        extra_args = list(slots)
     cur = conn.execute(
-        "SELECT p_up, realized_up, correct, brier FROM daily "
-        "WHERE market=? AND report_type=? AND graded_at IS NOT NULL "
-        "ORDER BY trade_date DESC LIMIT ?", (market, report_type, window))
+        "SELECT p_up, realized_up, correct, brier, overnight_correct FROM daily "
+        "WHERE market=? AND report_type=? AND graded_at IS NOT NULL" + extra +
+        " ORDER BY trade_date DESC LIMIT ?",
+        (market, report_type, *extra_args, window))
     rows = cur.fetchall()
     n = len(rows)
     if n == 0:
         return {"n": 0, "hit_rate": None, "mean_brier": None,
                 "pred_mean_p_up": None, "realized_up_rate": None,
-                "calibration_bias": None}
-    hits = sum(r["correct"] for r in rows if r["correct"] is not None)
+                "calibration_bias": None,
+                "overnight_hit_rate": None, "overnight_n": 0}
+    # 적중률 분모는 **방향을 낸 행(correct 존재)만** — p_up=None(데이터부족) 채점행이 분모에
+    # 섞이면 적중률이 부당하게 낮아진다(그 행은 correct=None 이라 분자엔 안 들어가므로).
+    graded_dir = [r["correct"] for r in rows if r["correct"] is not None]
+    hits = sum(graded_dir)
+    n_dir = len(graded_dir)
     briers = [r["brier"] for r in rows if r["brier"] is not None]
     p_ups = [r["p_up"] for r in rows if r["p_up"] is not None]
     ups = [r["realized_up"] for r in rows if r["realized_up"] is not None]
     pred_mean = sum(p_ups) / len(p_ups) if p_ups else None
     real_rate = sum(ups) / len(ups) if ups else None
     bias = (pred_mean - real_rate) if (pred_mean is not None and real_rate is not None) else None
+    # 실제 거래 지평(종가매수→익일 시가매도) 방향 정답률 — close→close 옆에 나란히.
+    ov = [r["overnight_correct"] for r in rows if r["overnight_correct"] is not None]
     return {
         "n": n,
-        "hit_rate": round(hits / n, 3),
+        "hit_rate": round(hits / n_dir, 3) if n_dir else None,
         "mean_brier": round(sum(briers) / len(briers), 4) if briers else None,
         "pred_mean_p_up": round(pred_mean, 3) if pred_mean is not None else None,
         "realized_up_rate": round(real_rate, 3) if real_rate is not None else None,
         "calibration_bias": round(bias, 3) if bias is not None else None,
+        "overnight_hit_rate": round(sum(ov) / len(ov), 3) if ov else None,
+        "overnight_n": len(ov),
     }
 
 
@@ -525,6 +614,10 @@ def volume_completion_factor(conn: sqlite3.Connection | None, market: str,
 
 # ── 내부 헬퍼 ──────────────────────────────────────────────────────────────
 def _market_of(rep: dict) -> str:
+    if (rep.get("report_type") == "btc_perp"
+            or (rep.get("id") or "").startswith("btc")
+            or (rep.get("market_code") == "BTCUSDT")):
+        return "BTCUSDT"
     rid = (rep.get("id") or "").lower()
     if "kosdaq" in rid or "코스닥" in (rep.get("label") or ""):
         return "KOSDAQ"
@@ -532,10 +625,78 @@ def _market_of(rep: dict) -> str:
 
 
 def _index_close(rep: dict) -> float | None:
+    if _market_of(rep) == "BTCUSDT":
+        return (rep.get("mark") or (rep.get("market") or {}).get("mark"))
     m = rep.get("market") or {}
     return m.get("kosdaq_close") if _market_of(rep) == "KOSDAQ" else m.get("kospi_close")
 
 
 def _index_chg(rep: dict) -> float | None:
+    if _market_of(rep) == "BTCUSDT":
+        return (rep.get("market") or {}).get("chg_pct")
     m = rep.get("market") or {}
     return m.get("kosdaq_chg_pct") if _market_of(rep) == "KOSDAQ" else m.get("kospi_chg_pct")
+
+
+def _next_btc_slot(trade_date: str, slot: str) -> tuple[str, str]:
+    from datetime import datetime, timedelta
+    if slot == "0930":
+        return trade_date, "2200"
+    d = datetime.strptime(trade_date, "%Y-%m-%d") + timedelta(days=1)
+    return d.strftime("%Y-%m-%d"), "0930"
+
+
+def _slot_ord(date: str, slot: str) -> tuple:
+    return (date, 0 if slot == "0930" else 1 if slot == "2200" else 2)
+
+
+def btc_prediction_exists(conn: sqlite3.Connection, trade_date: str, slot: str) -> bool:
+    r = conn.execute(
+        "SELECT 1 FROM daily WHERE market='BTCUSDT' AND report_type='btc_perp' "
+        "AND trade_date=? AND slot=?", (trade_date, slot)).fetchone()
+    return r is not None
+
+
+def grade_btc_pending(conn: sqlite3.Connection, now_date: str, now_slot: str,
+                      now_mark: float | None, graded_at: str,
+                      path_fn=None) -> list[dict]:
+    """정규 슬롯(0930/2200)만 다음 발행 마크가로 소급 채점. 수동 HHMM 제외.
+
+    path_fn(prev_date, prev_slot, next_date, next_slot) -> (high, low) | None.
+    구간 고/저를 알면 hit_target·hit_stop·MFE/MAE 가 경로 기준으로 채워지고,
+    없으면 그 지표들은 None 으로 남는다(마크-투-마크 정답률·Brier 만 유효).
+    """
+    if now_mark is None or now_slot not in ("0930", "2200"):
+        return []
+    rows = conn.execute(
+        "SELECT * FROM daily WHERE market='BTCUSDT' AND report_type='btc_perp' "
+        "AND slot IN ('0930','2200') AND graded_at IS NULL AND p_up IS NOT NULL "
+        "AND index_close IS NOT NULL"
+    ).fetchall()
+    out = []
+    for prev in rows:
+        nd, ns = _next_btc_slot(prev["trade_date"], prev["slot"])
+        if _slot_ord(now_date, now_slot) < _slot_ord(nd, ns):
+            continue  # 지평 미완성
+        nxt = conn.execute(
+            "SELECT index_close FROM daily WHERE market='BTCUSDT' AND report_type='btc_perp' "
+            "AND trade_date=? AND slot=?", (nd, ns)).fetchone()
+        mark_t1 = nxt["index_close"] if nxt and nxt["index_close"] else None
+        if mark_t1 is None and (nd, ns) == (now_date, now_slot):
+            mark_t1 = now_mark
+        if mark_t1 is None:
+            continue
+        base = prev["index_close"]
+        chg = (mark_t1 / base - 1) * 100 if base else 0.0
+        hi = lo = None
+        if path_fn is not None:
+            try:
+                path = path_fn(prev["trade_date"], prev["slot"], nd, ns)
+                if path:
+                    hi, lo = path
+            except Exception:  # noqa — 경로 조회 실패는 지표 결측으로
+                hi = lo = None
+        g = _apply_grade(conn, prev, f"{nd}-{ns}", chg, hi, lo, graded_at)
+        g["slot"] = prev["slot"]
+        out.append(g)
+    return out

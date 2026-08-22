@@ -247,22 +247,28 @@ class LSClient:
             time=str(r.get("time")) if minute else None,
         )
 
+    @staticmethod
+    def _valid_candle(c: Candle) -> bool:
+        """OHLC 가 전부 양수여야 유효한 가격 봉. _f() 가 파싱실패를 0.0 으로 채우므로,
+        0 가격 봉(가짜)을 스코어링에 흘리지 않게 여기서 드롭한다(거래량·거래대금 0 은 정상 허용)."""
+        return c.open > 0 and c.high > 0 and c.low > 0 and c.close > 0
+
     def daily_candles(self, shcode: str, sdate: str = "", edate: str = "",
                       period: str = "D", count: int = 500) -> CandleSeries:
         """일/주/월봉 시계열 (t8410). period: 'D'/'W'/'M'. 오름차순 반환."""
         data = self.daily_chart_raw(shcode, _PERIOD.get(period.upper(), "2"),
                                     count, sdate, edate)
         rows = data.get("t8410OutBlock1", []) or []
-        return CandleSeries(shcode, period.upper(),
-                            [self._to_candle(r, minute=False) for r in rows])
+        cds = [self._to_candle(r, minute=False) for r in rows]
+        return CandleSeries(shcode, period.upper(), [c for c in cds if self._valid_candle(c)])
 
     def minute_candles(self, shcode: str, ncnt: int = 60, edate: str = "",
                        nday: str = "1", count: int = 500) -> CandleSeries:
         """N분봉 시계열 (t8412). ncnt=분주기(1/3/5/10/15/30/60/120/240 네이티브)."""
         data = self.minute_chart_raw(shcode, ncnt, count, nday, "", edate)
         rows = data.get("t8412OutBlock1", []) or []
-        return CandleSeries(shcode, f"{ncnt}m",
-                            [self._to_candle(r, minute=True) for r in rows])
+        cds = [self._to_candle(r, minute=True) for r in rows]
+        return CandleSeries(shcode, f"{ncnt}m", [c for c in cds if self._valid_candle(c)])
 
     def multi_timeframe(self, shcode: str, edate: str = "",
                         minute_tfs: tuple[int, ...] = (5, 15, 60, 240),
@@ -326,9 +332,12 @@ class LSClient:
         nav = _f(d.get("nav"))
         offer = _f(d.get("offerho1"))
         bid = _f(d.get("bidho1"))
-        disparity = _f(d.get("kasis")) or ((price - nav) / nav * 100 if nav else 0.0)
+        # 괴리율: kasis(제공분) 우선, 없으면 nav 로 계산. **nav 도 0(장전)이면 '0'이 아니라
+        # '알 수 없음(None)'** — 0 으로 두면 '괴리 없음'으로 오독된다(spread 가 None 인 것과 정합).
+        kasis = _f(d.get("kasis"))
+        disparity = kasis if kasis else ((price - nav) / nav * 100 if nav else None)
         return {"shcode": shcode, "name": d.get("hname", ""), "price": price, "nav": nav,
-                "disparity_pct": round(disparity, 3),
+                "disparity_pct": round(disparity, 3) if disparity is not None else None,
                 "spread": round(offer - bid, 2) if (offer and bid) else None,
                 "offer": offer or None, "bid": bid or None,
                 "volume": _f(d.get("volume")), "value": _f(d.get("value"))}

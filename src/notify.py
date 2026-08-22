@@ -80,6 +80,49 @@ def build_report_summary(reports: list, kind: str, trade_date: str,
     return "\n".join(out)
 
 
+def build_btc_summary(rep: dict, last_grade: dict | None = None,
+                      url: str = SITE_URL) -> str:
+    """BTC 회차 성공 다이제스트. 주식 요약에 섞지 않는다."""
+    date = rep.get("trade_date") or ""
+    slot = rep.get("slot") or ""
+    kind = "수동 " + slot if (rep.get("kind") == "manual" or (
+        slot and slot not in ("0930", "2200"))) else slot
+    as_of = rep.get("as_of") or f"{date} {kind}"
+    total = rep.get("total")
+    grade = rep.get("grade") or "—"
+    pl, ps = rep.get("p_long"), rep.get("p_short")
+    gate = rep.get("gate") or {}
+    blocked = bool(gate.get("new_entry_blocked") or gate.get("no_trade")
+                   or rep.get("verdict") == "NO_TRADE")
+    tp = f"{total}" if total is not None else "미산출"
+    pp = (f"LONG {round(pl*100)}% / SHORT {round(ps*100)}%"
+          if pl is not None else "—")
+    gate_txt = "관망/현금" if blocked else "진입 검토"
+    if gate.get("no_trade") and (rep.get("core_missing") or rep.get("data_status") == "core_missing"):
+        gate_txt = "관망/현금 · 코어 결측"
+    lines = [f"easystock · BTC 선물 · {as_of}",
+             f"• BTCUSDT: {tp}·{grade} · {pp} · {gate_txt}"]
+    if last_grade and last_grade.get("correct") is not None:
+        hit = "적중" if last_grade["correct"] else "오판"
+        chg = last_grade.get("outcome_chg_pct")
+        prev_slot = last_grade.get("slot") or last_grade.get("trade_date")
+        extra = f" · 실측 {chg:+.1f}%" if chg is not None else ""
+        lines.append(f"   직전 {prev_slot} {hit}{extra}")
+    q = rep.get("quadrant")
+    nxt = "09:30" if slot == "2200" else "22:00"
+    lines.append(f"   다음 세션 {nxt}" + (f" · 사분면 {q}" if q else ""))
+    atr = (rep.get("atr") or {}).get("primary") or {}
+    if not blocked and atr.get("entry"):
+        lines.append(f"   진입 {atr['entry']:,.0f} · 손절 {atr['stop']:,.0f} · 목표 {atr['target']:,.0f}")
+        sz = rep.get("binance_size") or {}
+        if sz.get("usable"):
+            lines.append(
+                f"   참고(사용자입력) {sz.get('leverage')}x · {sz.get('margin'):,.0f} USDT → "
+                f"Size {sz.get('notional'):,.0f} · SL {sz.get('sl_pnl'):+.0f} · TP {sz.get('tp_pnl'):+.0f}")
+    lines.append(f"{url}/#btc-perp")
+    return "\n".join(lines)
+
+
 def send_telegram(text: str, timeout: float = 10.0) -> bool:
     """텔레그램으로 text 전송. 성공 True. 키 없거나 실패해도 예외 없이 False."""
     tok = _env("telegram_token")

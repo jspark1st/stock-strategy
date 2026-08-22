@@ -103,10 +103,17 @@ def test_breadth_limit_net_clamped():
 
 # ── 3) 투자주체 수급 ──────────────────────────────────────────────────────
 
-def test_flow_foreign_inst_buy_with_streak():
-    # frn 3000(→+12), ins 3000(→+8), prg 0, streak +1(→+10) => 50+12+8+10 = 80
-    s = score_flow(FlowInput(foreign_net=3000, inst_net=3000, program_net=0, foreign_streak=1))
-    assert s.score == pytest.approx(80.0)
+def test_flow_streak_bonus_only_at_three_days():
+    """SoT: +10 연속 보너스는 **3일 연속**에만. 1일 연속은 보너스 없음(과대평가 방지)."""
+    # frn 3000(→+12), ins 3000(→+8), prg 0. streak 1일 → 플래그 0 → 50+12+8 = 70
+    s1 = score_flow(FlowInput(foreign_net=3000, inst_net=3000, program_net=0, foreign_streak=1))
+    assert s1.score == pytest.approx(70.0)
+    # streak 3일 → 플래그 +1 → +10 → 80
+    s3 = score_flow(FlowInput(foreign_net=3000, inst_net=3000, program_net=0, foreign_streak=3))
+    assert s3.score == pytest.approx(80.0)
+    # 3일 연속 순매도 → 플래그 -1 → -10
+    sm = score_flow(FlowInput(foreign_net=3000, inst_net=3000, program_net=0, foreign_streak=-3))
+    assert sm.score == pytest.approx(60.0)
 
 
 def test_flow_retail_only_extra_penalty():
@@ -288,6 +295,32 @@ def test_call_excluded_on_expiry_not_counted_missing():
     assert r.data_sufficient is True          # 제외는 결측이 아님
     assert r.partial is False
     assert any("동시호가 항목 제외" in w for w in r.warnings)
+
+
+def test_news_not_applicable_excluded_not_neutral_50():
+    """검증된 재료 0건이면 뉴스를 중립 50 에 고정하지 않고 제외·재배분(감사: 죽은 10% 가중).
+
+    제외이므로 결측(부분데이터)이 아니라 완전성 100% 유지 + 가중이 실제 팩터로 재배분된다.
+    """
+    r = score_close(_full_inputs(
+        news=NewsInput(good_count=0, bad_count=0), news_not_applicable=True))
+    assert "news" in r.excluded_keys
+    assert "news" not in r.missing_keys
+    assert not any(s.key == "news" for s in r.subscores)   # 중립 50 서브스코어 없음
+    assert r.data_sufficient is True and r.partial is False
+    assert r.data_completeness == pytest.approx(1.0)       # 제외는 완전성 깎지 않음
+    # 남은 팩터 유효 가중 합 = 1 (news 0.10 이 실제 팩터로 재배분)
+    rep = r.to_report_dict()
+    assert sum(c["weight_eff"] for c in rep["contributions"]) == pytest.approx(1.0, abs=0.01)
+    assert "news" not in {c["key"] for c in rep["contributions"]}
+
+
+def test_news_scored_when_verified_materials_present():
+    """검증된 재료(호재≥1)가 있으면 제외하지 않고 정상 스코어(회귀 방지)."""
+    r = score_close(_full_inputs(
+        news=NewsInput(good_count=2, bad_count=0), news_not_applicable=False))
+    assert "news" not in r.excluded_keys
+    assert any(s.key == "news" for s in r.subscores)
 
 
 def test_breadth_divergence_lowers_p_up():

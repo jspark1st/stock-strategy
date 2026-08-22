@@ -147,6 +147,11 @@ def test_domestic_recap_is_not_scored_material():
 def test_overseas_recap_stays_material():
     """해외 마감은 국내 지수 항목과 중복이 아니라 익일 선행정보다."""
     assert news.classify_kind("뉴욕증시, 유가 급등에 하락 마감…다우 0.5%↓") == "재료"
+    # generic '지수'+세션어에 걸려 시황으로 오분류되던 해외 헤드라인 — 이제 재료 유지
+    assert news.classify_kind("뉴욕 지수 급락 마감") == "재료"
+    assert news.classify_kind("니케이 지수 반등 마감") == "재료"
+    # 국내 지수 recap 은 그대로 시황(회귀 방지)
+    assert news.classify_kind("코스피 지수 1% 하락 마감") == "시황"
 
 
 def test_capital_raise_always_material():
@@ -216,6 +221,42 @@ def test_short_direction_grading_is_mirrored():
     got = store.grade_with_candles(conn, "KOSPI", "close", _candles(), "t")
     # 숏: 목표는 저가로, 손절은 고가로 판정 (저가 101 > 목표 100.5 → 미달)
     assert got[0]["hit_target"] == 0 and got[0]["hit_stop"] == 0
+
+
+def test_accuracy_hit_rate_excludes_ungradeable_rows():
+    """p_up=None(데이터부족) 채점행은 correct=None → 적중률 분모에서 제외(적중률 왜곡 방지)."""
+    conn = _db()
+    # 방향을 낸 예측 1건(적중) + p_up 없는 예측 1건(채점되나 correct=None)
+    store.record_prediction(conn, {"id": "kospi-close", "trade_date": "2026-08-14",
+                                   "p_up": 0.7, "atr": {"direction": "long"}}, "t")
+    store.record_prediction(conn, {"id": "kospi-close", "trade_date": "2026-08-17",
+                                   "p_up": None, "atr": {"direction": "watch"}}, "t")
+    store.grade_with_candles(conn, "KOSPI", "close", _candles(), "t")
+    acc = store.accuracy(conn, "KOSPI", "close")
+    assert acc["n"] == 2                      # 2건 채점됨
+    assert acc["hit_rate"] == 1.0             # 방향 낸 1건이 적중 → 0.5 아님
+
+
+def test_overnight_horizon_graded_alongside_close():
+    """실제 거래 지평(종가매수→익일 시가매도, close→open)을 close→close 옆에 나란히 채점.
+
+    익일 시가는 갭 상승(+), 익일 종가는 하락(−)인 날 → 두 지평의 방향 정오가 갈린다.
+    이걸 라이브 채점이 잡아야 지평 불일치(exp_paper 발견)를 관측할 수 있다.
+    """
+    conn = _db()
+    cds = [Candle(date="20260814", open=100, high=101, low=99, close=100, volume=10),
+           Candle(date="20260817", open=100, high=104, low=99, close=103, volume=12),
+           # 익일: 시가 104(갭 +0.97%) 인데 종가 102(−0.97%) — 지평이 갈린다
+           Candle(date="20260818", open=104, high=106, low=101, close=102, volume=11)]
+    store.record_prediction(conn, {"id": "kospi-close", "trade_date": "2026-08-17",
+                                   "p_up": 0.7, "atr": {"direction": "long"}}, "t")
+    got = store.grade_with_candles(conn, "KOSPI", "close", cds, "t")
+    g = got[0]
+    assert g["realized_up"] == 0 and g["correct"] == 0        # close→close: 하락, 예측 빗나감
+    assert g["outcome_open_chg_pct"] > 0                       # close→open: 갭 상승
+    assert g["overnight_correct"] == 1                         # 실제 거래 지평선 예측 적중
+    acc = store.accuracy(conn, "KOSPI", "close")
+    assert acc["overnight_n"] == 1 and acc["overnight_hit_rate"] == 1.0
 
 
 def test_volume_factor_falls_back_then_learns():

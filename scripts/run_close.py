@@ -41,6 +41,7 @@ except Exception:
     pass
 
 from src import atr, calibration, config, execution, notify, quant, remote, store, strategy
+from src import btc_bundle
 from src.collectors import llm, naver, news
 from src.collectors.ls import LSClient, LSError, load_env
 from src.models import (
@@ -54,9 +55,8 @@ KST = timezone(timedelta(hours=9))
 DB_LOCAL = ROOT / "data" / "history.db"
 CALIB_BOOTSTRAP = ROOT / "data" / "calibration.json"   # 재구성 이력 부트스트랩 프라이어
 
-# 장 종료(종가 단일가 체결) 시각. 이 시각 전 실행 = 장중 스냅샷.
-SESSION_END_HHMM = 1530
-# 마감 후 데이터 확정까지의 여유 — 이 시각 이후 실행이면 당일 일봉을 확정으로 본다.
+# 마감 후 데이터 확정까지의 여유 — 이 시각(16:00) 이후 실행이면 당일 일봉을 확정으로 본다.
+# 세 데이터 소스(네이버 일봉·실시간 지수·LS t1511) 모두 이 하나로 잠정/확정을 판정한다.
 FINAL_AFTER_HHMM = 1600
 
 # etf: 지수 시간봉 프록시(t8412는 종목 전용) — KODEX 200 / KODEX 코스닥150
@@ -206,7 +206,10 @@ def resolve_session(series, quote, snap, now: datetime) -> Session | None:
         return Session(today, list(series.candles) + [c], intraday, src)
 
     if quote and quote.get("trade_date") == today and quote.get("price"):
-        intraday = (quote.get("market_status") == "OPEN") or hhmm < FINAL_AFTER_HHMM
+        # 잠정/확정은 세 소스 모두 16:00 하나로 판정한다. 예전엔 여기 market_status=="OPEN" 을
+        # OR 로 넣어, 장 마감 후에도 실시간 지수가 "OPEN"(단일가/시간외 잔여)을 주면 16:30 확정
+        # 회차가 intraday=True 로 뒤집혀 컨펌 diff 가 건너뛰이고 15:00 스냅샷이 덮여썼다.
+        intraday = hhmm < FINAL_AFTER_HHMM
         return _mk(quote["open"], quote["high"], quote["low"], quote["price"],
                    quote["volume"], quote["value"],
                    f"네이버 실시간 지수({quote.get('traded_at', '')[11:16]} 기준)", intraday)
@@ -215,8 +218,11 @@ def resolve_session(series, quote, snap, now: datetime) -> Session | None:
         return None
     if abs(snap.prev_close - last.close) > max(0.01, abs(last.close) * 1e-6):
         return None
+    # 잠정/확정 판정 임계는 세 소스 모두 FINAL_AFTER_HHMM(16:00)로 통일한다. 예전엔 이 LS
+    # 폴백만 15:30 을 써서 15:30~16:00 수동 실행 시 소스에 따라 intraday 가 엇갈렸다
+    # (확정 회차는 16:30 확정 일봉·수급을 쓰므로 16:00 기준이 맞다).
     return _mk(snap.open, snap.high, snap.low, snap.price, snap.volume, snap.value,
-               "LS t1511 라이브 지수(네이버 일봉 미반영)", hhmm < SESSION_END_HHMM)
+               "LS t1511 라이브 지수(네이버 일봉 미반영)", hhmm < FINAL_AFTER_HHMM)
 
 
 # ── 차트 프레임 ─────────────────────────────────────────────────────────────
@@ -270,7 +276,8 @@ def _llm_ctx(cfg, rep, atr_dict, materials, session: Session) -> dict:
         "total": rep.get("total"), "grade": rep.get("grade"),
         "p_up": rep.get("p_up"), "p_down": rep.get("p_down"),
         "subscores": rep.get("subscores", []), "flows": rep.get("flows", {}),
-        "atr": atr_dict, "gate": rep.get("gate"), "warnings": rep.get("warnings", []),
+        "atr": atr_dict, "gate": rep.get("gate"), "entry": rep.get("entry"),
+        "warnings": rep.get("warnings", []),
         "as_of": rep.get("as_of"),
         "intraday_snapshot": session.intraday,
         "headlines": ([{"title": m.title, "tag": m.tag, "kind": m.kind,
@@ -356,15 +363,19 @@ def build_report(cfg: dict, ls, client, conn, env, session_of: dict,
     if materials is not None:
         news_in = NewsInput(good_count=materials.good_count, bad_count=materials.bad_count)
         sources = materials.sources()
+        # 검증된 재료(호재·악재)가 하나도 없으면 뉴스를 중립 50 에 고정하지 않고 제외·재배분.
+        news_na = (materials.good_count == 0 and materials.bad_count == 0)
     else:
         news_in = NewsInput()
         sources = []
+        news_na = True   # 뉴스 수집 실패 — 중립 50 위조 대신 제외
 
     inputs = CloseInputs(
         trade_date=_iso(session.trade_ymd), close_strength=close_strength, breadth=breadth,
         flow=flow, value=value, call_auction=None, news=news_in, quant=quant_sig,
         market=ms, flags=DayFlags(), as_of=as_of,
         intraday_snapshot=session.intraday,
+        news_not_applicable=news_na,
         # 마감 동시호가(15:20~15:30): 15:00 장중엔 아직 미발생, 마감 후 재계산 회차에도
         # 이 파이프라인엔 동시호가 수집기가 없다 → 어느 회차든 '결측'이 아니라 '제외'로
         # 통일한다(확정 회차에서 갑자기 결측→재배분으로 총점이 출렁이지 않게). 전용 수집기가
@@ -381,8 +392,8 @@ def build_report(cfg: dict, ls, client, conn, env, session_of: dict,
     result = score_close(inputs, calib=calib_obj, direction_tilt=tilt)
     rep = result.to_report_dict(sources=sources)
     rep["id"] = cfg["id"]
-    rep["group"] = "장 마감"
-    rep["label"] = cfg["label"]
+    rep["group"] = cfg["label"]          # 코스피 / 코스닥
+    rep["label"] = "장 마감"
     rep["data_source"] = session.source
     rep["charts"] = {"index": _index_charts(market, client, session, intraday_series)}
     rep["intraday"] = intraday_block
@@ -433,8 +444,10 @@ def build_report(cfg: dict, ls, client, conn, env, session_of: dict,
             if not dry_run:
                 graded = store.grade_with_candles(conn, market, "close", candles, _now(),
                                                   session.pending_dates)
-        except Exception:  # noqa
+        except Exception as e:  # noqa
+            # 채점 실패를 조용히 삼키면 정확도 누적이 영구히 멈춰도 아무도 모른다 → 경보.
             graded = []
+            _alert(f"{cfg['label']} 예측 채점 실패({type(e).__name__}: {e}) — 자가학습 누적 중단 가능")
         acc = store.accuracy(conn, market, "close")
         try:
             perf = store.performance(conn, market, "close")
@@ -451,8 +464,10 @@ def build_report(cfg: dict, ls, client, conn, env, session_of: dict,
     rep["atr"] = atr_dict
 
     # ── 상품(ETF) 실행 엔진(P1-7): 지수 ATR 레벨 → ETF 가격 변환 + 괴리/스프레드 경고 ──
+    # 관망(watch)도 환산 표는 만든다 — 코스피·코스닥은 ETF가 본거래라 게이트 차단이어도
+    # 참고 타점이 필요. 인버스는 숏 판단일 때만.
     rep["order_card"] = None
-    if ls is not None and plan is not None and plan.direction in ("long", "short"):
+    if ls is not None and plan is not None:
         try:
             etf_code = cfg.get("etf_inv") if plan.direction == "short" else cfg.get("etf")
             eq = ls.etf_quote(etf_code)
@@ -467,21 +482,12 @@ def build_report(cfg: dict, ls, client, conn, env, session_of: dict,
         except Exception:  # noqa — 실행 카드 실패가 리포트를 막지 않는다
             rep["order_card"] = None
 
-    # ── 서술(3-LLM) ──
-    ctx = _llm_ctx(cfg, rep, atr_dict, materials, session)
-    try:
-        narrative = llm.build_narrative(ctx, env).to_dict()
-    except Exception as e:  # noqa
-        narrative = {"engine_trace": [f"LLM 실패({type(e).__name__})"]}
-    rep["narrative"] = narrative
-    for s in narrative.get("sources", []):
-        if s.get("url") and s not in rep.get("sources", []):
-            rep.setdefault("sources", []).append(s)
-
     rep["accuracy"] = acc
     rep["performance"] = perf
 
     # ── 신뢰도 확정(표본 보정) + 진입 게이트 + 버전 각인 (evaluation2/3) ──
+    # **서술(LLM) 앞에서 계산한다** — facts_block 이 entry.allow(6조건 AND)를 반영해야
+    # '등급 통과·allow=False'(코스닥) 케이스에서 LLM 이 매수 결론을 내지 않는다.
     # 주의: 여기서 필요한 건 전역 앱 config(risk 임계 등)다. **시장 cfg(id/mk/label 보유)를
     # 덮어쓰면 안 된다** — 아래 컨펌 diff(cfg["id"]·cfg["mk"])·LS 경보(cfg["label"])가 깨진다.
     # (과거 `cfg = config.load()` 덮어쓰기로 16:30 확정 회차가 KeyError 로 죽던 잠복 버그.)
@@ -505,6 +511,17 @@ def build_report(cfg: dict, ls, client, conn, env, session_of: dict,
     rep["entry"] = strategy.entry_decision(rep, appcfg)
     rep["lifecycle"] = strategy.resolve_lifecycle(
         now.hour * 100 + now.minute, "close", session.intraday)
+
+    # ── 서술(3-LLM) — entry.allow(6조건 AND) 반영 후 ──
+    ctx = _llm_ctx(cfg, rep, atr_dict, materials, session)
+    try:
+        narrative = llm.build_narrative(ctx, env).to_dict()
+    except Exception as e:  # noqa
+        narrative = {"engine_trace": [f"LLM 실패({type(e).__name__})"]}
+    rep["narrative"] = narrative
+    for s in narrative.get("sources", []):
+        if s.get("url") and s not in rep.get("sources", []):
+            rep.setdefault("sources", []).append(s)
 
     for g in graded:
         rep.setdefault("warnings", []).append(
@@ -687,7 +704,8 @@ def main() -> int:
     trade_date = reports[0].get("trade_date", "output")
     # 같은 날 아침 개장 전 뷰가 있으면 대시보드에 함께 남긴다(하루 4뷰).
     preopen = _load_preopen(trade_date)
-    bundle = {"trade_date": trade_date, "reports": reports + preopen,
+    btc = btc_bundle.load_btc()
+    bundle = {"trade_date": trade_date, "reports": btc_bundle.merge(reports + preopen, btc),
               "as_of": now.strftime("%Y-%m-%d %H:%M KST")}
     out_dir = ROOT / "out"
     out_dir.mkdir(exist_ok=True)

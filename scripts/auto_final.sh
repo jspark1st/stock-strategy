@@ -54,7 +54,14 @@ if git diff --cached --quiet; then
 fi
 
 git commit -m "auto(마감확정): $(date +%F)" >> "$LOG" 2>&1
-git pull --rebase --autostash origin main >> "$LOG" 2>&1
+# rebase 충돌 시 반쪽 상태·autostash 미복원 방지(auto_close.sh 주석 참조) → 중단·복구·배포 보류.
+if ! git pull --rebase --autostash origin main >> "$LOG" 2>&1; then
+  echo "[$(date '+%F %T')] ✗ git pull --rebase 충돌 — rebase 중단·워킹트리 복구, 배포 보류" >> "$LOG"
+  git rebase --abort >> "$LOG" 2>&1 || true
+  echo "[$(date '+%F %T')] ALERT: auto_final git rebase 충돌 — 수동 확인 필요" >> out/alerts.log
+  "$PY" scripts/notify.py "🔴 easystock 마감확정(16:30) git rebase 충돌 — 배포 보류·워킹트리 복구. 서버 확인." >> "$LOG" 2>&1 || true
+  exit 1
+fi
 if git push origin main >> "$LOG" 2>&1; then
   echo "[$(date '+%F %T')] ✓ 마감 확정본 배포 완료(Vercel 재배포)" >> "$LOG"
 else

@@ -50,8 +50,17 @@ if git diff --cached --quiet; then
 fi
 
 git commit -m "auto(마감): $(date +%F)" >> "$LOG" 2>&1
-# 원격이 앞서 있으면 push 가 거부된다 → rebase 로 맞춘 뒤 재시도
-git pull --rebase --autostash origin main >> "$LOG" 2>&1
+# 원격이 앞서 있으면 push 가 거부된다 → rebase 로 맞춘 뒤 재시도.
+# ⚠ rebase 가 public/index.html 충돌로 멈추면 (a) 반쪽 rebase 상태로 repo 가 잠기고
+#   (b) --autostash 로 치워둔 **미커밋 소스(라이브 코드)**가 pop 되지 않아, 다음 회차가
+#   조용히 옛 커밋 코드로 돈다. 실패 시 rebase 를 중단해 원상복구(autostash 자동 복원)하고 배포 보류.
+if ! git pull --rebase --autostash origin main >> "$LOG" 2>&1; then
+  echo "[$(date '+%F %T')] ✗ git pull --rebase 충돌 — rebase 중단·워킹트리 복구, 배포 보류" >> "$LOG"
+  git rebase --abort >> "$LOG" 2>&1 || true
+  echo "[$(date '+%F %T')] ALERT: auto_close git rebase 충돌 — 수동 확인 필요" >> out/alerts.log
+  "$PY" scripts/notify.py "🔴 easystock 마감(15:00) git rebase 충돌 — 배포 보류·워킹트리 복구. 서버 확인." >> "$LOG" 2>&1 || true
+  exit 1
+fi
 if git push origin main >> "$LOG" 2>&1; then
   echo "[$(date '+%F %T')] ✓ 마감 리포트 배포 완료(Vercel 자동배포 트리거)" >> "$LOG"
 else

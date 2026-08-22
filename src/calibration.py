@@ -87,6 +87,11 @@ def vol_tilt(params: dict | None, vol_ratio: float | None) -> float:
     """clamp(k·(vol_ratio−center), −cap, +cap). params 없거나 입력 없으면 0(무영향).
 
     KOSDAQ 만 params 를 갖는다(KOSPI 는 walk-forward 에서 신호가 과최적 → params 없음 → 0).
+
+    ⚠ 같은 vol_ratio 가 scoring.score_value(하락일 반전 감점)에도 쓰여 부호가 충돌한다(이중계상).
+    이 틸트의 증분 이득은 score_value 를 포함한 total 캘리브레이션 위에서 측정됐고(exp_guarded,
+    KOSDAQ AUC 0.488→0.577), 경험 측정(exp_vol_interaction)도 고거래량=방향무관 강세로 이 부호를
+    지지한다. 단 단일레짐·소표본이라 cap(±0.10)·KOSDAQ 한정으로 손상을 제한한다.
     """
     if not params or vol_ratio is None:
         return 0.0
