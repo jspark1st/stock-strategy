@@ -267,6 +267,13 @@ Environment: Python 3.12.3. **의존성은 venv(`~/overnight_report/.venv`)** �
 - **t8419** `/indtp/chart` 지수 일봉 — **미해결**: `gubun=2`+예제 파라미터로도 0행 반환. (지수 MA5·20일 평균거래대금이 여기 걸림 → 대안/파라미터 추가 조사 필요.)
 - **t1601** `/stock/investor` 투자자별종합 — **매핑 보류**: OutBlock `svolume_NN`(순매수=`ms_NN`-`md_NN`) 이 투자자유형 코드(suffix 00~18)별로 오나, **suffix→투자자(외국인/기관/개인) legend와 금액/수량 단위가 공개 스펙엔 없고 DevCenter `.res` 파일에만 존재.** 추측 금지(대원칙: 정확 수치는 API). 라이브 관찰: `_18`=합계, `{00..17}` 순매수 합=0(시장 항등식), 최대매수/매도는 `_08`/`_17`.
 - **미착수**: 실시간 웹소켓 `wss://openapi.ls-sec.co.kr:9443/websocket`.
+- **선물(야간 KOSPI200) — TR 프로브 완료·미구현 (2026-08-25, LsApiHelper 카탈로그)**: 개장전 유일한
+  '직교 실시간 후보' 조사 결과 — **t2101**(선물 현재가, InBlock `focode` → price·OHLC·basis·IV·그릭스),
+  **t2201**(선물 차트, InBlock `focode·stime·etime·cts_time` → 시계열 OHLC·volume·미결제·야간 필드
+  `jnilclose`). **2025-06 이후 KRX 야간거래**(EUREX연계 종료). 구현하려면 ①근월물 focode 획득
+  ②엔드포인트(index.json /futureoption/…) ③수집기 ④measure-first. **미구현 이유**: 야간선물은 간밤
+  미국장에 반응 → US blend와 **semi-redundant** 가능성 높음(오늘 ES/NQ 드리프트·VIX/DXY·펀딩이 전부
+  중복/음성이었음). 다레짐 데이터 축적 후 재측정 대상(open item, EV 낮음). 스펙 확보됐으니 재개 가능.
 
 ## Directory structure
 
