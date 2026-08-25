@@ -438,7 +438,7 @@ def build_report(cfg: dict, ls, client, conn, env, session_of: dict,
     rep = result.to_report_dict(sources=sources)
     rep["id"] = cfg["id"]
     rep["group"] = cfg["label"]          # 코스피 / 코스닥
-    rep["label"] = "장 마감"
+    rep["label"] = "장마감전 분석"
     rep["data_source"] = session.source
     rep["charts"] = {"index": _index_charts(market, client, session, intraday_series)}
     rep["intraday"] = intraday_block

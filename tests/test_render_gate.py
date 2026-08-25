@@ -207,21 +207,21 @@ def test_facts_block_allows_when_entry_allow_true():
 
 def test_sidebar_groups_by_market_then_stage():
     html = rr.build_sidebar([
-        {"id": "kosdaq-close", "group": "코스닥", "label": "장 마감",
+        {"id": "kosdaq-close", "group": "코스닥", "label": "장마감전 분석",
          "ph": False, "total": 32.3, "grade": "위험"},
-        {"id": "kospi-preopen", "group": "코스피", "label": "개장 전",
+        {"id": "kospi-preopen", "group": "코스피", "label": "개장전 분석",
          "ph": False, "total": 66.2, "grade": "우호"},
         {"id": "btc-perp", "group": "비트코인 선물", "label": "BTCUSDT",
          "ph": False, "total": 57.6, "grade": "중립"},
-        {"id": "kospi-close", "group": "코스피", "label": "장 마감",
+        {"id": "kospi-close", "group": "코스피", "label": "장마감전 분석",
          "ph": False, "total": 54.8, "grade": "약세"},
-        {"id": "kosdaq-preopen", "group": "코스닥", "label": "개장 전",
+        {"id": "kosdaq-preopen", "group": "코스닥", "label": "개장전 분석",
          "ph": False, "total": 56.6, "grade": "중립"},
     ])
     assert html.index("nav-title\">코스피") < html.index("nav-title\">코스닥")
     assert html.index("nav-title\">코스닥") < html.index("비트코인 선물")
     k = html[html.index("코스피"):html.index("코스닥")]
-    assert k.index("장 마감") < k.index("개장 전")
+    assert k.index("장마감전 분석") < k.index("개장전 분석")
 
 
 def test_normalize_remaps_legacy_nav():
@@ -231,8 +231,8 @@ def test_normalize_remaps_legacy_nav():
             {"id": "kospi-preopen", "group": "개장 전", "label": "코스피", "total": 2},
         ]
     })
-    assert b["reports"][0]["group"] == "코스피" and b["reports"][0]["label"] == "장 마감"
-    assert b["reports"][1]["group"] == "코스피" and b["reports"][1]["label"] == "개장 전"
+    assert b["reports"][0]["group"] == "코스피" and b["reports"][0]["label"] == "장마감전 분석"
+    assert b["reports"][1]["group"] == "코스피" and b["reports"][1]["label"] == "개장전 분석"
 
 
 def test_preopen_order_card_copied_from_close_on_normalize():

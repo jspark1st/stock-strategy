@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """마감/개장전 점수 번들 JSON → 단일 자체완결 HTML 대시보드 렌더러.
 
-구조: 좌측 사이드바(테마 그룹: 장 마감 / 개장 전) + 우측 뷰. 코스피/코스닥 시장/지수 레벨.
+구조: 좌측 사이드바(시장 그룹: 코스피/코스닥, 아이템: 장마감전 분석 / 개장전 분석) + 우측 뷰.
 트레이더 선호 UI: 다크 기본, 한국 HTS 색관례(빨강 상승·매수 / 파랑 하락·매도),
 오더티켓형 ATR 매매 플랜, 밀도 높은 KPI, 반응형(모바일 햄버거)·앱 대비 마크업.
 
@@ -27,12 +27,14 @@ LWC_PATH = ROOT / "assets" / "vendor" / "lightweight-charts.standalone.productio
 FAVORABLE = {"강세", "우호", "매수우위", "긍정", "호전", "적극"}
 NEUTRAL = {"중립", "관망", "혼조", "보통"}
 
-# 사이드바: 시장이 그룹, 단계가 아이템. 같은 시장의 마감→개장 전을 한 덩어리로 본다.
+# 사이드바: 시장이 그룹, 단계가 아이템. 같은 시장의 마감전 분석→개장전 분석을 한 덩어리로 본다.
 NAV_GROUP_ORDER = ("코스피", "코스닥", "비트코인 선물")
-NAV_ITEM_ORDER = ("장 마감", "개장 전")
+LABEL_CLOSE = "장마감전 분석"
+LABEL_PREOPEN = "개장전 분석"
+NAV_ITEM_ORDER = (LABEL_CLOSE, LABEL_PREOPEN)
 DEFAULT_PLACEHOLDERS = [
-    {"id": "kospi-preopen", "group": "코스피", "label": "개장 전", "note": "08:00 갱신"},
-    {"id": "kosdaq-preopen", "group": "코스닥", "label": "개장 전", "note": "08:00 갱신"},
+    {"id": "kospi-preopen", "group": "코스피", "label": LABEL_PREOPEN, "note": "08:00 갱신"},
+    {"id": "kosdaq-preopen", "group": "코스닥", "label": LABEL_PREOPEN, "note": "08:00 갱신"},
     {"id": "btc-perp", "group": "비트코인 선물", "label": "BTCUSDT", "note": "09:30 · 22:00"},
 ]
 
@@ -1444,7 +1446,7 @@ def _btc_mtf_table(r: dict) -> str:
 def render_report_view(r: dict, date: str) -> str:
     if r.get("report_type") == "btc_perp" or r.get("id") == "btc-perp":
         return render_btc_view(r, date)
-    group = esc(r.get("group", "장 마감"))
+    group = esc(r.get("group", LABEL_CLOSE))
     label = esc(r.get("label", "코스피"))
     view_date = esc(r.get("trade_date", date))
     nar = r.get("narrative", {}) or {}
@@ -1498,14 +1500,18 @@ def render_placeholder_view(p: dict) -> str:
 
 # ── 셸 조립 ─────────────────────────────────────────────────────────────────
 _NAV_REMAP = {
-    ("장 마감", "코스피"): ("코스피", "장 마감"),
-    ("장 마감", "코스닥"): ("코스닥", "장 마감"),
-    ("장 마감", "코스피 마감"): ("코스피", "장 마감"),
-    ("장 마감", "코스닥 마감"): ("코스닥", "장 마감"),
-    ("개장 전", "코스피"): ("코스피", "개장 전"),
-    ("개장 전", "코스닥"): ("코스닥", "개장 전"),
-    ("개장 전", "개장 전 · 코스피"): ("코스피", "개장 전"),
-    ("개장 전", "개장 전 · 코스닥"): ("코스닥", "개장 전"),
+    ("장 마감", "코스피"): ("코스피", LABEL_CLOSE),
+    ("장 마감", "코스닥"): ("코스닥", LABEL_CLOSE),
+    ("장 마감", "코스피 마감"): ("코스피", LABEL_CLOSE),
+    ("장 마감", "코스닥 마감"): ("코스닥", LABEL_CLOSE),
+    ("개장 전", "코스피"): ("코스피", LABEL_PREOPEN),
+    ("개장 전", "코스닥"): ("코스닥", LABEL_PREOPEN),
+    ("개장 전", "개장 전 · 코스피"): ("코스피", LABEL_PREOPEN),
+    ("개장 전", "개장 전 · 코스닥"): ("코스닥", LABEL_PREOPEN),
+    ("코스피", "장 마감"): ("코스피", LABEL_CLOSE),
+    ("코스닥", "장 마감"): ("코스닥", LABEL_CLOSE),
+    ("코스피", "개장 전"): ("코스피", LABEL_PREOPEN),
+    ("코스닥", "개장 전"): ("코스닥", LABEL_PREOPEN),
 }
 
 
@@ -1528,7 +1534,8 @@ def _attach_preopen_order_cards(reports: list[dict]) -> None:
     closes = {}
     for r in reports:
         rid = r.get("id") or ""
-        if rid.endswith("-close") or (r.get("label") == "장 마감" and not _is_preopen_report(r)):
+        if rid.endswith("-close") or (r.get("label") in ("장 마감", LABEL_CLOSE)
+                                      and not _is_preopen_report(r)):
             mk = "kosdaq" if "kosdaq" in rid.lower() else "kospi"
             if r.get("order_card"):
                 closes[mk] = r["order_card"]
@@ -1550,7 +1557,7 @@ def normalize_bundle(data: dict) -> dict:
         rep = dict(data)
         rep.setdefault("id", "kospi-close")
         rep.setdefault("label", "코스피")
-        rep.setdefault("group", "장 마감")
+        rep.setdefault("group", LABEL_CLOSE)
         rep.setdefault("market", data.get("market", {}))
         b = {"trade_date": data.get("trade_date", ""), "reports": [rep]}
     have_ids = {p.get("id") for p in b.get("placeholders") or []}
@@ -1572,8 +1579,9 @@ def normalize_bundle(data: dict) -> dict:
                          and p.get("id") not in present_ids]
     for i, rep in enumerate(b["reports"]):
         rep.setdefault("id", f"report-{i}")
-        rep.setdefault("group", "장 마감")
+        rep.setdefault("group", "코스피")
         rep.setdefault("label", rep["id"])
+        _remap_nav(rep)
     return b
 
 
@@ -1652,7 +1660,7 @@ def render(data: dict, lwc_src: str | None = None) -> str:
         if not r.get("as_of") and bundle_as_of:
             r["as_of"] = bundle_as_of
         items.append({"id": vid, "label": r.get("label", vid),
-                      "group": r.get("group", "장 마감"), "ph": False,
+                      "group": r.get("group", "코스피"), "ph": False,
                       "total": r.get("total"), "grade": r.get("grade")})
         views.append((vid, render_report_view(r, date)))
         if r.get("charts"):
@@ -1721,7 +1729,7 @@ TEMPLATE = r"""<!doctype html>
   .num{font-variant-numeric:tabular-nums}
 
   /* 사이드바 */
-  .sidebar{width:236px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);
+  .sidebar{width:252px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);
     padding:18px 14px;position:sticky;top:0;height:100vh;height:100dvh;overflow-y:auto;
     display:flex;flex-direction:column;gap:6px}
   .brand{font-weight:800;font-size:1.02rem}
