@@ -31,7 +31,7 @@ except Exception:
     pass
 
 from src import btc_bundle, config, notify, overnight, remote, store, strategy
-from src.collectors import llm, naver
+from src.collectors import llm, naver, yahoo
 from src.collectors.ls import load_env
 from render_report import render
 
@@ -71,7 +71,8 @@ def _mk_of(rep: dict) -> str:
 
 def build_preopen(close_rep: dict, today: str, env: dict, anchor_date: str,
                   stale_note: str | None, as_of: str, fx: dict | None,
-                  world: dict | None = None, macro: dict | None = None) -> dict:
+                  world: dict | None = None, macro: dict | None = None,
+                  futures: dict | None = None) -> dict:
     mk = _mk_of(close_rep)
     market_ko = {"kospi": "코스피", "kosdaq": "코스닥"}.get(
         mk, close_rep.get("group") or close_rep.get("label") or "코스피")
@@ -100,6 +101,9 @@ def build_preopen(close_rep: dict, today: str, env: dict, anchor_date: str,
           "confirm_mult": confirm_mult, "direction": direction,
           "anchor_intraday": bool(close_rep.get("intraday_snapshot")),
           "macro": macro or {},
+          # 개장전 실시간 미국 지수선물(Yahoo 실API). **표시용·점수 미반영**(measure-first 미통과 —
+          # 현물 blend 대비 증분 미확인). 신선한 위험 맥락 + 표본 축적 후 재측정용.
+          "us_futures": futures or {},
           "exit_plan": strategy.exit_plan(cfg, direction)}
 
     ctx = {
@@ -205,10 +209,17 @@ def main() -> int:
     if macro:
         print("간밤 매크로: " + " · ".join(
             f"{v['name']} {v['chg_pct']:+.2f}%" for v in macro.values()))
+    # 개장전 실시간 미국 지수선물(Yahoo 실API) — 표시용·점수 미반영(measure-first 미통과).
+    futures = yahoo.futures_snapshot()
+    if futures:
+        shown_f = [f"{v['name']} {v['chg_pct']:+.2f}%" for v in futures.values()
+                   if v.get("chg_pct") is not None]
+        if shown_f:
+            print("개장전 선물(실시간·표시용): " + " · ".join(shown_f))
 
     preopen_reports = []
     for cr in close_reports:
-        prep = build_preopen(cr, today, env, anchor_date, stale_note, as_of, fx, world, macro)
+        prep = build_preopen(cr, today, env, anchor_date, stale_note, as_of, fx, world, macro, futures)
         preopen_reports.append(prep)
         n = prep["narrative"]
         print(f"[{prep['label']} 개장 전] {' / '.join(n.get('engine_trace', []))}")
