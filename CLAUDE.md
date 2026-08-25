@@ -131,7 +131,7 @@ BTC 상세는 **HANDOFF_BTC.md** (이 파일의 주식 로그보다 그쪽이 So
 
 ### 지금 서버·repo
 - **KS6F-JNT-3-VM-1** `~/overnight_report` (구 KS5F `~/stock_strategy` 는 폐기).
-- Python은 **`.venv/bin/python`** (시스템 python3 에 pytest/httpx 없음). 테스트 **212 passed**.
+- Python은 **`.venv/bin/python`** (시스템 python3 에 pytest/httpx 없음). 테스트 **250 passed** (2026-08-25, `.venv`).
 - 라이브: https://easystock-junaitech.vercel.app — `public/index.html` push → Vercel.
 - 마지막 사이트 배포: `2ee469a` (2026-08-22 11:11, HTML만).
 
@@ -171,9 +171,12 @@ BTC 상세는 **HANDOFF_BTC.md** (이 파일의 주식 로그보다 그쪽이 So
   임계를 이 숫자로 느슨하게 하지 말 것. 확률추종/항상롱은 비용 후 음수 R.
 - **BTC 코딩은 여기서 접음.** 관측만. 주식과 섞지 말 것.
 
-### 미커밋 워킹트리 (2026-08-22 기준, 커밋 금지)
-수정: `scripts/render_report.py` `run_close.py` `run_preopen.py` `src/collectors/llm.py` `news.py` `src/notify.py` `src/store.py` `tests/test_render_gate.py` (+ AGENTS/CLAUDE/.env.example)
-untracked BTC: `src/btc_*.py` `scripts/run_btc.py` `auto_btc.sh` `btc_tui.py` `exp_btc*.py` `src/collectors/binance.py` `tests/test_btc*.py` `HANDOFF_BTC.md`
+### 미커밋 워킹트리 (2026-08-22 기준 — ⚠️ 이 목록은 이후 전부 커밋됨. 현재 git status clean)
+> **낡음 주의(2026-08-25):** 아래는 8/22 시점 스냅샷일 뿐, 그 후 파이썬 소스·BTC 파일이 모두
+> main 에 커밋됨(현재 `git status` clean). "커밋 금지"는 그 시점 규율이었고, 이후 사용자 지시로
+> 커밋들이 진행됐다(σ_AM·HTS·notify·health_check·BTC 캐리 등). 이 목록을 "미커밋"으로 믿지 말 것.
+수정(당시): `scripts/render_report.py` `run_close.py` `run_preopen.py` `src/collectors/llm.py` `news.py` `src/notify.py` `src/store.py` `tests/test_render_gate.py` (+ AGENTS/CLAUDE/.env.example)
+untracked BTC(당시): `src/btc_*.py` `scripts/run_btc.py` `auto_btc.sh` `btc_tui.py` `exp_btc*.py` `src/collectors/binance.py` `tests/test_btc*.py` `HANDOFF_BTC.md`
 
 ### 다음 사람이 하면 안 되는 것
 - BTC 게이트 임계를 통과율 높이려고 낮추기.
@@ -227,18 +230,18 @@ python3 scripts/render_report.py <path-to-bundle-or-scores.json>
 cd out && python3 -m http.server 8931 --bind 127.0.0.1
 #   then open http://127.0.0.1:8931/report_<date>.html
 
-# Tests
-.venv/bin/python -m pytest tests/ -q                 # 212 passed (2026-08-22)
-python3 -m pytest tests/test_scoring.py -q            # scoring engine only
-python3 -m pytest tests/test_scoring.py::<name> -q    # single test
+# Tests — 반드시 .venv (시스템 python3 엔 pytest/httpx 없음)
+.venv/bin/python -m pytest tests/ -q                       # 250 passed (2026-08-25)
+.venv/bin/python -m pytest tests/test_scoring.py -q         # scoring engine only
+.venv/bin/python -m pytest tests/test_scoring.py::<name> -q # single test
 ```
 
-Environment: Python 3.12.3, `httpx` present (installed via `pip --user`, plus `anthropic` for LLM narrative). No virtualenv; scripts use stdlib + httpx.
+Environment: Python 3.12.3. **의존성은 venv(`~/overnight_report/.venv`)** — httpx·anthropic·pytest 등. 시스템 python3 엔 없음(구서버 KS5F 시절 "No virtualenv" 서술은 폐기). 실행·테스트는 `.venv/bin/python` 으로.
 
 ## Conventions and gotchas
 
 - **UTF-8:** on Linux it's automatic. New scripts that print Korean should still reconfigure stdout to UTF-8 at the top so they survive a cp949 console if ever run on Windows.
-- **Secrets stay in `.env`.** Scripts read them via a dependency-free parser (`load_env`) or `os.environ` — never hardcode, never print raw key/token values (mask to `first4...last4`). `.env` is gitignored; `.env.example` documents key names only. The live `.env` on this server has 9 keys and is placed by the user (`~/stock_strategy/.env`).
+- **Secrets stay in `.env`.** Scripts read them via a dependency-free parser (`load_env`) or `os.environ` — never hardcode, never print raw key/token values (mask to `first4...last4`). `.env` is gitignored; `.env.example` documents key names only. The live `.env` is at **`~/overnight_report/.env`** (구서버 경로 `~/stock_strategy/.env` 는 폐기). 텔레그램 알림 키(`telegram_token`·`telegram_chat_id`) 포함.
 - Reports follow the skills' teal/dark-light design language (from `assets/dashboard-template.html`); keep new UI consistent with `scripts/render_report.py`.
 
 ## Data sources and keys
@@ -663,6 +666,20 @@ Keep this section updated as work advances. Status legend: ✅ done · 🔶 part
   - ✅ **헬스체크 배선**(`scripts/health_check.py` → `auto_final.sh`): 매일 16:30 뒤 실거래-라벨 괴리·
     간밤틸트 head-to-head·채점 정체·BTC 고아행을 검사해 텔레그램 보고(읽기전용·fail-safe). n<40은
     '측정중'으로만. 테스트 +3(`test_health_check.py`: 괴리경보·정합무경보·n<40 규율).
+
+- **2026-08-25 (2차) — fan-out 전면 점검(5에이전트) + 후속 수정(브랜치 fix/audit-followups)**
+  5개 에이전트 병렬 감사(스코어링·ATR·캐리 / 파이프라인·크론 / 신규코드 적대리뷰 / 수집기·인과성 /
+  문서정합). **코드는 견고**(실행·게이트·페이지네이션·미래참조 전부 정상, 250 통과). 발견·수정:
+  - 🔴 **[유일 라이브 실버그] `naver._num` 결측→0.0** — `world_indices` chg_pct/close 가 누락되면 '보합'
+    으로 둔갑해 `overnight.py` 의 `is None` 결측 가드를 무력화(간밤 틸트 오염). `_num_opt`(None 반환)
+    신설·world_indices 적용, run_preopen 표시 None 가드. 유일한 검증 edge(간밤 신호) 보호.
+  - 🟡 **[캐리 저심각] 능동 왕복비용 2배** — `sw*roundtrip`(1왕복=2전환) → `sw*(roundtrip/2)`. 안전측
+    이었으나 정정. **net_with_basis off-by-one** — 베이시스 루프에 i=0 포함(rates 와 n 일치, 경계항 정확).
+  - 🟡 **[robustness] run_btc_carry** — 부분수집 시 `c.failed` 항상 로그 · `mkdir(parents=True)`.
+  - 📄 **문서 정합** — CLAUDE.md Commands/Env 의 구서버(KS5F) 잔재 정정(.venv 필수·`.env` 경로·pytest
+    명령), 테스트수 212→250, "미커밋 워킹트리(커밋금지)" 배너에 낡음 경고, AGENTS.md 불변식에 BTC 캐리
+    별도트랙 인지, HANDOFF_BTC 에 캐리 모듈 반영. 테스트 +4(`test_naver_numopt`).
+  - 커밋은 **브랜치 `fix/audit-followups`**(사용자 지시대로 브랜치에). main 미병합.
 
 ### 이어서 할 곳 (open items)
 0. **[최우선] 방향예측 — 판별력(AUC) 계속** — 5차 처리분: 캘리브레이션(비관편향, 양시장) + **가드된

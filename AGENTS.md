@@ -18,9 +18,13 @@
 
 ## 절대 규칙 (섞지 마라)
 
-1. **다른 전략을 추가하지 않는다.** 숏 단독 전략·데이트레이딩·스캘핑·목표도달(path) 트레이딩 등은
-   이 프로젝트의 범위가 **아니다.** 오버나이트 롱 방향예측 하나만 최고로 만든다.
+1. **주식 트랙에 다른 전략을 섞지 않는다.** 숏 단독 전략·데이트레이딩·스캘핑·목표도달(path) 트레이딩 등은
+   **주식(코스피/코스닥) 트랙**의 범위가 **아니다.** 오버나이트 롱 방향예측 하나만 최고로 만든다.
    (BTC 선물 트랙은 예외가 아니라 **별도 트랙**이다 — `src/scoring.py` 를 공유하지 않는다.)
+   - **BTC 별도 트랙 내 추가(2026-08-25):** BTC 트랙에는 방향예측(perp)에 더해 **시장중립 펀딩 캐리**
+     (`src/btc_carry.py`·`scripts/run_btc_carry.py`, 관측/실험 L0/L1)가 있다. 주식 스코어링·크론·
+     대시보드와 완전 분리돼 공존하므로 이 규칙(주식 단일 전략)과 충돌하지 않는다. 실거래·자동집행은
+     다레짐 재검증 전까지 없음. → 상세 `docs/CROSS_BTC_CARRY.md`.
 2. **표현이 아니라 검증으로 발전한다.** 문구·UI를 다듬는 것보다 **방향예측 정확도를 실제로 올리는 것**이
    항상 우선이다. 개선은 `scripts/run_backtest.py`(하네스)로 **측정 → 개선 → 재측정**한다.
 3. **정확 수치는 API.** 점수·확률·가격·수급은 LS/네이버 API 값만. LLM 은 서술 전용, 수치 생성 금지.
@@ -74,7 +78,7 @@ cron(평일): `0 8` preopen · `0 15` close · `30 16` final. 자동 push→Verc
 PYTHONUTF8=1 python scripts/run_backtest.py --count 250 --tune   # 방향예측 성적·튜닝(개발 중심)
 PYTHONUTF8=1 python scripts/run_close.py                          # 마감 파이프라인
 PYTHONUTF8=1 python scripts/run_preopen.py                        # 개장전 재평가
-PYTHONUTF8=1 .venv/bin/python -m pytest tests/ -q                  # 212 passed (2026-08-22)
+PYTHONUTF8=1 .venv/bin/python -m pytest tests/ -q                  # 250 passed (2026-08-25)
 ```
 
 ## 문서 지도 (이 순서로 파고든다)

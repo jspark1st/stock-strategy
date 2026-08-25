@@ -129,7 +129,7 @@ def build_preopen(close_rep: dict, today: str, env: dict, anchor_date: str,
             f"앵커가 된 마감 리포트는 {close_rep.get('as_of') or '장중'} 스냅샷 기준이었다 "
             "— 실제 종가와 다를 수 있으니 오늘 시가 대응 시 재확인.")
     return {
-        "id": f"{mk}-preopen", "group": market_ko, "label": "개장 전",
+        "id": f"{mk}-preopen", "group": market_ko, "label": "개장전 분석",
         "report_type": "preopen", "trade_date": today, "anchor_date": anchor_date,
         "as_of": as_of,
         "total": close_rep.get("total"), "grade": close_rep.get("grade"),
@@ -195,8 +195,12 @@ def main() -> int:
         print(f"원달러: {fx['price']:,.2f} ({fx['chg_pct']:+.2f}%)")
     world = naver.world_indices()
     if world:
-        print("간밤 미국장: " + " · ".join(
-            f"{v['name']} {v['chg_pct']:+.2f}%" for v in world.values()))
+        # chg_pct 가 None(결측)인 지수는 표시에서 제외 — _num_opt 도입으로 결측이 0.0 이 아닌
+        # None 이 되므로 :+.2f 크래시 방지(결측은 overnight_tilt 에서도 자동 제외됨).
+        shown = [f"{v['name']} {v['chg_pct']:+.2f}%" for v in world.values()
+                 if v.get("chg_pct") is not None]
+        if shown:
+            print("간밤 미국장: " + " · ".join(shown))
     macro = naver.macro_overnight()
     if macro:
         print("간밤 매크로: " + " · ".join(
