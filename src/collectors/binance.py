@@ -118,6 +118,35 @@ class BinanceClient:
             })
         return out
 
+    def funding_history_paged(self, pages: int = 6, per_page: int = 1000) -> list[dict]:
+        """페이지네이션 펀딩 이력 → [{time, rate}] 오름차순(중복 제거·결측 rate 제외).
+
+        바이낸스는 요청당 최대치(관측상 ~500행)만 주므로 endTime 으로 과거를 이어 붙인다.
+        **`len(rows) < per_page` 로 멈추지 않는다** — 그게 1페이지만 돌던 버그였다. 빈 페이지나
+        진전 없음(가장 오래된 시각이 안 줄어듦)에서만 중단. 결측 rate 는 0 이 아니라 제외한다."""
+        seen: dict[int, float] = {}
+        end: int | None = None
+        for _ in range(max(1, pages)):
+            params = {"symbol": SYMBOL, "limit": per_page}
+            if end is not None:
+                params["endTime"] = end
+            rows = self._try("/fapi/v1/fundingRate", params, "fundingRate")
+            if not rows:
+                break
+            times = [int(r.get("fundingTime") or 0) for r in rows if r.get("fundingTime")]
+            if not times:
+                break
+            for r in rows:
+                t = int(r.get("fundingTime") or 0)
+                rate = _f(r.get("fundingRate"))
+                if t and rate is not None:
+                    seen[t] = rate
+            new_end = min(times) - 1
+            if end is not None and new_end >= end:   # 진전 없음 → 중단
+                break
+            end = new_end
+        return [{"time": t, "rate": seen[t]} for t in sorted(seen)]
+
     def open_interest(self) -> float | None:
         d = self._try("/fapi/v1/openInterest", {"symbol": SYMBOL}, "openInterest")
         return _f(d.get("openInterest")) if d else None
