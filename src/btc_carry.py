@@ -37,11 +37,15 @@ def _cum(rs: list[float]) -> float:
 
 
 def carry_backtest(rates: list, roundtrip_cost: float = ROUNDTRIP_COST,
-                   capital_mult: float = CAPITAL_MULT) -> dict:
-    """펀딩레이트 리스트(8시간 단위) → 패시브/능동 캐리 성적(비용차감·자본보정).
+                   capital_mult: float = CAPITAL_MULT,
+                   basis: list | None = None) -> dict:
+    """펀딩레이트 리스트(8시간 단위) → 패시브/능동 캐리 성적(비용차감·자본보정·베이시스 MTM).
 
     - 패시브: 항상 델타중립 보유 → 매 8h 펀딩 수취(음수면 지급). 진입/청산 1회 비용.
     - 능동: 펀딩 양수일 때만 수취(음수 회피) — 회전 비용에 보통 진다(대조용).
+    - **베이시스(basis)**: rates 와 같은 길이의 프리미엄 분수 리스트를 주면, 정확한 현금캐리
+      P&L(= 펀딩 − Δ베이시스)과 베이시스 MTM 리스크(변동성·최악낙폭)를 함께 낸다. 무기한은
+      만기가 없어 Δ베이시스는 장기엔 ~0(경계항)이지만 보유 중 **MTM 변동 리스크**는 실재.
     명목(notional)과 **자본대비(capital)** 를 둘 다 반환. 자본대비 = 명목 / capital_mult.
     """
     rates = _clean(rates)
@@ -50,7 +54,9 @@ def carry_backtest(rates: list, roundtrip_cost: float = ROUNDTRIP_COST,
             "ann_notional_pct": None, "ann_capital_pct": None,
             "passive_notional_pct": None, "passive_capital_pct": None,
             "active_notional_pct": None, "active_switches": 0,
-            "worst_neg_run_pct": None, "capital_mult": capital_mult, "measuring": True}
+            "worst_neg_run_pct": None, "capital_mult": capital_mult,
+            "net_with_basis_notional_pct": None, "basis_mtm_std_pct": None,
+            "worst_basis_mtm_pct": None, "measuring": True}
     if n == 0:
         return base
     years = n / FUNDINGS_PER_YEAR
@@ -72,6 +78,23 @@ def carry_backtest(rates: list, roundtrip_cost: float = ROUNDTRIP_COST,
     for r in rates:
         run = run + r if r < 0 else 0.0
         worst = min(worst, run)
+    # 베이시스 MTM: 현금캐리 P&L = 펀딩 − Δ베이시스(숏 perp + 롱 spot). 장기엔 경계항이나 변동은 리스크.
+    net_basis = std_basis = worst_basis = None
+    if basis is not None and len(basis) == len(rates):
+        step_pnl, cum_b, peak, dd = [], 0.0, 0.0, 0.0
+        for i in range(1, len(rates)):
+            b0, b1 = basis[i - 1], basis[i]
+            dpx = (b1 - b0) if (b0 is not None and b1 is not None) else 0.0
+            step = rates[i] - dpx           # 펀딩 − Δ베이시스
+            step_pnl.append(step)
+            cum_b += step
+            peak = max(peak, cum_b)
+            dd = min(dd, cum_b - peak)
+        if step_pnl:
+            net_basis = (_cum(step_pnl) - roundtrip_cost * 100)
+            m = sum(step_pnl) / len(step_pnl)
+            std_basis = (sum((x - m) ** 2 for x in step_pnl) / len(step_pnl)) ** 0.5 * 100
+            worst_basis = dd * 100
     return {
         "n": n, "years": round(years, 2), "pos_ratio": round(pos_ratio, 3),
         "mean_8h": mean_8h, "capital_mult": capital_mult,
@@ -81,6 +104,9 @@ def carry_backtest(rates: list, roundtrip_cost: float = ROUNDTRIP_COST,
         "passive_capital_pct": round(passive_capital, 2),
         "active_notional_pct": round(active_notional, 2), "active_switches": sw,
         "worst_neg_run_pct": round(worst * 100, 3),
+        "net_with_basis_notional_pct": (round(net_basis, 2) if net_basis is not None else None),
+        "basis_mtm_std_pct": (round(std_basis, 4) if std_basis is not None else None),
+        "worst_basis_mtm_pct": (round(worst_basis, 2) if worst_basis is not None else None),
         "measuring": n < MIN_N,
     }
 

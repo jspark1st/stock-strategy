@@ -147,6 +147,34 @@ class BinanceClient:
             end = new_end
         return [{"time": t, "rate": seen[t]} for t in sorted(seen)]
 
+    def premium_index_paged(self, pages: int = 6, per_page: int = 1000,
+                            interval: str = "8h") -> list[dict]:
+        """프리미엄지수(베이시스) 이력 → [{time, basis}] 오름차순. basis = 프리미엄 분수((perp-spot)/spot).
+
+        8h 봉이 펀딩 정산(00/08/16 UTC)과 정렬된다. 캐리의 베이시스 MTM(현금캐리 P&L = 펀딩 − Δ베이시스)과
+        베이시스 리스크(변동성·최악낙폭) 산출용. 페이지네이션·결측 제외는 funding_history_paged 와 동일 규율."""
+        seen: dict[int, float] = {}
+        end: int | None = None
+        for _ in range(max(1, pages)):
+            params = {"symbol": SYMBOL, "interval": interval, "limit": per_page}
+            if end is not None:
+                params["endTime"] = end
+            rows = self._try("/fapi/v1/premiumIndexKlines", params, "premIdxKlines")
+            if not rows:
+                break
+            times = [int(r[0]) for r in rows if r and r[0] is not None]
+            if not times:
+                break
+            for r in rows:
+                t = int(r[0]); basis = _f(r[4])   # close = 프리미엄 분수
+                if t and basis is not None:
+                    seen[t] = basis
+            new_end = min(times) - 1
+            if end is not None and new_end >= end:
+                break
+            end = new_end
+        return [{"time": t, "basis": seen[t]} for t in sorted(seen)]
+
     def open_interest(self) -> float | None:
         d = self._try("/fapi/v1/openInterest", {"symbol": SYMBOL}, "openInterest")
         return _f(d.get("openInterest")) if d else None

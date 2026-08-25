@@ -32,9 +32,10 @@ def _arg(flag, default=None):
 
 def main() -> int:
     pages = int(_arg("--pages", "6"))
-    c = BinanceClient(budget_s=60.0)
+    c = BinanceClient(budget_s=90.0)
     try:
         hist = c.funding_history_paged(pages=pages)
+        basis_hist = c.premium_index_paged(pages=pages)
         prem = c.premium()
     finally:
         c.close()
@@ -42,7 +43,11 @@ def main() -> int:
         print(f"펀딩 데이터 수집 실패({', '.join(c.failed) or '빈 결과'}) — 종료")
         return 1
     rates = [h["rate"] for h in hist]
-    bt = btc_carry.carry_backtest(rates)
+    # 베이시스를 펀딩 시각(8h 버킷)에 정렬 → 현금캐리 P&L(펀딩 − Δ베이시스)·MTM 리스크 산출.
+    BUCKET = 8 * 3600 * 1000
+    basis_map = {b["time"] // BUCKET: b["basis"] for b in basis_hist}
+    basis_aligned = [basis_map.get(h["time"] // BUCKET) for h in hist]
+    bt = btc_carry.carry_backtest(rates, basis=basis_aligned)
     periods = btc_carry.carry_periods(rates, buckets=4)
     sig = btc_carry.carry_signal(rates, prem)
 
@@ -51,6 +56,10 @@ def main() -> int:
     print(f"  패시브(항상 중립) 순 연환산: 명목 {bt['ann_notional_pct']:+.1f}% → **자본대비 {bt['ann_capital_pct']:+.1f}%/년** ({tag}) · 방향위험 0")
     print(f"  능동(양수시만) 명목 {bt['active_notional_pct']:+.1f}% (전환 {bt['active_switches']}회) — 회전비용에 취약(대조용)")
     print(f"  최악 음수펀딩 연속 {bt['worst_neg_run_pct']:.2f}%")
+    if bt.get("net_with_basis_notional_pct") is not None:
+        print(f"  베이시스 반영 현금캐리(펀딩−Δ베이시스): 명목 {bt['net_with_basis_notional_pct']:+.1f}% "
+              f"(펀딩만 {bt['passive_notional_pct']:+.1f}% 대비 차이=경계항)")
+        print(f"    베이시스 MTM 리스크: 8h변동 std {bt['basis_mtm_std_pct']}% · 최악 MTM 낙폭 {bt['worst_basis_mtm_pct']}%")
     if periods:
         print("  구간 분해(레짐 지속성, 자본대비 연환산):")
         for p in periods:

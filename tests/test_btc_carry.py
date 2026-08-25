@@ -65,6 +65,24 @@ def test_signal_enters_above_capital_threshold():
     assert "방향위험 없음" in strong["risk"]
 
 
+def test_basis_mtm_included_and_boundary():
+    # 현금캐리 P&L = 펀딩 − Δ베이시스. 베이시스가 평평하면 펀딩만과 사실상 같고(경계항 0),
+    # 베이시스가 변하면 MTM 리스크(std·낙폭) 가 산출된다(검토 지적: 베이시스 손익 없음 → 반영).
+    rates = [0.0002] * 50
+    flat = btc_carry.carry_backtest(rates, basis=[0.0] * 50)
+    assert flat["net_with_basis_notional_pct"] is not None
+    assert abs(flat["net_with_basis_notional_pct"] - flat["passive_notional_pct"]) < 0.3
+    assert flat["basis_mtm_std_pct"] == 0.0
+    moving = btc_carry.carry_backtest(rates, basis=[0.001 * (i % 2) for i in range(50)])
+    assert moving["basis_mtm_std_pct"] > 0        # 베이시스 변동 → MTM 리스크 잡힘
+    assert moving["worst_basis_mtm_pct"] <= 0
+
+
+def test_basis_ignored_when_length_mismatch():
+    bt = btc_carry.carry_backtest([0.0002] * 50, basis=[0.0] * 10)
+    assert bt["net_with_basis_notional_pct"] is None    # 길이 불일치 → 무시(크래시 없음)
+
+
 def test_empty_rates_safe():
     bt = btc_carry.carry_backtest([])
     assert bt["n"] == 0 and bt["ann_capital_pct"] is None
