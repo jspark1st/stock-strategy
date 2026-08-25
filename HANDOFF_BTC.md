@@ -1,4 +1,10 @@
-# HANDOFF_BTC — BTCUSDT 무기한 선물 리포트 트랙 (2026-08-21)
+# HANDOFF_BTC — BTCUSDT 무기한 선물 리포트 트랙 (2026-08-21, 갱신 2026-08-25)
+
+> **2026-08-25 추가:** 이 방향예측(perp) 트랙과 **별개로**, BTC 트랙에 **시장중립 펀딩 캐리**
+> 모듈이 추가됨(`src/btc_carry.py`·`scripts/run_btc_carry.py`·`src/collectors/binance.py` 의
+> `funding_history_paged`/`premium_index_paged`). 관측/실험(L0/L1)·실주문 없음. "BTC 코딩 접음"은
+> perp **방향예측** 트랙 얘기고, 캐리는 별도 파일이라 모순 아님. 상세 `docs/CROSS_BTC_CARRY.md`.
+> 라이브 실측: 패시브 캐리 자본대비 ~+4%/년(구간분해 7.8→1.2% 압축), 저회전 패시브가 옳음.
 
 > **AGENTS.md 의 오버나이트 롱(KOSPI/KOSDAQ) 전략과 섞지 마라.** 이건 **별도 트랙**이다.
 > 스코어링 파일·크론·팩터·DB 슬롯이 모두 분리돼 있다. 같은 것은 서버·`.env`·`history.db`
@@ -111,7 +117,7 @@ cd ~/overnight_report
 bash scripts/auto_btc.sh                          # 크론과 같은 경로(--auto) + git push
 bash scripts/auto_btc.sh manual 5 1000            # 수동 슬롯(HHMM) + git push
 bash scripts/auto_btc.sh push-only                # 파이프라인 없이 배포만
-.venv/bin/python -m pytest tests/ -q              # 212 통과 (2026-08-22, 주식 포함)
+.venv/bin/python -m pytest tests/ -q              # 250 통과 (2026-08-25, 주식+BTC캐리 포함)
 ```
 
 로그 `out/auto_btc.log` · 경보 `out/alerts.log`.

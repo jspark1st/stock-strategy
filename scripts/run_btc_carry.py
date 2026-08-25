@@ -42,6 +42,8 @@ def main() -> int:
     if not hist:
         print(f"펀딩 데이터 수집 실패({', '.join(c.failed) or '빈 결과'}) — 종료")
         return 1
+    if c.failed:  # 부분 수집(네트워크 조기종료 등)이면 n/years 가 조용히 축소되므로 항상 알린다.
+        print(f"  ⚠ 부분 수집 — 일부 페이지 실패: {', '.join(c.failed)} (n·연수 축소 가능)")
     rates = [h["rate"] for h in hist]
     # 베이시스를 펀딩 시각(8h 버킷)에 정렬 → 현금캐리 P&L(펀딩 − Δ베이시스)·MTM 리스크 산출.
     BUCKET = 8 * 3600 * 1000
@@ -71,7 +73,7 @@ def main() -> int:
 
     if "--json" in sys.argv:
         out = ROOT / (_arg("--json") or "out/btc_carry.json")
-        out.parent.mkdir(exist_ok=True)
+        out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(json.dumps({"backtest": bt, "periods": periods, "signal": sig},
                                   ensure_ascii=False, indent=2), encoding="utf-8")
         print(f"  → {out} 저장(효도봇 실행부 소비용)")

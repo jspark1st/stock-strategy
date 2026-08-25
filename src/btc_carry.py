@@ -64,7 +64,8 @@ def carry_backtest(rates: list, roundtrip_cost: float = ROUNDTRIP_COST,
     mean_8h = sum(rates) / n
     passive_notional = _cum(rates) - roundtrip_cost * 100
     passive_capital = passive_notional / capital_mult
-    # 능동(양수일 때만) — 회전 비용
+    # 능동(양수일 때만) — 회전 비용. sw=상태전환 횟수(진입 1 + 청산 1 = 2전환 = 1왕복)이므로
+    # 전환당 편도비용(roundtrip/2)을 부과해야 1왕복=roundtrip 이 된다(과거 sw*roundtrip 은 2배 과다).
     active_rs, inpos, sw = [], False, 0
     for r in rates:
         want = r > 0
@@ -72,7 +73,7 @@ def carry_backtest(rates: list, roundtrip_cost: float = ROUNDTRIP_COST,
             sw += 1
             inpos = want
         active_rs.append(r if inpos else 0.0)
-    active_notional = _cum(active_rs) - sw * roundtrip_cost * 100
+    active_notional = _cum(active_rs) - sw * (roundtrip_cost / 2) * 100
     # 최악 음수 펀딩 연속(하락장 위험)
     run = worst = 0.0
     for r in rates:
@@ -81,10 +82,15 @@ def carry_backtest(rates: list, roundtrip_cost: float = ROUNDTRIP_COST,
     # 베이시스 MTM: 현금캐리 P&L = 펀딩 − Δ베이시스(숏 perp + 롱 spot). 장기엔 경계항이나 변동은 리스크.
     net_basis = std_basis = worst_basis = None
     if basis is not None and len(basis) == len(rates):
+        # 첫 스텝(i=0)은 진입 시점이라 Δ베이시스가 없다(dpx=0). i=0 을 포함해야 step_pnl 이 rates 와
+        # 같은 n 개가 되어 passive_notional 과의 차이가 정확히 '베이시스 경계항'만 남는다(off-by-one 해소).
         step_pnl, cum_b, peak, dd = [], 0.0, 0.0, 0.0
-        for i in range(1, len(rates)):
-            b0, b1 = basis[i - 1], basis[i]
-            dpx = (b1 - b0) if (b0 is not None and b1 is not None) else 0.0
+        for i in range(len(rates)):
+            if i == 0:
+                dpx = 0.0
+            else:
+                b0, b1 = basis[i - 1], basis[i]
+                dpx = (b1 - b0) if (b0 is not None and b1 is not None) else 0.0
             step = rates[i] - dpx           # 펀딩 − Δ베이시스
             step_pnl.append(step)
             cum_b += step

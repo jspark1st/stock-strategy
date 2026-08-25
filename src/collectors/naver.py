@@ -234,6 +234,19 @@ def _num(x) -> float:
         return 0.0
 
 
+def _num_opt(x) -> float | None:
+    """_num 과 같되 결측(None)·파싱 실패는 **0.0 이 아니라 None**을 반환한다.
+
+    간밤 지수처럼 소비처가 `is None` 으로 결측을 거르는(overnight.py) 필드용. 0.0 으로 채우면
+    '데이터 없음'이 '보합(0%)'으로 둔갑해 None-가드가 무력화되고 방향 틸트가 오염된다
+    (ls._f / binance._f 와 동일 계약)."""
+    if x is None or str(x).strip() == "":
+        return None
+    v = _num(x)
+    # 원문에 숫자가 하나도 없으면(_num 은 0.0 반환) 결측으로 본다.
+    return v if any(ch.isdigit() for ch in str(x)) else None
+
+
 def index_quote(market: str, client: httpx.Client | None = None) -> dict | None:
     """지수 실시간 스냅샷. 장중이면 현재값, 마감 후면 종가.
 
@@ -324,8 +337,8 @@ def world_indices(client: httpx.Client | None = None) -> dict:
                           headers={"Referer": "https://finance.naver.com/world/"})
                 r.raise_for_status()
                 d = (r.json().get("datas") or [{}])[0]
-                out[code] = {"name": name, "close": _num(d.get("closePrice")),
-                             "chg_pct": _num(d.get("fluctuationsRatio")),
+                out[code] = {"name": name, "close": _num_opt(d.get("closePrice")),
+                             "chg_pct": _num_opt(d.get("fluctuationsRatio")),
                              "as_of": str(d.get("localTradedAt") or "")[:16]}
             except Exception:  # noqa — 개별 지수 실패는 건너뛴다
                 continue
