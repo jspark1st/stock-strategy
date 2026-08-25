@@ -688,6 +688,18 @@ Keep this section updated as work advances. Status legend: ✅ done · 🔶 part
     별도트랙 인지, HANDOFF_BTC 에 캐리 모듈 반영. 테스트 +4(`test_naver_numopt`).
   - 커밋은 **브랜치 `fix/audit-followups`**(사용자 지시대로 브랜치에). main 미병합.
 
+### 2026-08-25 — 월간 자동 엣지 재검증 크론 (테스트 258→263)
+open#0ⓐ('다레짐 재검증')를 **자동화**. 크론은 매일 예측·채점을 기록만 하고, "엣지(간밤신호 0.60·
+캘리브)가 아직 사는가"는 아무도 자동 재측정 안 했다 — 하락/횡보로 레짐이 뒤집혀도 안 드러남.
+  - ✅ **`scripts/revalidate.py`** — 시장별 `backtest.reconstruct(250)` 로 표본 재생성(캐시 갱신) →
+    walk-forward OOS 재측정: ①마감 캘리브레이션 Brier·AUC·적중 ②간밤 미국장 blend 고정틸트(overnight
+    WEIGHTS·K_MARKET·CAP) 개장전 방향 AUC. `out/revalidation_history.jsonl` 누적 → 직전 대비 추세
+    (↑/↓) 텔레그램. n<60 '측정중'·단일레짐 경고 유지. 라이브: KOSPI 간밤+틸트 AUC 0.603·KOSDAQ 0.566,
+    마감 캘리브 ~0.5(8차 결과 재현 — 엣지 생존 확인).
+  - ✅ **`scripts/auto_revalidate.sh`** — cron 러너(flock·로그로테이션·실패 시 alerts.log+텔레그램).
+    배포/커밋 없음(분석·알림만). **크론 등록: `0 7 1 * *`**(매월 1일 07:00 KST).
+  - 테스트 +5(`test_revalidate.py`: AUC·metrics·추세화살표·blend 재정규화). 총 **263 통과**.
+
 ### 이어서 할 곳 (open items)
 0. **[최우선] 방향예측 — 판별력(AUC) 계속** — 5차 처리분: 캘리브레이션(비관편향, 양시장) + **가드된
    KOSDAQ 거래량 틸트**(walk-forward AUC 0.488→0.577). 남은 것:
