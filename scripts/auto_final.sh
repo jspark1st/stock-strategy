@@ -47,6 +47,11 @@ fi
 "$PY" scripts/probe_investor_map.py >> "$LOG" 2>&1 || \
   echo "[$(date '+%F %T')] (참고) t1601 매핑 프로브 실패 — 무시하고 진행" >> "$LOG"
 
+# 자가학습 축적 헬스체크(며칠 감시) — 실거래 지평 괴리·채점 정체·고아행 등을 텔레그램 보고.
+# 읽기 전용·비파괴. 실패해도 이번 회차/배포를 막지 않는다.
+"$PY" scripts/health_check.py >> "$LOG" 2>&1 || \
+  echo "[$(date '+%F %T')] (참고) 헬스체크 실패 — 무시하고 진행" >> "$LOG"
+
 # 크로스트랙 배포 직렬화(공유 락, 대기 120s — auto_close.sh 주석 참조).
 exec 8>"out/.deploy.lock"
 if ! flock -w 120 8; then
