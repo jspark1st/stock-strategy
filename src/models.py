@@ -327,7 +327,14 @@ class ScoreResult:
         if not self.data_sufficient:
             miss = ", ".join(self.missing_keys)
             return f"데이터 부족(결측: {miss}) — 총점 미산출, 잠정 방향성만 참고."
-        head = f"{self.grade} · 마감 총점 {self.total} · 익일 상승확률 {self.p_up * 100:.0f}%."
+        # 판별 미확보 밴드(±8%p): 캘리브레이션 확률이 기저율(≈50%) 근처면 방향 edge 가 사실상
+        # 없어(단일레짐 AUC≈0.5) '58%' 같은 거짓 정밀도로 방향을 단정하지 않는다. build_hero 와
+        # 동일 임계 — 표시 전용, 게이트 임계와 무관.
+        if self.p_up is not None and abs(self.p_up - 0.5) < 0.08:
+            prob_str = f"방향 중립·판별 미확보(캘리브 기저율 {self.p_up * 100:.0f}%)"
+        else:
+            prob_str = f"익일 상승확률 {self.p_up * 100:.0f}%"
+        head = f"{self.grade} · 마감 총점 {self.total} · {prob_str}."
         if self.warnings:
             head += f" {self.warnings[0]}"
         return head

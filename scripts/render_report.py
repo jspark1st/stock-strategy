@@ -176,6 +176,14 @@ def build_hero(r: dict) -> str:
             calib = '<div class="hero-note">방향 확률은 점추정 · 성적 n&lt;40 — 캘리브·성적 참고 금지</div>'
         else:
             calib = '<div class="hero-note">방향 확률은 점추정(신뢰구간 없음) · 표본 누적 시 캘리브레이션</div>'
+    # 판별 미확보 밴드: 캘리브레이션된 확률이 기저율(≈50%) 근처면(±8%p) 방향 edge 가 사실상
+    # 없다(단일레짐 AUC≈0.5). '58%' 같은 거짓 정밀도가 방향 베팅 근거로 읽히거나, 등급이 다른
+    # 두 시장의 확률이 뒤바뀌어(약세 58% > 우호 54%) 모순처럼 보이는 것을 막는다. 게이트 임계와
+    # 무관한 **표시 전용** 정직성 밴드.
+    if not btc and p_up is not None and abs(p_up - 0.5) < 0.08:
+        calib += ('<div class="hero-note" style="color:var(--caution)">'
+                  f'※ {p_up*100:.0f}% 는 40–60% 판별 미확보 구간(캘리브 기저율) — '
+                  '방향 베팅 근거 아님, 등급·총점과 별개 축</div>')
     return f"""
     <div class="stat">
       <div class="big" style="color:var(--accent)">{total_txt}</div>
@@ -908,22 +916,25 @@ def build_accuracy(r: dict) -> str:
     hr = acc.get("hit_rate")
     hr_col = "var(--up)" if (hr or 0) >= 0.5 else "var(--down)"
     bias = acc.get("calibration_bias")
-    tile_list = [
-        _tile("표본", f"{acc.get('n')}일"),
-        _tile("방향 적중률", pct(hr) if hr is not None else "—", hr_col,
-              sub="익일 종가 기준(라벨)"),
+    tile_list = [_tile("표본", f"{acc.get('n')}일")]
+    # 전략이 실제 체결하는 지평은 종가매수→익일 시가매도(close→open)다. 라벨(종가→종가)은
+    # 캘리브레이션 연속성용일 뿐 — 둘이 크게 갈리므로(라벨 85% vs 실거래 25% 같은 사례) 실거래
+    # 지평을 **주지표로 앞에** 놓고, 라벨은 '실행 아님'을 명시해 뒤로 강등한다.
+    ohr = acc.get("overnight_hit_rate")
+    ovn = acc.get("overnight_n") or 0
+    if ohr is not None and ovn > 0:
+        tile_list.append(_tile("실거래 적중률", pct(ohr),
+                               "var(--up)" if ohr >= 0.5 else "var(--down)",
+                               sub=f"종가→익일 시가(실청산·n{ovn})"))
+    tile_list += [
+        _tile("라벨 적중률", pct(hr) if hr is not None else "—", hr_col,
+              sub="종가→종가(캘리브용·실행 아님)"),
         _tile("Brier", fmt(acc.get('mean_brier'), 3), sub="낮을수록 정확"),
         _tile("예측 평균 p_up", pct(acc.get('pred_mean_p_up'))),
         _tile("실제 상승빈도", pct(acc.get('realized_up_rate'))),
         _tile("캘리브레이션 편향", signed(bias, 3) if bias is not None else "—",
               sub="+과대낙관/−과대비관"),
     ]
-    # 실제 거래 지평(종가매수→익일 시가매도) 정답률 — 라벨(익일 종가)과 다른 값. 나란히 표시.
-    ohr = acc.get("overnight_hit_rate")
-    if ohr is not None and (acc.get("overnight_n") or 0) > 0:
-        tile_list.append(_tile("실거래 지평 적중률", pct(ohr),
-                               "var(--up)" if ohr >= 0.5 else "var(--down)",
-                               sub="종가→익일 시가(실청산)"))
     tiles = "".join(tile_list)
     return f"""
   <div class="card">

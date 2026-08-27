@@ -590,9 +590,18 @@ def build_report(cfg: dict, ls, client, conn, env, session_of: dict,
             rep.setdefault("sources", []).append(s)
 
     for g in graded:
-        rep.setdefault("warnings", []).append(
-            f"{g['trade_date']} 예측 채점(실측일 {g['outcome_date']}): "
-            f"{'적중' if g.get('correct') else '빗나감'} · 실측 {g['outcome_chg_pct']:+.2f}%")
+        # 라벨 지평(종가→종가)은 캘리브레이션 연속성용일 뿐 — 전략이 실제 체결하는 지평은
+        # 종가매수→익일 시가매도(close→open)다. 둘이 크게 갈릴 수 있으므로(예: 갭다운 후 장중
+        # 회복이면 라벨은 '적중'이나 실청산은 손실) 실거래 지평을 **나란히** 노출해 오해를 막는다.
+        line = (f"{g['trade_date']} 예측 채점(실측일 {g['outcome_date']}): "
+                f"{'적중' if g.get('correct') else '빗나감'}(라벨 종가→종가) "
+                f"· 실측 {g['outcome_chg_pct']:+.2f}%")
+        oc = g.get("outcome_open_chg_pct")
+        if oc is not None:
+            ov = g.get("overnight_correct")
+            ov_lbl = "적중" if ov == 1 else ("빗나감" if ov == 0 else "—")
+            line += f" / 실청산 종가→시가 {oc:+.2f}%({ov_lbl})"
+        rep.setdefault("warnings", []).append(line)
 
     if ls_warn:
         rep["warnings"] = [ls_warn] + rep.get("warnings", [])
