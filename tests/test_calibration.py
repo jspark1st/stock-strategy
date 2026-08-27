@@ -102,7 +102,8 @@ def test_score_close_applies_calibration():
     calib = {"a": 0.03, "b": -1.2, "n": 80, "source": "store"}
     d0 = scoring.score_close(_inputs()).to_report_dict()
     d1 = scoring.score_close(_inputs(), calib=calib).to_report_dict()
-    assert d1["calibration"] == {"source": "store", "n": 80}
+    # 메타에 기울기 a 도 실린다(렌더가 '기울기 하한=총점 무영향'을 고지하는 데 사용).
+    assert d1["calibration"] == {"source": "store", "n": 80, "a": 0.03}
     assert d1["p_up_raw"] == d0["p_up_raw"]        # raw 는 캘리브레이션과 무관 보존
     assert d1["p_up"] != d0["p_up"]                # 값이 실제로 달라짐
     assert scoring.PROB_CLIP_LO <= d1["p_up"] <= scoring.PROB_CLIP_HI

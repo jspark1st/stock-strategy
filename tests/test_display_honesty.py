@@ -73,6 +73,37 @@ def test_accuracy_promotes_real_trade_horizon():
     assert "실행 아님" in html
 
 
+# ── C. 레짐 편향 고지 ────────────────────────────────────────────────
+def _cal_report(a, source="bootstrap", n=149):
+    return {"total": 55.0, "grade": "중립", "p_up": 0.62, "p_down": 0.38,
+            "report_type": "close",
+            "calibration": {"source": source, "n": n, "a": a}}
+
+
+def test_regime_anchor_badge_shown_for_stock():
+    # 단일 상승레짐 적합이면 '기저율 앵커·하락장 미검증' 고지가 뜬다.
+    assert "단일 상승레짐" in rr.build_hero(_cal_report(0.0104))
+
+
+def test_slope_floor_warning_when_score_no_influence():
+    # 기울기가 하한(0.005) 근처 → 총점이 확률에 영향 없음을 경고.
+    assert "총점이 확률에 거의 영향 없음" in rr.build_hero(_cal_report(0.005))
+    # 기울기가 충분하면 그 경고는 없다(배지는 여전히 있음).
+    h = rr.build_hero(_cal_report(0.05))
+    assert "총점이 확률에 거의 영향 없음" not in h
+    assert "단일 상승레짐" in h
+
+
+def test_regime_badge_absent_for_sot_and_btc():
+    # SoT 폴백(캘리브 없음)엔 레짐 배지 없음.
+    assert "단일 상승레짐" not in rr.build_hero(_cal_report(0.0104, source="sot"))
+    # BTC 는 별도 트랙 — 적용 안 함.
+    btc = {"total": 55.5, "grade": "중립", "p_long": 0.6, "p_short": 0.4,
+           "report_type": "btc_perp",
+           "calibration": {"source": "btc", "n": 10, "a": 0.005}}
+    assert "단일 상승레짐" not in rr.build_hero(btc)
+
+
 def test_accuracy_hidden_under_40():
     r = {"accuracy": {"n": 7, "hit_rate": 0.857, "overnight_hit_rate": 0.25,
                       "overnight_n": 4}}

@@ -184,6 +184,17 @@ def build_hero(r: dict) -> str:
         calib += ('<div class="hero-note" style="color:var(--caution)">'
                   f'※ {p_up*100:.0f}% 는 40–60% 판별 미확보 구간(캘리브 기저율) — '
                   '방향 베팅 근거 아님, 등급·총점과 별개 축</div>')
+    # 레짐 편향 고지: 캘리브레이터가 2026 상반기 **단일 상승레짐**으로 적합됐다 → 확률이 그 구간의
+    # 기저 상승률(~60%)에 앵커돼, 추세가 꺾이면(하락/횡보) 체계적으로 과대낙관이 된다. 또 기울기가
+    # 하한(_MIN_SLOPE=0.005) 근처면 총점이 확률에 사실상 영향을 못 준다(확률≈절편). 표시 전용.
+    cal_meta = r.get("calibration") or {}
+    if not btc and cal_meta.get("source") and cal_meta["source"] != "sot":
+        parts = [f'확률은 단일 상승레짐(표본 n={cal_meta.get("n")}) 기저율 앵커 · 하락장 미검증']
+        a = cal_meta.get("a")
+        if a is not None and a <= 0.006:
+            parts.append('캘리브 기울기 하한 — 총점이 확률에 거의 영향 없음')
+        calib += ('<div class="hero-note" style="color:var(--caution)">※ '
+                  + ' · '.join(parts) + '</div>')
     return f"""
     <div class="stat">
       <div class="big" style="color:var(--accent)">{total_txt}</div>
