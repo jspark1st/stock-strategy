@@ -1719,6 +1719,7 @@ def render(data: dict, lwc_src: str | None = None) -> str:
         "{{VIEWS}}": views_html,
         "{{CHART_DATA_JSON}}": chart_json,
         "{{LWC_SCRIPT}}": lwc_script,
+        "{{BTC_DATESEL_SYNC}}": BTC_DATESEL_SYNC,
     }
     tpl = TEMPLATE
     for k, v in repl.items():
@@ -2123,8 +2124,50 @@ TEMPLATE = r"""<!doctype html>
   var s=startId(); if(s) activate(s);
 })();
 </script>
+{{BTC_DATESEL_SYNC}}
 </body>
 </html>"""
+
+
+# BTC 날짜 드롭다운을 **로드 시 manifest 로 다시 그린다**. 아카이브 페이지는 렌더 시점의 날짜
+# 목록이 정적으로 구워져 있어(그때 없던 최신 날짜가 빠짐) 과거로 가면 최신으로 못 돌아오는
+# 버그가 있었다. 이 스크립트가 매 로드마다 /archive/manifest.json(매 회차 갱신) 으로 옵션을
+# 재구성해 **모든 페이지(과거·미래)가 항상 전체 날짜**를 갖게 한다. fetch 실패(file://)면 조용히
+# 구워진 옵션 유지. 라벨 'ㄴ날짜'로 셀렉트를 찾으므로 기존 아카이브에 주입만 해도 동작(백필).
+BTC_DATESEL_SYNC = """<script>
+(function(){
+  try{
+    if(window.__btcDateSynced) return; window.__btcDateSynced=true;
+    var labels=document.querySelectorAll('label.slot-lab'), sel=null;
+    for(var i=0;i<labels.length;i++){
+      if((labels[i].textContent||'').trim().indexOf('\\ub0a0\\uc9dc')===0){
+        sel=labels[i].querySelector('select'); break; }
+    }
+    if(!sel) return;
+    var curDate='', cop=sel.options[sel.selectedIndex];
+    if(cop){ var mm=(cop.textContent||'').match(/\\d{4}-\\d{2}-\\d{2}/); if(mm) curDate=mm[0]; }
+    fetch('/archive/manifest.json',{cache:'no-store'}).then(function(r){return r.json();}).then(function(items){
+      if(!Array.isArray(items)||!items.length) return;
+      var byDate={};
+      items.forEach(function(x){ var d=x&&x.date; if(!d) return; (byDate[d]=byDate[d]||[]).push(x); });
+      var dates=Object.keys(byDate).sort().reverse(); if(!dates.length) return;
+      function isReg(x){ return x&&x.kind!=='manual'&&(x.slot==='0930'||x.slot==='2200'); }
+      function landing(day){
+        var pick=null, want=['2200','0930'];
+        for(var s=0;s<want.length&&!pick;s++)
+          for(var j=0;j<day.length;j++){ if(isReg(day[j])&&day[j].slot===want[s]){pick=day[j];break;} }
+        if(!pick) pick=day.slice().sort(function(a,b){return (a.slot||'')<(b.slot||'')?1:-1;})[0];
+        return (pick&&pick.href)||'/#btc-perp';
+      }
+      if(!curDate||dates.indexOf(curDate)<0) curDate=dates[0];
+      sel.innerHTML=dates.map(function(d){
+        return '<option value="'+landing(byDate[d])+'"'+(d===curDate?' selected':'')+'>'+d+'</option>';
+      }).join('');
+      if(!sel.getAttribute('onchange')) sel.setAttribute('onchange','if(this.value) location=this.value');
+    }).catch(function(){});
+  }catch(e){}
+})();
+</script>"""
 
 
 def main() -> int:
