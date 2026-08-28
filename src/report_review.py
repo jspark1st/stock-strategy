@@ -26,26 +26,27 @@ _SLOPE_FLOOR = 0.006
 _HORIZON_GAP = 0.20
 
 
+def _is_btc(r: dict) -> bool:
+    return (r.get("report_type") == "btc_perp"
+            or "btc" in (r.get("id") or "").lower()
+            or "BTC" in str(r.get("market") or "").upper())
+
+
 def _market_key(r: dict) -> str:
-    i = (r.get("id") or "").lower()
-    if "btc" in i:
+    if _is_btc(r):
         return "BTC"
+    i = (r.get("id") or "").lower()
     if "kosdaq" in i:
         return "KOSDAQ"
     if "kospi" in i:
         return "KOSPI"
-    return (r.get("market") or "ALL").upper()
+    return str(r.get("market") or "ALL").upper()
 
 
 def _report_type(r: dict) -> str:
-    i = (r.get("id") or "").lower()
-    if "btc" in i:
+    if _is_btc(r):
         return "btc"
-    return "preopen" if "preopen" in i else "close"
-
-
-def _is_btc(r: dict) -> bool:
-    return _market_key(r) == "BTC"
+    return "preopen" if "preopen" in (r.get("id") or "").lower() else "close"
 
 
 def _f(source, category, code, severity, title, detail=None, evidence=None) -> dict:
@@ -128,6 +129,32 @@ def _per_report_rules(r: dict) -> list[dict]:
                       "항목 신호 혼재(상·하방 섞임)",
                       "서브스코어가 방향으로 정렬되지 않아 방향 확신이 낮다.",
                       f"signal_agreement={sa:.2f}"))
+    if btc:
+        out += _btc_rules(r)
+    return out
+
+
+def _btc_rules(r: dict) -> list[dict]:
+    """BTC 전용 관측 규칙 — 스코어링·게이트는 안 건드리고 '왜 늘 관망인지'만 기록한다.
+
+    비평은 관측이라 BTC 동결 규율과 충돌하지 않는다(게이트 임계 완화 아님). gate_block 은
+    매 회차 쌓여 digest 에서 '게이트 통과 0 연속'의 구조적 증거가 된다(체결 팩터 이력 부재).
+    """
+    out: list[dict] = []
+    gate = r.get("gate") or {}
+    if gate.get("no_trade") or gate.get("new_entry_blocked"):
+        reason = "; ".join(gate.get("reasons") or []) or "관망"
+        out.append(_f("rule", "관측", "btc_gate_block", "low",
+                      "게이트 신규진입 차단(관망 유지)",
+                      "설계상 차단이지만 누적 빈도가 곧 '게이트 통과 0 연속'의 증거 — "
+                      "임계 완화가 아니라 체결 팩터 이력 축적으로만 풀어야 할 구조.",
+                      reason))
+    if r.get("core_aligned") is False:
+        miss = ", ".join(r.get("core_missing") or []) or "일부"
+        out.append(_f("rule", "관측", "btc_core_unaligned", "med",
+                      "코어 정렬 미충족(체결 팩터 부재)",
+                      "코어 정렬 조건을 못 채워 게이트가 탈락한다 — BTC가 매번 관망인 근본 원인.",
+                      f"core_side={r.get('core_side')}, 결측={miss}, 필요={r.get('core_needed')}"))
     return out
 
 

@@ -21,7 +21,8 @@ try:
 except Exception:
     pass
 
-from src import btc_quant, btc_scoring, btc_size, btc_bundle, calibration, notify, remote, store
+from src import (btc_quant, btc_scoring, btc_size, btc_bundle, calibration, notify,
+                 remote, report_review, store)
 from src.collectors import binance as bn
 from src.collectors import llm, naver, news
 from src.collectors.ls import load_env
@@ -484,6 +485,19 @@ def main() -> int:
             conn.close()
         return 1
 
+    # 리포트 자가비평(관측) — BTC 도 비평 대상. 스코어링·게이트는 불변, '왜 관망인지'만 기록.
+    review_meta = {}
+    if conn is not None:
+        try:
+            review_meta = report_review.evaluate(conn, rep["trade_date"], [rep], env,
+                                                 dry_run=dry_run)
+            nrev = len(rep.get("reviews", {}).get("rules", [])) + \
+                len(rep.get("reviews", {}).get("llm", []))
+            print(f"[BTC 자가비평] 발견 {nrev}건 · 누적 "
+                  f"{(review_meta.get('digest') or {}).get('n_total', 0)}건")
+        except Exception as e:  # noqa
+            print(f"⚠ BTC 비평 실패({type(e).__name__}: {e}) — 스킵")
+
     if conn is not None and not dry_run:
         try:
             if slot in ("0930", "2200"):
@@ -517,7 +531,9 @@ def main() -> int:
 
     stock = btc_bundle.load_stock_reports()
     reports = btc_bundle.merge(stock, rep)
-    bundle = {"trade_date": rep["trade_date"], "as_of": rep["as_of"], "reports": reports}
+    bundle = {"trade_date": rep["trade_date"], "as_of": rep["as_of"], "reports": reports,
+              "review_cross": review_meta.get("cross"),
+              "review_digest": review_meta.get("digest")}
     OUT.mkdir(exist_ok=True)
     latest_name = "btc_latest.dryrun.json" if dry_run else "btc_latest.json"
     (OUT / latest_name).write_text(

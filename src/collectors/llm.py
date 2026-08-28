@@ -43,8 +43,12 @@ def resolve_models(env: dict | None = None) -> dict:
 
     콤마로 폴백 체인을 지정할 수 있다(앞이 우선, 실패 시 다음). 예:
         perplexity_model=sonar-pro
-        gemini_model=gemini-2.5-pro,gemini-2.5-flash
-        claude_model=claude-opus-5,claude-sonnet-5
+        gemini_model=gemini-flash-latest,gemini-2.5-flash   # 서술 초안(저렴)
+        claude_model=claude-opus-5,claude-sonnet-5           # 최종 종합
+        critic_model=gemini-pro-latest,gemini-3.1-pro-preview  # 리포트 자가비평(고급)
+
+    우리가 쓰는 모든 LLM 이 이 함수 하나로 모델명을 해석한다(하드코딩 없음). 값이 없으면
+    각 엔진 기본 체인으로 폴백. `-latest` 별칭을 권장(버전 고정명은 폐기 시 404).
     """
     env = env or load_env()
 
@@ -578,7 +582,7 @@ def preopen_research(ctx: dict, env: dict) -> dict | None:
             "3) 전일 한국 마감 이후 나온 주요 재료(호재/악재)\n"
             "4) 오늘 한국 증시 개장 갭 전망(상방/하방)과 근거\n"
             "5) 장중 경계할 리스크\n각 항목 간결히. 마지막에 한 줄 총평.")
-    body = {"model": PPLX_MODEL, "temperature": 0.2, "max_tokens": 900,
+    body = {"model": resolve_models(env)["perplexity"], "temperature": 0.2, "max_tokens": 900,
             "messages": [{"role": "system", "content": sys}, {"role": "user", "content": user}]}
     try:
         r = httpx.post(PPLX_URL, headers={"Authorization": f"Bearer {key}"},

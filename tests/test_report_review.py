@@ -60,11 +60,32 @@ def test_cross_market_no_inversion_when_ordered():
 
 
 def test_btc_skips_stock_only_rules():
-    btc = _report(id="btc-perp", calibration={"source": "btc", "n": 10, "a": 0.005},
-                  p_up=0.55)
+    btc = _report(id="btc-perp", report_type="btc_perp",
+                  calibration={"source": "btc", "n": 10, "a": 0.005}, p_up=0.55)
     codes = _codes(report_review._per_report_rules(btc))
     assert "calib_slope_floor" not in codes    # 레짐 밴드/기울기 규칙은 주식 전용
     assert "no_discrimination" not in codes
+
+
+def test_btc_specific_rules_fire():
+    btc = {"id": "btc-perp", "report_type": "btc_perp", "market": "BTCUSDT",
+           "gate": {"no_trade": True, "new_entry_blocked": True,
+                    "reasons": ["수렴 게이트 — 관망"]},
+           "core_aligned": False, "core_missing": ["taker", "oi"],
+           "core_side": "long", "core_needed": 3,
+           "accuracy": {"n": 12, "hit_rate": 0.5, "overnight_hit_rate": None,
+                        "overnight_n": 0}}
+    codes = _codes(report_review._per_report_rules(btc))
+    assert "btc_gate_block" in codes
+    assert "btc_core_unaligned" in codes
+
+
+def test_btc_detected_by_report_type_even_with_dict_market():
+    # BTC market 은 dict — report_type 로 견고하게 감지되어야
+    btc = {"report_type": "btc_perp", "market": {"symbol": "BTCUSDT"},
+           "gate": {"no_trade": True}}
+    assert report_review._is_btc(btc)
+    assert report_review._market_key(btc) == "BTC"
 
 
 # ── LLM 파싱 ─────────────────────────────────────────────────────────
