@@ -40,10 +40,12 @@ description: >-
 - 한국 색관례(빨강 상승·파랑 하락), dataviz 스킬 팔레트 PASS, 라이트/다크 검증.
 
 ## 방법
-1. `git diff`(최근 변경) + 대상 소스 정독. 필요시 `scoring-auditor` / `data-collector-debug` 서브에이전트에 위임.
+1. **기본은 `pipeline-fanout-auditor` 에 위임** (8축 병렬 + 적대검증 + 재발 체크리스트).
+   한 세션이 파일을 순차로 훑지 않는다. 축만 좁히면 `scoring-auditor` / `data-collector-debug` /
+   `ui-honesty-auditor` 를 직접 띄워도 된다.
 2. 각 축을 코드에서 검증하고 산식은 직접 계산.
-3. `.venv/bin/python -m pytest tests/ -q`(212, 2026-08-22) 통과 확인.
-4. 발견을 **심각도 순 · 파일:라인 · 실패 시나리오** 로 정리.
+3. `.venv/bin/python -m pytest tests/ -q` 통과 확인.
+4. 발견을 **심각도 순 · 파일:심볼 · 실패 시나리오** 로 정리.
 
 ## 출력
 축별 결과와 발견 목록. 수정이 필요하면 제안하고 **사용자 승인 후** 진행. 회귀 테스트를 새 결함마다 추가하는 것을 원칙으로.
