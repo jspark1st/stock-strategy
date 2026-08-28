@@ -27,10 +27,12 @@ from .ls import load_env
 PPLX_URL = "https://api.perplexity.ai/chat/completions"
 PPLX_MODEL = "sonar"
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
+# 버전 고정 모델명은 시간이 지나면 404(폐기)된다(gemini-2.0/1.5-flash 실측 404, 2026-08).
+# → `-latest` 별칭을 우선 두어 폐기 내성을 갖는다. 서술은 flash(저렴).
+GEMINI_MODELS = ["gemini-flash-latest", "gemini-2.5-flash", "gemini-3.5-flash"]
 # 리포트 자가비평 담당 — 저렴·긴 컨텍스트라 Gemini 고급(pro) 우선, 실패 시 flash 폴백.
-# .env `critic_model` 로 오버라이드(콤마 체인). 최신 고급 모델을 기본으로 둔다.
-CRITIC_MODELS = ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.0-flash"]
+# .env `critic_model` 로 오버라이드(콤마 체인). 최신 고급(pro) 별칭을 기본으로 둔다.
+CRITIC_MODELS = ["gemini-pro-latest", "gemini-3.1-pro-preview", "gemini-flash-latest"]
 # 종합 단계 모델 체인. Opus 5 가 과부하(529)면 Sonnet 5 로 내려가 서술을 살린다.
 # (모델을 임의로 낮추지 않되, '아예 못 쓰는 것'보다는 한 단계 아래가 낫다.)
 CLAUDE_MODELS = ["claude-opus-5", "claude-sonnet-5"]

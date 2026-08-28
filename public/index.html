@@ -199,6 +199,30 @@
   .slot-empty,.slot-hint{font-size:.74rem;color:var(--muted)}
   .slot-hint{margin-left:auto}
 
+  /* 전체 복사 버튼 — 보고서 텍스트를 클립보드로(LLM 이어붙이기용) */
+  .view-actions{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap}
+  .copy-btn{border:1px solid var(--accent);
+    background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent);
+    border-radius:8px;padding:7px 14px;font:inherit;font-size:.82rem;font-weight:700;
+    min-height:36px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+  .copy-btn:hover{background:color-mix(in srgb,var(--accent) 24%,transparent)}
+  .copy-btn.copied{border-color:var(--good);color:var(--good);
+    background:color-mix(in srgb,var(--good) 16%,transparent)}
+  .copy-hint{font-size:.74rem;color:var(--muted)}
+
+  /* 리포트 자가비평 */
+  .rv-list{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:10px}
+  .rv-item{border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:var(--surface2)}
+  .rv-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .rv-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+  .rv-cat{font-size:.7rem;font-weight:700;color:var(--muted);border:1px solid var(--border);
+    border-radius:6px;padding:1px 7px}
+  .rv-src{font-size:.68rem;font-weight:600;color:var(--accent);
+    background:color-mix(in srgb,var(--accent) 12%,transparent);border-radius:6px;padding:1px 7px}
+  .rv-title{font-weight:700;font-size:.9rem;color:var(--text)}
+  .rv-detail{font-size:.82rem;color:var(--muted);margin-top:5px;line-height:1.5}
+  .rv-ev{font-size:.74rem;color:var(--muted);margin-top:4px;font-variant-numeric:tabular-nums}
+
   /* 리스트/재료/체크 */
   .sub-h{font-weight:700;font-size:.86rem;margin:12px 0 6px;color:var(--text)}
   .tag-src{font-size:.66rem;background:var(--surface2);color:var(--muted);padding:1px 7px;border-radius:999px;font-weight:600}
@@ -260,7 +284,7 @@
   <aside class="sidebar" id="sidebar">
     <div class="brand">📊 easystock</div>
     <div class="brand-sub">by junaitech · 2026-08-28</div>
-    <div class="nav-group"><div class="nav-title">코스피</div><a class="nav-item" data-target="kospi-close" href="#kospi-close" aria-label="장마감전 분석 코스피"><span>장마감전 분석</span><span class="nav-score" style="color:var(--caution)">40.6</span></a><a class="nav-item" data-target="kospi-preopen" href="#kospi-preopen" aria-label="개장전 분석 코스피"><span>개장전 분석</span><span class="nav-score" style="color:var(--caution)">53.7</span></a></div><div class="nav-group"><div class="nav-title">코스닥</div><a class="nav-item" data-target="kosdaq-close" href="#kosdaq-close" aria-label="장마감전 분석 코스닥"><span>장마감전 분석</span><span class="nav-score" style="color:var(--neutral)">55.3</span></a><a class="nav-item" data-target="kosdaq-preopen" href="#kosdaq-preopen" aria-label="개장전 분석 코스닥"><span>개장전 분석</span><span class="nav-score" style="color:var(--good)">65.1</span></a></div><div class="nav-group"><div class="nav-title">비트코인 선물</div><a class="nav-item" data-target="btc-perp" href="#btc-perp" aria-label="BTCUSDT 비트코인 선물"><span>BTCUSDT</span><span class="nav-score" style="color:var(--neutral)">58.8</span></a></div>
+    <div class="nav-group"><div class="nav-title">코스피</div><a class="nav-item" data-target="kospi-close" href="#kospi-close" aria-label="장마감전 분석 코스피"><span>장마감전 분석</span><span class="nav-score" style="color:var(--caution)">40.6</span></a><a class="nav-item" data-target="kospi-preopen" href="#kospi-preopen" aria-label="개장전 분석 코스피"><span>개장전 분석</span><span class="nav-score" style="color:var(--caution)">53.7</span></a></div><div class="nav-group"><div class="nav-title">코스닥</div><a class="nav-item" data-target="kosdaq-close" href="#kosdaq-close" aria-label="장마감전 분석 코스닥"><span>장마감전 분석</span><span class="nav-score" style="color:var(--neutral)">55.3</span></a><a class="nav-item" data-target="kosdaq-preopen" href="#kosdaq-preopen" aria-label="개장전 분석 코스닥"><span>개장전 분석</span><span class="nav-score" style="color:var(--good)">65.1</span></a></div><div class="nav-group"><div class="nav-title">비트코인 선물</div><a class="nav-item" data-target="btc-perp" href="#btc-perp" aria-label="BTCUSDT 비트코인 선물"><span>BTCUSDT</span><span class="nav-score" style="color:var(--neutral)">58.8</span></a></div><div class="nav-group"><div class="nav-title">진단</div><a class="nav-item" data-target="report-review" href="#report-review" aria-label="리포트 비평 진단"><span>리포트 비평</span><span class="nav-badge">8건</span></a></div>
     <div class="side-foot">
       <button class="toggle" onclick="window.__toggleTheme()">🌓 라이트 / 다크</button>
     </div>
@@ -278,6 +302,68 @@
       <div class="stage-strip"><div class="stage-steps"><span class="stage-step stage-on">① 결정</span><span class="stage-sep">›</span><span class="stage-step ">② 컨펌</span><span class="stage-sep">›</span><span class="stage-step ">③ 재평가</span></div><div class="stage-note">지금 <b>① 결정</b> · 종가베팅 주문 판단 · 다음 갱신 16:30 확정</div><div class="stage-note">상태 <b>PRE_CLOSE_DECISION</b> · 허용 데이터: 장중 지수·수급·폭(잠정, 15:00) · 허용 액션: 종가베팅 진입/차단 판정 · 자동주문 차단</div></div>
       <div class="muted">KOSPI 6,791.79 (<span style='color:var(--down)'>-1.74%</span>) · 원달러 1,375.8</div>
       <div class="basis"><span class="basis-k">기준시각</span> 2026-08-28 15:00 KST · <span class="basis-k">상태</span> <b style="color:var(--neutral)">장 종료 전 스냅샷 · 종가 아님</b> · <span class="basis-k">지수 출처</span> 네이버 지수 일봉(장중 갱신) · <span class="basis-k">원달러</span> 1,375.80 <span style="color:var(--down)">-0.45%</span> <span class="basis-note">(원화 강세)</span></div>
+      <div class="view-actions"><button class="copy-btn" type="button" onclick="__copyReport(this)">📋 전체 복사</button><span class="copy-hint">LLM에 붙여넣어 이어서 질문</span><textarea class="copy-src" hidden aria-hidden="true"># 장마감전 분석 · 코스피 · 2026-08-28
+- 상태: 장중 잠정(마감 전 스냅샷) · 기준시각 2026-08-28 15:00 KST
+
+코스피는 장중 스냅샷 기준 6791.79로 전일 대비 -1.74% 하락했고, 외국인·기관이 동시에 매도(외국인 -15,921억, 기관 -2,927억)하며 개인 순매수(+2,682억)만으로는 낙폭을 방어하지 못한 약세장입니다. 투자주체 수급 점수가 10.2로 극히 낮아 종가 강도(30.9)와 함께 총점을 40.6까지 끌어내렸습니다.
+- 시장: 코스피 6,791.8 (-1.74%) · 원달러 1,375.8
+
+## 총점 40.6 · 등급 위험 · 익일 상승확률 59.0% / 하락 41.0%
+- (원시 19.1% → 캘리브 59.0% · bootstrap n=149 · 단일 상승레짐 기저율 앵커, 하락장 미검증)
+- 진입 판정: 차단 (방향 long) · 사유: 게이트 신규진입 허용, 방향 확률 임계, 신뢰도 임계
+
+## 항목별 점수
+- 종가 강도 30.9 (가중 20%) · 종가위치 0.08 · -1.74% · 5일선 상회 · 윗꼬리 긴 약한 마감 — 등락률 무관 감점
+- 시장 폭 64.0 (가중 20%) · adv_ratio 0.65 · 상한가 1 하한가 0 · 폭 양호, 실제 체력 뒷받침
+- 투자주체 수급 10.2 (가중 25%) · 외국인 -15,921억 · 기관 -2,927억 · 개인 +2,682억 · 프로그램 미수집 · 개인만 순매수 — 추가 감점
+- 거래대금 57.2 (가중 15%) · 지수 거래량 당일/직전20일평균 0.85배 · 장중 누적→종일 환산 x0.93(기본값·표본 7/8) · 하락 · 대금 평이
+- 기술·퀀트 56.3 (가중 15%) · 추세 혼조 · RSI 50 · MACD + · %B 0.68 · 전강후약(고점 초반·종가위치 7%) · 기술 지표 우호
+
+## 투자자 수급(억원)
+- 외국인 -15,921억 · 기관 -2,927억 · 개인 +2,682억 · 프로그램 미수집
+
+## 오버나이트 타점
+- 오버나이트(익일 오전): 진입 6,791.8 / 손절 6,580.2 / 목표 7,003.4 · 손익비 1.0
+- 상품 주문(KODEX 200·069500): 진입 107,205.0 / 손절 102,882.5 / 목표 111,527.5
+
+## 매매 결론
+신규진입 차단(비중배수 0.0, 등급게이트 발동) 상태이므로 매수·숏 등 신규 실행은 하지 않고 관망·현금 유지가 결론이며, ATR 타점(진입 6791.79/손절 6580.17/목표 7003.41)은 보유분 리스크 관리 참고치로만 활용한다.
+
+## 익일 시나리오
+- 상승: 엔비디아발 반도체 훈풍과 원화 강세(1375.8, -0.45%)가 이어지면 외국인 수급이 반전되며 반등 시도가 가능하나, 오늘 장중 시장폭(64.0)·기술퀀트(56.3)는 견조해 낙폭과대 인식이 커질 경우 기술적 반등 여지는 있음
+- 하락: 한은 기준금리 인상 부담과 외국인·기관 동반 매도(합산 -18,848억) 기조가 지속되면 6580선(ATR 손절가 6580.17)까지 추가 하락 압력이 유효함
+- 트리거: 익일 오전 잭슨홀 연준 발언·미국 소비심리 확정치 및 도쿄 CPI 결과, 그리고 개장 직후 외국인 선물·현물 수급 방향 전환 여부
+
+## 리스크
+- 원·달러 환율 반등 시 외국인 매수 유인 약화 가능성
+- 잭슨홀 연준 발언 및 미국 금리 메시지에 따른 야간선물 변동성 확대
+- 한은 긴축 기조와 미국 반도체 관세 검토 등 정책 리스크 지속
+- 신호 일치도 0%(상·하방 혼재)로 방향 확신도 낮은 구간
+
+## 주의 신호
+- 리포트 시점(장 종료 전)에 마감 동시호가 미발생 — 항목 제외, 가중치 재배분
+- 당일 검증된 시장 재료 없음 — 뉴스 항목 제외, 가중치 재배분
+- 장중 스냅샷 기준(데이터 기준시각 2026-08-28 15:00 KST) — 지수·거래량은 마감 확정치가 아니다. 종가베팅 판단을 장 종료 전에 내리기 위한 설계.
+- 신호 일치도 0%(상·하방 혼재) — 방향 확신 완화, 익일확률 20% 수축
+- 확률 캘리브레이션 적용(부트스트랩, n=149) — 고정 시그모이드 대비 비관편향 교정
+
+## 자가학습 성적
+- 표본 7회 — 측정중(40회 전엔 성적으로 읽지 말 것)
+
+## 출처
+- https://kr.investing.com/equities/south-korea
+- https://www.biospace.com/press-releases/samsung-biologics-announces-krw-3-trillion-rights-offering-to-fund-its-next-phase-expansion
+- https://www.tradingview.com/news/smallcaps:a8d8abe19094b:0-spc-global-holdings-lifts-earnings-with-shift-to-higher-margin-products/
+- https://sonmul.co.kr/news/2026-08-28
+- https://www.newspim.com/news/view/20260728000876
+- https://markets.hankyung.com/indices/kospi
+- https://xn--6j1bp61aksejsj.com/article/%EB%89%B4%EC%8A%A4-%EC%A3%BC%EC%9A%94%EA%B3%B5%EC%8B%9C/2/95577/
+- https://buffettlab.co.kr/news/view.php?idx=56291
+- https://www.buffettlab.co.kr/news/view.php?idx=56333
+- https://www.etoday.co.kr/market
+- https://biz.chosun.com/stock/stock_general/2026/07/28/KCC35MFLQJFFFD722N3GD2MWX4/?outputType=amp
+
+※ 개인용 리스크 브리핑 · 투자자문 아님. 확정 수치는 API 원천, 확률은 방향 참고값.</textarea></div>
     </div>
 
     <div class="card"><p class="headline">코스피는 장중 스냅샷 기준 6791.79로 전일 대비 -1.74% 하락했고, 외국인·기관이 동시에 매도(외국인 -15,921억, 기관 -2,927억)하며 개인 순매수(+2,682억)만으로는 낙폭을 방어하지 못한 약세장입니다. 투자주체 수급 점수가 10.2로 극히 낮아 종가 강도(30.9)와 함께 총점을 40.6까지 끌어내렸습니다.</p></div>
@@ -466,6 +552,7 @@
       40회(약 20일)가 쌓이기 전엔 성적으로 읽지 말 것(가중치·확률 보정에도 쓰지 않는다).</p>
   </div>
     
+    <div class="card"><h2>리포트 자가비평 <span class="pill pill-ghost">3건</span></h2><ul class="rv-list"><li class="rv-item"><div class="rv-head"><span class="rv-dot" style="background:var(--caution)"></span><span class="rv-cat">부족</span><span class="rv-src">규칙</span><span class="rv-title">신뢰도 0(신호 완전 혼재)</span></div><div class="rv-detail">신호 일치도 0으로 방향 확신이 없다 — 진입 임계에서 자동 차단되나, 리포트가 방향을 단정하지 않도록 주의.</div><div class="rv-ev">근거 · agreement=0.0, confidence=0.0</div></li><li class="rv-item"><div class="rv-head"><span class="rv-dot" style="background:var(--down)"></span><span class="rv-cat">모순</span><span class="rv-src">규칙</span><span class="rv-title">라벨 적중률과 실거래(시가청산) 적중률 괴리</span></div><div class="rv-detail">라벨(종가→종가)은 맞는데 실제 거래 지평(종가→익일 시가)은 다른 결과 — &#x27;라벨은 맞고 실거래는 지는&#x27; 위험.</div><div class="rv-ev">근거 · 라벨 86% vs 실거래 25% (n=4)</div></li><li class="rv-item"><div class="rv-head"><span class="rv-dot" style="background:var(--muted)"></span><span class="rv-cat">개선</span><span class="rv-src">규칙</span><span class="rv-title">재료(뉴스) 항목이 제외됨 — 가중 활용 안 됨</span></div><div class="rv-detail">당일 검증 재료가 없어 뉴스 항목이 제외됐다. 자주 반복되면 재료 소스/판정을 개선하거나 가중을 재설계할 신호.</div></li></ul><div class="note muted">규칙 기반(결정론) + Gemini 비평 · 자동 반영 아님 — 개선 백로그로 누적해 보고서를 점진 강화</div></div>
     
   <div class="card">
     <h2>익일 개장 전 재검토 체크리스트</h2>
@@ -476,6 +563,69 @@
       <div class="stage-strip"><div class="stage-steps"><span class="stage-step stage-on">① 결정</span><span class="stage-sep">›</span><span class="stage-step ">② 컨펌</span><span class="stage-sep">›</span><span class="stage-step ">③ 재평가</span></div><div class="stage-note">지금 <b>① 결정</b> · 종가베팅 주문 판단 · 다음 갱신 16:30 확정</div><div class="stage-note">상태 <b>PRE_CLOSE_DECISION</b> · 허용 데이터: 장중 지수·수급·폭(잠정, 15:00) · 허용 액션: 종가베팅 진입/차단 판정 · 자동주문 차단</div></div>
       <div class="muted">KOSDAQ 836.16 (<span style='color:var(--down)'>-0.18%</span>) · 원달러 1,375.8</div>
       <div class="basis"><span class="basis-k">기준시각</span> 2026-08-28 15:00 KST · <span class="basis-k">상태</span> <b style="color:var(--neutral)">장 종료 전 스냅샷 · 종가 아님</b> · <span class="basis-k">지수 출처</span> 네이버 지수 일봉(장중 갱신) · <span class="basis-k">원달러</span> 1,375.80 <span style="color:var(--down)">-0.45%</span> <span class="basis-note">(원화 강세)</span></div>
+      <div class="view-actions"><button class="copy-btn" type="button" onclick="__copyReport(this)">📋 전체 복사</button><span class="copy-hint">LLM에 붙여넣어 이어서 질문</span><textarea class="copy-src" hidden aria-hidden="true"># 장마감전 분석 · 코스닥 · 2026-08-28
+- 상태: 장중 잠정(마감 전 스냅샷) · 기준시각 2026-08-28 15:00 KST
+
+코스닥은 장중 스냅샷 기준 836.16으로 소폭 약세(-0.18%)를 보이며, 총점 55.3(중립 등급) 속에 투자주체 수급 점수(37.0)가 가장 취약한 흐름을 만들고 있다. 외국인·기관 동반 순매도(외국인 -1209억, 기관 -80억)를 개인 순매수(+1295억)가 받아내는 전형적인 수급 공백 장세다.
+- 시장: 코스닥 836.2 (-0.18%) · 원달러 1,375.8
+
+## 총점 55.3 · 등급 중립 · 익일 상승확률 51.1% / 하락 48.9%
+- (원시 50.7% → 캘리브 51.1% · bootstrap n=149 · 단일 상승레짐 기저율 앵커, 하락장 미검증)
+- 진입 판정: 차단 (방향 watch) · 사유: 방향 확률 임계, 신뢰도 임계
+
+## 항목별 점수
+- 종가 강도 60.3 (가중 20%) · 종가위치 0.58 · -0.18% · 5일선 상회 · 5일선 위 안정적 마감
+- 시장 폭 62.7 (가중 20%) · adv_ratio 0.51 · 상한가 6 하한가 0 · 폭 중립
+- 투자주체 수급 37.0 (가중 25%) · 외국인 -1,209억 · 기관 -80억 · 개인 +1,295억 · 프로그램 미수집 · 개인만 순매수 — 추가 감점
+- 거래대금 57.2 (가중 15%) · 지수 거래량 당일/직전20일평균 0.85배 · 장중 누적→종일 환산 x0.96(기본값·표본 7/8) · 하락 · 대금 평이
+- 기술·퀀트 67.4 (가중 15%) · 추세 혼조 · RSI 53 · MACD + · %B 0.61 · 중립 마감(종가위치 53%) · 기술 지표 우호
+
+## 투자자 수급(억원)
+- 외국인 -1,209억 · 기관 -80억 · 개인 +1,295억 · 프로그램 미수집
+
+## 오버나이트 타점
+- 오버나이트(익일 오전): 진입 836.2 / 손절 818.0 / 목표 854.3 · 손익비 1.0
+- 상품 주문(KODEX 코스닥150·229200): 진입 14,435.0 / 손절 14,061.8 / 목표 14,808.2
+
+## 매매 결론
+진입판정 신규진입 차단(방향확률·신뢰도 임계 미충족)으로 등급게이트 통과와 무관하게 관망·현금이 원칙 — 권장비중 0%, ATR 타점(진입 836.16·손절 818.05·목표 854.27)은 보유분 관리 참고치로만 활용, 신규 롱·숏 실행 금지
+
+## 익일 시나리오
+- 상승: 거래대금(57.2)·기술·퀀트(67.4) 점수가 견조해 개인 매수세가 이어지고 외국인 매도가 둔화되면 ATR 참고 목표 854.27 방향으로 반등 시도 가능
+- 하락: 외국인·기관 매도가 확대되거나 원화 강세(1375.8, -0.45%) 되돌림이 겹치면 손절선 818.05 부근까지 눌릴 위험
+- 트리거: 잭슨홀 후속 발언 해석 및 미국 기술주·반도체(엔비디아 실적 후속) 흐름, 한국은행 금리 인상 여파의 성장주 반영 정도
+
+## 리스크
+- 외국인 코스닥 순매도(-1209억) 지속 여부
+- 원달러 환율(1375.8, -0.45%) 반전 시 외국인 수급 부담 재부각 가능성
+- 한은 기준금리 인상 여파로 성장주·고밸류 종목 추가 조정 위험
+- 잭슨홀 발언 해석에 따른 위험선호 급변동
+
+## 주의 신호
+- 리포트 시점(장 종료 전)에 마감 동시호가 미발생 — 항목 제외, 가중치 재배분
+- 당일 검증된 시장 재료 없음 — 뉴스 항목 제외, 가중치 재배분
+- 장중 스냅샷 기준(데이터 기준시각 2026-08-28 15:00 KST) — 지수·거래량은 마감 확정치가 아니다. 종가베팅 판단을 장 종료 전에 내리기 위한 설계.
+- 거래량 판별 신호 익일확률 -3%p (walk-forward AUC 0.577 · 단일 상승레짐 표본 n≈89, 신뢰구간이 0.5를 걸쳐 통계적으로 미확정 — 참고 신호, 하락장 표본 쌓이면 재검증 필요)
+- 신호 일치도 25%(상·하방 혼재) — 방향 확신 완화, 익일확률 15% 수축
+- 확률 캘리브레이션 적용(부트스트랩, n=149) — 고정 시그모이드 대비 비관편향 교정
+
+## 자가학습 성적
+- 표본 7회 — 측정중(40회 전엔 성적으로 읽지 말 것)
+
+## 출처
+- https://kr.investing.com/equities/south-korea
+- https://www.biospace.com/press-releases/samsung-biologics-announces-krw-3-trillion-rights-offering-to-fund-its-next-phase-expansion
+- https://www.tradingview.com/news/smallcaps:a8d8abe19094b:0-spc-global-holdings-lifts-earnings-with-shift-to-higher-margin-products/
+- https://sonmul.co.kr/news/2026-08-28
+- https://kr.investing.com/indices/kosdaq
+- https://markets.hankyung.com/indices/kospi
+- https://buffettlab.co.kr/news/view.php?idx=56291
+- https://finance.naver.com/sise/sise_index.naver?code=KOSDAQ
+- https://www.etoday.co.kr/market
+- https://www.wowtv.co.kr/Finance/DomesticStock/Kospi?menuSeq=79006
+- https://m.ytn.co.kr/news_view.php?key=202608280916322969&amp;s_mcd=0102
+
+※ 개인용 리스크 브리핑 · 투자자문 아님. 확정 수치는 API 원천, 확률은 방향 참고값.</textarea></div>
     </div>
 
     <div class="card"><p class="headline">코스닥은 장중 스냅샷 기준 836.16으로 소폭 약세(-0.18%)를 보이며, 총점 55.3(중립 등급) 속에 투자주체 수급 점수(37.0)가 가장 취약한 흐름을 만들고 있다. 외국인·기관 동반 순매도(외국인 -1209억, 기관 -80억)를 개인 순매수(+1295억)가 받아내는 전형적인 수급 공백 장세다.</p></div>
@@ -664,6 +814,7 @@
       40회(약 20일)가 쌓이기 전엔 성적으로 읽지 말 것(가중치·확률 보정에도 쓰지 않는다).</p>
   </div>
     
+    <div class="card"><h2>리포트 자가비평 <span class="pill pill-ghost">4건</span></h2><ul class="rv-list"><li class="rv-item"><div class="rv-head"><span class="rv-dot" style="background:var(--caution)"></span><span class="rv-cat">관측</span><span class="rv-src">규칙</span><span class="rv-title">캘리브 기울기 하한 — 총점이 확률에 영향 없음</span></div><div class="rv-detail">캘리브레이터 기울기가 하한에 박혀 총점이 확률을 거의 못 움직인다(확률≈절편=상승레짐 기저율).</div><div class="rv-ev">근거 · a=0.005, source=bootstrap, n=149</div></li><li class="rv-item"><div class="rv-head"><span class="rv-dot" style="background:var(--muted)"></span><span class="rv-cat">관측</span><span class="rv-src">규칙</span><span class="rv-title">방향 판별 미확보(확률≈기저율)</span></div><div class="rv-detail">익일 상승확률이 40~60% 판별 미확보 구간이라 방향 베팅 근거가 약하다.</div><div class="rv-ev">근거 · p_up=0.511</div></li><li class="rv-item"><div class="rv-head"><span class="rv-dot" style="background:var(--down)"></span><span class="rv-cat">모순</span><span class="rv-src">규칙</span><span class="rv-title">라벨 적중률과 실거래(시가청산) 적중률 괴리</span></div><div class="rv-detail">라벨(종가→종가)은 맞는데 실제 거래 지평(종가→익일 시가)은 다른 결과 — &#x27;라벨은 맞고 실거래는 지는&#x27; 위험.</div><div class="rv-ev">근거 · 라벨 71% vs 실거래 50% (n=4)</div></li><li class="rv-item"><div class="rv-head"><span class="rv-dot" style="background:var(--muted)"></span><span class="rv-cat">개선</span><span class="rv-src">규칙</span><span class="rv-title">재료(뉴스) 항목이 제외됨 — 가중 활용 안 됨</span></div><div class="rv-detail">당일 검증 재료가 없어 뉴스 항목이 제외됐다. 자주 반복되면 재료 소스/판정을 개선하거나 가중을 재설계할 신호.</div></li></ul><div class="note muted">규칙 기반(결정론) + Gemini 비평 · 자동 반영 아님 — 개선 백로그로 누적해 보고서를 점진 강화</div></div>
     
   <div class="card">
     <h2>익일 개장 전 재검토 체크리스트</h2>
@@ -674,6 +825,51 @@
       <div class="stage-strip"><div class="stage-steps"><span class="stage-step ">① 결정</span><span class="stage-sep">›</span><span class="stage-step ">② 컨펌</span><span class="stage-sep">›</span><span class="stage-step stage-on">③ 재평가</span></div><div class="stage-note">지금 <b>③ 재평가</b> · 간밤 반영·방향 결정 · 다음 갱신 장중 15:00 결정</div><div class="stage-note">상태 <b>PREOPEN</b> · 허용 데이터: 전일 확정치·미국장·금리·유가·환율 · 허용 액션: 관심 시나리오·개장 대응(유지/축소/청산) 결정만 · 자동주문 차단</div></div>
       <div class="muted">KOSPI 6,912.37 (<span style='color:var(--up)'>+1.53%</span>) · 원달러 1,382.0</div>
       <div class="basis"><span class="basis-k">기준시각</span> 2026-08-28 08:00 KST · <span class="basis-k">수치 앵커</span> 2026-08-27 마감</div>
+      <div class="view-actions"><button class="copy-btn" type="button" onclick="__copyReport(this)">📋 전체 복사</button><span class="copy-hint">LLM에 붙여넣어 이어서 질문</span><textarea class="copy-src" hidden aria-hidden="true"># 개장전 분석 · 코스피 · 2026-08-28
+- 상태: 개장전 재검토 · 기준시각 2026-08-28 08:00 KST
+
+간밤 미국 증시는 필라델피아반도체(+2.33%)·나스닥(+1.57%) 중심으로 강세를 보였고 원화도 강세(-0.29%)를 나타내 위험선호가 회복되는 흐름이었다. 다만 Perplexity 리서치에서는 SOX·반도체주 관련 자료가 엇갈려 시점별·업종별 차별화 가능성이 함께 확인된다.
+- 시장: 코스피 6,912.4 (+1.53%) · 원달러 1,382.0
+
+## 총점 53.7 · 등급 약세 · 익일 상승확률 61.3% / 하락 38.7%
+- 진입 판정: 차단 (방향 long) · 사유: 방향 확률 임계, 신뢰도 임계
+
+## 간밤 미국장
+- 블렌드 +1.38% · 필라델피아반도체 +2.33% · 나스닥 +1.57% · S&amp;P500 +0.72% · 다우 +0.20% · 원달러(원화 강세) -0.29%
+
+## 오버나이트 타점
+- 오버나이트(익일 오전): 진입 6,912.4 / 손절 6,695.1 / 목표 7,129.6 · 손익비 1.0
+- 상품 주문(KODEX 200·069500): 진입 109,135.0 / 손절 104,679.1 / 목표 113,590.9
+
+## 매매 결론
+전일 판단(약세 등급·NO_TRADE) 유지 — 확률상 방향은 상승 우위(61%)이나 등급게이트가 신규진입을 차단하므로 오늘도 관망/현금을 유지한다.
+
+## 익일 시나리오
+- 상승: 미국 선물 강세와 반도체 업종 훈풍이 이어질 경우 코스피는 보합~소폭 상방 출발 가능하나, 등급게이트상 신규진입은 차단되어 있어 방향과 무관하게 신규 매매 실행은 없다.
+- 하락: 간밤 SOX 관련 자료 엇갈림처럼 반도체 대형주 중심 되돌림이 나오거나 미국 선물이 장중 반락하면 코스피도 상승분을 반납하며 약세 전환할 수 있다.
+- 트리거: 개장 직후 SOX·반도체 대형주(삼성전자·SK하이닉스) 초반 흐름과 원달러 환율의 방향 유지 여부가 핵심 변수
+
+## 리스크
+- 미국 선물·나스닥 강세가 장중 되돌림으로 전환될 리스크
+- SOX·반도체 업종 내 종목별 차별화로 인한 변동성 확대
+- 원달러 환율 급변 시 외국인 수급 방향 전환 가능성
+- 개인 수급 순매도(-19120억) 지속에 따른 수급 공백 우려
+
+## 주의 신호
+- 개장 전 재검토 — 총점·구조는 2026-08-27 마감 앵커, **방향확률은 간밤 미국장·환율로 재평가**했다. 장중 갭 확인 후 대응.
+- 간밤 재평가: 익일확률 58%→61% · 간밤 블렌드 +1.38% → 방향 긍정적(지수 +3.4%·환율 +0.3%, 합 +3.7% 유계)
+
+## 출처
+- https://www.newspim.com/news/view/20260729000031
+- https://kr.investing.com/markets/united-states
+- https://ko.tradingeconomics.com/united-states/stock-market
+- https://m.finance.daum.net/global/quotes/US.COMP
+- https://m.finance.daum.net/global/quotes/US.SP500
+- https://www.tradingkey.com/kr/analysis/stocks/us-stocks/262113027-us-stock-close-dow-nasdaq-ai-memory-sandisk-micron-tradingkey
+- https://m.finance.daum.net/global
+- https://datacenter.hankyung.com/major-indices
+
+※ 개인용 리스크 브리핑 · 투자자문 아님. 확정 수치는 API 원천, 확률은 방향 참고값.</textarea></div>
     </div>
 
     <div class="card"><p class="headline">간밤 미국 증시는 필라델피아반도체(+2.33%)·나스닥(+1.57%) 중심으로 강세를 보였고 원화도 강세(-0.29%)를 나타내 위험선호가 회복되는 흐름이었다. 다만 Perplexity 리서치에서는 SOX·반도체주 관련 자료가 엇갈려 시점별·업종별 차별화 가능성이 함께 확인된다.</p></div>
@@ -751,6 +947,7 @@
     
     
     
+    
   <div class="card">
     <h2>장중 확인 체크리스트</h2>
     <ul class="check"><li>개장 직후 코스피 갭 방향 및 삼성전자·SK하이닉스 초반 흐름 확인</li><li>원달러 환율 재개장 후 방향 유지 여부 점검</li><li>외국인·기관 수급 동향(장 초반 매수/매도 전환 여부) 확인</li><li>거래대금·시장 폭 지표가 전일 대비 개선되는지 여부 확인</li><li>08:50 장전 재평가 시점까지 등급게이트(NO_TRADE) 변동 여부 재확인</li></ul>
@@ -760,6 +957,51 @@
       <div class="stage-strip"><div class="stage-steps"><span class="stage-step ">① 결정</span><span class="stage-sep">›</span><span class="stage-step ">② 컨펌</span><span class="stage-sep">›</span><span class="stage-step stage-on">③ 재평가</span></div><div class="stage-note">지금 <b>③ 재평가</b> · 간밤 반영·방향 결정 · 다음 갱신 장중 15:00 결정</div><div class="stage-note">상태 <b>PREOPEN</b> · 허용 데이터: 전일 확정치·미국장·금리·유가·환율 · 허용 액션: 관심 시나리오·개장 대응(유지/축소/청산) 결정만 · 자동주문 차단</div></div>
       <div class="muted">KOSDAQ 837.65 (<span style='color:var(--up)'>+1.30%</span>) · 원달러 1,382.0</div>
       <div class="basis"><span class="basis-k">기준시각</span> 2026-08-28 08:00 KST · <span class="basis-k">수치 앵커</span> 2026-08-27 마감</div>
+      <div class="view-actions"><button class="copy-btn" type="button" onclick="__copyReport(this)">📋 전체 복사</button><span class="copy-hint">LLM에 붙여넣어 이어서 질문</span><textarea class="copy-src" hidden aria-hidden="true"># 개장전 분석 · 코스닥 · 2026-08-28
+- 상태: 개장전 재검토 · 기준시각 2026-08-28 08:00 KST
+
+전일 코스닥은 +1.30% 상승 마감하며 총점 65.1 우호 등급을 기록했고, 간밤 미국 증시는 필라델피아반도체·나스닥·S&amp;P·다우 모두 상승하며 원화도 강세(원달러 하락)를 보였다. 다만 Perplexity 리서치는 간밤 나스닥/SOX 흐름을 상대적으로 약세로 해석하는 등 확정 수치와 결이 다른 정성적 시각도 존재한다.
+- 시장: 코스닥 837.6 (+1.30%) · 원달러 1,382.0
+
+## 총점 65.1 · 등급 우호 · 익일 상승확률 58.4% / 하락 41.6%
+- 진입 판정: 차단 (방향 watch) · 사유: 방향 확률 임계
+
+## 간밤 미국장
+- 블렌드 +1.65% · 필라델피아반도체 +2.33% · 나스닥 +1.57% · S&amp;P500 +0.72% · 다우 +0.20% · 원달러(원화 강세) -0.29%
+
+## 오버나이트 타점
+- 오버나이트(익일 오전): 진입 837.6 / 손절 819.1 / 목표 856.2 · 손익비 1.0
+- 상품 주문(KODEX 코스닥150·229200): 진입 14,500.0 / 손절 14,109.4 / 목표 14,890.6
+
+## 매매 결론
+등급게이트상 신규진입은 허용이나 ATR 타점상 방향 watch·권장비중 0%·edge 미미로 사실상 진입 근거 부족, 포지션 정책상 NO_TRADE/신규진입 차단 확정 — 전일 판단은 &#x27;관망&#x27; 유지, 신규 매수·숏·인버스 등 어떤 실행도 취하지 않고 현금 대응 유지.
+
+## 익일 시나리오
+- 상승: 간밤 미국 증시 강세(나스닥+1.57%·SOX+2.33%)와 원화 강세 기조가 이어지며 반도체·성장주 중심 갭업 출발 가능
+- 하락: Perplexity 지적대로 반도체 업종 내 종목별 온도차나 장초 수급 쏠림 되돌림이 발생하며 약보합~갭다운 출발 가능
+- 트리거: 장 초반 외국인·기관 수급 강도 지속 여부 및 반도체 대형주 갭 방향
+
+## 리스크
+- 반도체 대형주 갭 변동성 확대 시 지수 폭 급변
+- 개인 수급 순매도(-1498억) 지속에 따른 수급 불균형 심화
+- 원달러 환율 재상승 전환 시 외국인 수급 훼손 가능성
+- 야간선물·환율 지표 부재로 인한 갭 방향 불확실성
+
+## 주의 신호
+- 개장 전 재검토 — 총점·구조는 2026-08-27 마감 앵커, **방향확률은 간밤 미국장·환율로 재평가**했다. 장중 갭 확인 후 대응.
+- 간밤 재평가: 익일확률 54%→58% · 간밤 블렌드 +1.65% → 방향 긍정적(지수 +4.1%·환율 +0.3%, 합 +4.4% 유계)
+
+## 출처
+- https://www.newspim.com/news/view/20260729000031
+- https://kr.investing.com/markets/united-states
+- https://ko.tradingeconomics.com/united-states/stock-market
+- https://m.finance.daum.net/global/quotes/US.COMP
+- https://m.finance.daum.net/global/quotes/US.SP500
+- https://www.tradingkey.com/kr/analysis/stocks/us-stocks/262113027-us-stock-close-dow-nasdaq-ai-memory-sandisk-micron-tradingkey
+- https://m.finance.daum.net/global
+- https://datacenter.hankyung.com/major-indices
+
+※ 개인용 리스크 브리핑 · 투자자문 아님. 확정 수치는 API 원천, 확률은 방향 참고값.</textarea></div>
     </div>
 
     <div class="card"><p class="headline">전일 코스닥은 +1.30% 상승 마감하며 총점 65.1 우호 등급을 기록했고, 간밤 미국 증시는 필라델피아반도체·나스닥·S&amp;P·다우 모두 상승하며 원화도 강세(원달러 하락)를 보였다. 다만 Perplexity 리서치는 간밤 나스닥/SOX 흐름을 상대적으로 약세로 해석하는 등 확정 수치와 결이 다른 정성적 시각도 존재한다.</p></div>
@@ -837,6 +1079,7 @@
     
     
     
+    
   <div class="card">
     <h2>장중 확인 체크리스트</h2>
     <ul class="check"><li>장 초반 코스닥 갭 방향 및 반도체 대형주(2차전지 포함) 개별 흐름 확인</li><li>외국인·기관 수급 강도 지속 여부(전일 대비) 점검</li><li>원달러 환율 08:50 기준 재확인 후 시간청산 규율 적용</li><li>개인 순매도 규모 축소/확대 여부 체크</li><li>09시 이후 거래대금 회복 여부로 등급 재평가 가능성 점검</li></ul>
@@ -846,6 +1089,57 @@
       <div class="slot-pick"><label class="slot-lab">날짜 <select class="slot-sel" onchange="if(this.value) location=this.value"><option value="/#btc-perp" selected>2026-08-28</option><option value="/archive/btc/2026-08-27-2200.html#btc-perp">2026-08-27</option><option value="/archive/btc/2026-08-26-2200.html#btc-perp">2026-08-26</option><option value="/archive/btc/2026-08-25-2200.html#btc-perp">2026-08-25</option><option value="/archive/btc/2026-08-24-2200.html#btc-perp">2026-08-24</option><option value="/archive/btc/2026-08-23-2200.html#btc-perp">2026-08-23</option><option value="/archive/btc/2026-08-22-2200.html#btc-perp">2026-08-22</option><option value="/archive/btc/2026-08-21-2200.html#btc-perp">2026-08-21</option></select></label><div class="slot-regs"><a class="slot-chip active" href="/#btc-perp">09:30</a></div><span class="slot-hint">정규 하루 2회 · 수동은 목록</span></div>
       <div class="basis"><span class="basis-k">기준</span> 2026-08-28 09:30 KST · 마크 80,382.0 (<span style="color:var(--up)">+0.22%</span>)
         · 나스닥 마감 +1.57% · 실시간 아님</div>
+      <div class="view-actions"><button class="copy-btn" type="button" onclick="__copyReport(this)">📋 전체 복사</button><span class="copy-hint">LLM에 붙여넣어 이어서 질문</span><textarea class="copy-src" hidden aria-hidden="true"># BTCUSDT 무기한 선물 · 2026-08-28 0930
+- 상태: 마감 확정 · 기준시각 2026-08-28 09:30 KST
+
+BTCUSDT는 80,381.9선에서 총점 58.8·중립 등급으로 신규진입 차단 상태다. 세션확률은 LONG 70%로 기울지만 기술·심리 간 괴리와 Medium 확신도로 게이트가 관망을 지시한다.
+
+## 총점 58.8 · 등급 중립 · 세션 LONG 69.7% / SHORT 30.3%
+- 게이트: 수렴 게이트(괴리·확신도 Medium) — 관망
+
+## 항목별 점수
+- 기술·추세 63.1 (가중 22%) · 4H 80,386.7 · EMA 정배열 · MACD− · RSI 65 · ST↑ · 1H RSI 64 · 추세 우세
+- 파생 포지셔닝 52.7 (가중 28%) · 펀딩 0.0064% · OI 세션 +3.1% · 30일비 +4.2% · Q1 · 롱 군집
+- 체결·청산 56.7 (가중 15%) · 테이커 1.04 · LS 2.07 · 체결 흐름
+- 시장 환경 65.7 (가중 15%) · 나스닥 세션 +1.57% · 위험선호
+- 뉴스 재료 70.0 (가중 12%) · 팩트체크 호재 3·악재 1 (시황 제외) · 호재 우위
+- SNS 심리 43.0 (가중 8%) · Fear&amp;Greed 73 · 극단 역행
+
+## 매매 결론
+NO_TRADE — 신규진입 차단, 관망 유지.
+
+## 익일 시나리오
+- 상승: LONG 시나리오는 나스닥 강세 연동과 1D RSI 82.39·1D StochK 95.25 등 과열권에서도 상단 돌파가 이어질 경우에 한해 참고 가능하나 현재 게이트상 신규진입은 차단된 상태다.
+- 하락: SHORT 시나리오는 심리 지표(F&amp;G 73, 커뮤니티 bias Long 편향)의 과열 반전 및 탑트레이더 LS비율 2.0712의 쏠림 해소 시 고려되나 이 역시 게이트 차단으로 실행 대상이 아니다.
+- 트리거: 다음 세션 트리거는 신호 일치도 77% 이상으로의 회복 또는 확신도 Medium→High 전환, 그리고 수렴/괴리 해소 여부다.
+
+## 리스크
+- 1D RSI 82.39·StochK 95.25로 단기 과열권 진입
+- 괴리 상태(기술·기본 Long vs 심리 Short)로 확신도 Medium에 머묾
+- 탑트레이더 LS비율(2.0712)과 글로벌 LS비율(0.9201) 간 포지션 쏠림 불일치
+- 펀딩 0.0064%·OI 108,698 수준에서 레버리지 청산 변동성 가능성
+
+## 주의 신호
+- 신호 일치도 77% — 방향 확신 완화
+- 수렴 게이트(괴리·확신도 Medium) — 관망
+
+## 자가학습 성적
+- 표본 12회 — 측정중(40회 전엔 성적으로 읽지 말 것)
+
+## 출처
+- https://www.reuters.com/world/russian-speaking-cybercriminals-used-spacexs-cursor-ai-tool-hack-seven-companies-2026-08-27/
+- https://www.investors.com/news/bitcoin-price-test-key-level-treasury-trump-adminsitration-clarity-act-crypto-regulations-iren-earnings-crypto-stocks/
+- https://www.foxbusiness.com/economy/fed-chair-warsh-faces-jackson-hole-spotlight-inflation-rate-path-focus
+- https://www.cnbc.com/2026/08/26/case-for-bitcoin-stronger-as-regulation-takes-back-seat-blackrock-says.html
+- https://thefintechtimes.com/fastest-route-to-market-digital-assets-and-the-next-layer-of-licensing-complexity/
+- https://finance.yahoo.com/markets/crypto/articles/bitcoin-rally-stalls-at-80000-as-traders-await-inflation-data-082152117.html
+- https://www.coindesk.com/markets/2026/08/27/bitcoin-tests-its-largest-supply-wall-at-usd80-000-near-etf-holders-average-price
+- https://www.coindesk.com/markets/2026/08/26/E
+- https://biz.chosun.com/en/en-finance/2026/08/28/4WXJNS3NHBGGZLQ5DGQ3E3P3YU/
+- https://www.tokenpost.kr/amp/news/briefing/399268
+- https://www.tokenpost.kr/news/cryptocurrency/194689
+
+※ 개인용 리스크 브리핑 · 투자자문 아님. 확정 수치는 API 원천, 확률은 방향 참고값.</textarea></div>
     </div>
     <div class="card"><p class="headline">BTCUSDT는 80,381.9선에서 총점 58.8·중립 등급으로 신규진입 차단 상태다. 세션확률은 LONG 70%로 기울지만 기술·심리 간 괴리와 Medium 확신도로 게이트가 관망을 지시한다.</p></div>
     <div class="card hero">
@@ -982,10 +1276,11 @@
   </div>
     
     
+    
   <div class="card">
     <h2>익일 개장 전 재검토 체크리스트</h2>
     <ul class="check"><li>신호 일치도 77% 이상 유지 또는 상승 여부 확인</li><li>확신도 Medium→High 전환 여부 점검</li><li>1D RSI·StochK 과열 해소(하락 전환) 여부 확인</li><li>탑/글로벌 LS비율 쏠림 완화 여부 재점검</li><li>펀딩률·OI 변화로 레버리지 쏠림 재평가</li></ul>
-  </div></section>
+  </div></section><section class="view" data-view="report-review"><div class="view-head"><div class="view-title">리포트 자가비평 <span class="view-sub">· 2026-08-28</span></div><div class="muted">보고서 스스로의 모순·부족·개선점을 누적한다 — 규칙 기반(결정론)과 Gemini 비평. 자동 반영 아님, 사람이 검토하는 개선 백로그.</div></div><div class="card"><h2>교차시장 점검 <span class="pill pill-ghost">1건</span></h2><ul class="rv-list"><li class="rv-item"><div class="rv-head"><span class="rv-dot" style="background:var(--caution)"></span><span class="rv-cat">모순</span><span class="rv-src">규칙</span><span class="rv-title">교차시장 확률 역전(총점↔확률 순서 뒤바뀜)</span></div><div class="rv-detail">총점이 낮은 시장의 익일 상승확률이 더 높게 표시된다 — 캘리브 평탄화의 부작용. 등급(총점)과 확률(캘리브)이 다른 축임을 화면이 분명히 해야 오해가 없다.</div><div class="rv-ev">근거 · 코스닥 총점 55.3 p_up 51% vs 코스피 총점 40.6 p_up 59%</div></li></ul></div><div class="card"><h2>장마감전 분석 · 코스피 <span class="pill pill-ghost">3건</span></h2><ul class="rv-list"><li class="rv-item"><div class="rv-head"><span class="rv-dot" style="background:var(--caution)"></span><span class="rv-cat">부족</span><span class="rv-src">규칙</span><span class="rv-title">신뢰도 0(신호 완전 혼재)</span></div><div class="rv-detail">신호 일치도 0으로 방향 확신이 없다 — 진입 임계에서 자동 차단되나, 리포트가 방향을 단정하지 않도록 주의.</div><div class="rv-ev">근거 · agreement=0.0, confidence=0.0</div></li><li class="rv-item"><div class="rv-head"><span class="rv-dot" style="background:var(--down)"></span><span class="rv-cat">모순</span><span class="rv-src">규칙</span><span class="rv-title">라벨 적중률과 실거래(시가청산) 적중률 괴리</span></div><div class="rv-detail">라벨(종가→종가)은 맞는데 실제 거래 지평(종가→익일 시가)은 다른 결과 — &#x27;라벨은 맞고 실거래는 지는&#x27; 위험.</div><div class="rv-ev">근거 · 라벨 86% vs 실거래 25% (n=4)</div></li><li class="rv-item"><div class="rv-head"><span class="rv-dot" style="background:var(--muted)"></span><span class="rv-cat">개선</span><span class="rv-src">규칙</span><span class="rv-title">재료(뉴스) 항목이 제외됨 — 가중 활용 안 됨</span></div><div class="rv-detail">당일 검증 재료가 없어 뉴스 항목이 제외됐다. 자주 반복되면 재료 소스/판정을 개선하거나 가중을 재설계할 신호.</div></li></ul></div><div class="card"><h2>장마감전 분석 · 코스닥 <span class="pill pill-ghost">4건</span></h2><ul class="rv-list"><li class="rv-item"><div class="rv-head"><span class="rv-dot" style="background:var(--caution)"></span><span class="rv-cat">관측</span><span class="rv-src">규칙</span><span class="rv-title">캘리브 기울기 하한 — 총점이 확률에 영향 없음</span></div><div class="rv-detail">캘리브레이터 기울기가 하한에 박혀 총점이 확률을 거의 못 움직인다(확률≈절편=상승레짐 기저율).</div><div class="rv-ev">근거 · a=0.005, source=bootstrap, n=149</div></li><li class="rv-item"><div class="rv-head"><span class="rv-dot" style="background:var(--muted)"></span><span class="rv-cat">관측</span><span class="rv-src">규칙</span><span class="rv-title">방향 판별 미확보(확률≈기저율)</span></div><div class="rv-detail">익일 상승확률이 40~60% 판별 미확보 구간이라 방향 베팅 근거가 약하다.</div><div class="rv-ev">근거 · p_up=0.511</div></li><li class="rv-item"><div class="rv-head"><span class="rv-dot" style="background:var(--down)"></span><span class="rv-cat">모순</span><span class="rv-src">규칙</span><span class="rv-title">라벨 적중률과 실거래(시가청산) 적중률 괴리</span></div><div class="rv-detail">라벨(종가→종가)은 맞는데 실제 거래 지평(종가→익일 시가)은 다른 결과 — &#x27;라벨은 맞고 실거래는 지는&#x27; 위험.</div><div class="rv-ev">근거 · 라벨 71% vs 실거래 50% (n=4)</div></li><li class="rv-item"><div class="rv-head"><span class="rv-dot" style="background:var(--muted)"></span><span class="rv-cat">개선</span><span class="rv-src">규칙</span><span class="rv-title">재료(뉴스) 항목이 제외됨 — 가중 활용 안 됨</span></div><div class="rv-detail">당일 검증 재료가 없어 뉴스 항목이 제외됐다. 자주 반복되면 재료 소스/판정을 개선하거나 가중을 재설계할 신호.</div></li></ul></div><div class="card"><h2>개선 백로그(누적 반복) <span class="pill pill-ghost">8건</span></h2><ul class="rv-list"><li class="rv-item"><div class="rv-head"><span class="rv-cat">반복 2회</span><span class="rv-title">라벨 적중률과 실거래(시가청산) 적중률 괴리</span></div></li><li class="rv-item"><div class="rv-head"><span class="rv-cat">반복 2회</span><span class="rv-title">재료(뉴스) 항목이 제외됨 — 가중 활용 안 됨</span></div></li></ul><div class="note muted">규칙 발견이 반복될수록 구조적 결함 → 우선 개선 대상. 누적본은 월간 다이제스트로도 보고.</div></div></section>
     <p class="disc">투자 판단의 참고 자료이며 투자 권유가 아님.</p>
   </main>
 </div>
@@ -1148,6 +1443,23 @@
     }).catch(function(){});
   }catch(e){}
 })();
+</script>
+<script>
+window.__copyReport=function(btn){
+  try{
+    var ta=btn.parentElement.querySelector('.copy-src'); if(!ta) return;
+    var txt=ta.value;
+    function done(){ var o=btn.getAttribute('data-lbl')||btn.textContent;
+      btn.setAttribute('data-lbl',o); btn.textContent='✓ 복사됨';
+      btn.classList.add('copied');
+      setTimeout(function(){ btn.textContent=o; btn.classList.remove('copied'); },1600); }
+    function fallback(){ ta.hidden=false; ta.select();
+      try{document.execCommand('copy');}catch(e){} ta.hidden=true; done(); }
+    if(navigator.clipboard&&navigator.clipboard.writeText){
+      navigator.clipboard.writeText(txt).then(done,fallback);
+    } else fallback();
+  }catch(e){}
+};
 </script>
 </body>
 </html>
