@@ -40,7 +40,8 @@ try:
 except Exception:
     pass
 
-from src import atr, calibration, config, execution, notify, quant, remote, store, strategy
+from src import (atr, calibration, config, execution, notify, quant, remote,
+                 report_review, store, strategy)
 from src import btc_bundle
 from src.collectors import llm, naver, news
 from src.collectors.ls import LSClient, LSError, load_env
@@ -768,6 +769,20 @@ def main() -> int:
                   f"· 결측 {miss or '없음'} · 제외 {excl or '없음'}")
             print(f"    서술: {trace}")
 
+    # ── 리포트 자가비평: 규칙 기반 + Gemini(최신) 비평을 DB 누적 + 리포트 첨부 ──
+    # conn 이 닫히기 전에 실행(review_digest 조회 포함). 실패해도 파이프라인은 계속.
+    review_meta = {}
+    if reports:
+        try:
+            td_r = reports[0].get("trade_date", "output")
+            review_meta = report_review.evaluate(conn, td_r, reports, env, dry_run=dry_run)
+            nrev = sum(len(r.get("reviews", {}).get("rules", [])) +
+                       len(r.get("reviews", {}).get("llm", [])) for r in reports)
+            print(f"[자가비평] 발견 {nrev}건 · 교차 {len(review_meta.get('cross') or [])}건 "
+                  f"· 누적 백로그 {(review_meta.get('digest') or {}).get('n_total', 0)}건")
+        except Exception as e:  # noqa
+            print(f"⚠ 리포트 비평 실패({type(e).__name__}: {e}) — 스킵")
+
     if ls is not None:
         ls.close()
 
@@ -781,7 +796,9 @@ def main() -> int:
     preopen = _load_preopen(trade_date)
     btc = btc_bundle.load_btc()
     bundle = {"trade_date": trade_date, "reports": btc_bundle.merge(reports + preopen, btc),
-              "as_of": now.strftime("%Y-%m-%d %H:%M KST")}
+              "as_of": now.strftime("%Y-%m-%d %H:%M KST"),
+              "review_cross": review_meta.get("cross"),
+              "review_digest": review_meta.get("digest")}
     out_dir = ROOT / "out"
     out_dir.mkdir(exist_ok=True)
 

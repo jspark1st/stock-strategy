@@ -1324,6 +1324,83 @@ def _copy_widget(r: dict) -> str:
             f'</div>')
 
 
+_SEV_COLOR = {"high": "var(--down)", "med": "var(--caution)", "low": "var(--muted)"}
+
+
+def _review_items_html(findings: list[dict]) -> str:
+    rows = []
+    for f in findings or []:
+        col = _SEV_COLOR.get(f.get("severity"), "var(--muted)")
+        src = "규칙" if f.get("source") == "rule" else "Gemini"
+        ev = f.get("evidence")
+        ev_html = f'<div class="rv-ev">근거 · {esc(str(ev))}</div>' if ev else ""
+        rows.append(
+            f'<li class="rv-item"><div class="rv-head">'
+            f'<span class="rv-dot" style="background:{col}"></span>'
+            f'<span class="rv-cat">{esc(f.get("category") or "")}</span>'
+            f'<span class="rv-src">{src}</span>'
+            f'<span class="rv-title">{esc(f.get("title") or "")}</span></div>'
+            f'<div class="rv-detail">{esc(f.get("detail") or "")}</div>{ev_html}</li>')
+    return "".join(rows)
+
+
+def _all_findings(r: dict) -> list[dict]:
+    rv = r.get("reviews") or {}
+    return (rv.get("rules") or []) + (rv.get("llm") or [])
+
+
+def build_review_card(r: dict) -> str:
+    """뷰 안 '리포트 자가비평' 카드 — 그 리포트의 규칙+LLM 발견."""
+    allf = _all_findings(r)
+    if not allf:
+        return ""
+    return (f'<div class="card"><h2>리포트 자가비평 '
+            f'<span class="pill pill-ghost">{len(allf)}건</span></h2>'
+            f'<ul class="rv-list">{_review_items_html(allf)}</ul>'
+            f'<div class="note muted">규칙 기반(결정론) + Gemini 비평 · 자동 반영 아님 — '
+            f'개선 백로그로 누적해 보고서를 점진 강화</div></div>')
+
+
+def build_review_view(bundle: dict) -> str:
+    """'리포트 비평' 메뉴 전용 뷰 — 전 시장 비평 + 교차 점검 + 누적 개선 백로그."""
+    reports = bundle.get("reports") or []
+    date = esc(str(bundle.get("trade_date", "")))
+    blocks = []
+    cross = bundle.get("review_cross") or []
+    if cross:
+        blocks.append(f'<div class="card"><h2>교차시장 점검 '
+                      f'<span class="pill pill-ghost">{len(cross)}건</span></h2>'
+                      f'<ul class="rv-list">{_review_items_html(cross)}</ul></div>')
+    for r in reports:
+        allf = _all_findings(r)
+        if not allf:
+            continue
+        title = esc(" · ".join(x for x in (r.get("label"), r.get("group")) if x))
+        blocks.append(f'<div class="card"><h2>{title} '
+                      f'<span class="pill pill-ghost">{len(allf)}건</span></h2>'
+                      f'<ul class="rv-list">{_review_items_html(allf)}</ul></div>')
+    dg = bundle.get("review_digest") or {}
+    rec = dg.get("recurring") or []
+    if rec:
+        rows = "".join(
+            f'<li class="rv-item"><div class="rv-head">'
+            f'<span class="rv-cat">반복 {d.get("n")}회</span>'
+            f'<span class="rv-title">{esc(d.get("title") or "")}</span></div></li>'
+            for d in rec[:12])
+        blocks.append(f'<div class="card"><h2>개선 백로그(누적 반복) '
+                      f'<span class="pill pill-ghost">{dg.get("n_total", 0)}건</span></h2>'
+                      f'<ul class="rv-list">{rows}</ul>'
+                      f'<div class="note muted">규칙 발견이 반복될수록 구조적 결함 → 우선 개선 대상. '
+                      f'누적본은 월간 다이제스트로도 보고.</div></div>')
+    body = "".join(blocks) or ('<div class="card"><p class="muted">오늘 비평 항목 없음 — '
+                               '파이프라인 재실행 후 채워진다.</p></div>')
+    return (f'<div class="view-head"><div class="view-title">리포트 자가비평 '
+            f'<span class="view-sub">· {date}</span></div>'
+            f'<div class="muted">보고서 스스로의 모순·부족·개선점을 누적한다 — '
+            f'규칙 기반(결정론)과 Gemini 비평. 자동 반영 아님, 사람이 검토하는 개선 백로그.</div>'
+            f'</div>{body}')
+
+
 def render_btc_view(r: dict, date: str) -> str:
     """BTCUSDT 전용 뷰. ETF/HTS/수급/3단계 루프 없음."""
     nar = r.get("narrative", {}) or {}
@@ -1400,6 +1477,7 @@ def render_btc_view(r: dict, date: str) -> str:
     {build_materials(r)}
     {build_accuracy(r)}
     {build_paper(r)}
+    {build_review_card(r)}
     {build_reopen(r)}"""
 
 
@@ -1692,6 +1770,7 @@ def render_report_view(r: dict, date: str) -> str:
     {build_materials(r)}
     {build_accuracy(r)}
     {build_paper(r)}
+    {build_review_card(r)}
     {build_reopen(r)}"""
 
 
@@ -1812,6 +1891,8 @@ def build_sidebar(items: list[dict]) -> str:
             cls = "nav-item" + (" ph" if it["ph"] else "")
             if it["ph"]:
                 badge = f'<span class="nav-badge">{esc(it.get("note", "준비 중"))}</span>'
+            elif it.get("badge"):
+                badge = f'<span class="nav-badge">{esc(it["badge"])}</span>'
             elif it.get("total") is not None:
                 badge = (f'<span class="nav-score" style="color:{grade_color(it.get("grade",""))}">'
                          f'{fmt(it["total"])}</span>')
@@ -1878,6 +1959,14 @@ def render(data: dict, lwc_src: str | None = None) -> str:
                       "group": p.get("group", "기타"), "ph": True,
                       "note": p.get("note", "준비 중")})
         views.append((vid, render_placeholder_view(p)))
+
+    # 리포트 비평 뷰 — 메뉴 하나. 전 시장 비평 + 교차 점검 + 누적 개선 백로그.
+    n_rev = sum(len(_all_findings(r)) for r in bundle["reports"]) + \
+        len(bundle.get("review_cross") or [])
+    if bundle["reports"]:
+        items.append({"id": "report-review", "label": "리포트 비평", "group": "진단",
+                      "ph": False, "badge": (f"{n_rev}건" if n_rev else "—")})
+        views.append(("report-review", build_review_view(bundle)))
 
     sidebar = build_sidebar(items)
     views_html = "".join(
@@ -2115,6 +2204,19 @@ TEMPLATE = r"""<!doctype html>
   .copy-btn.copied{border-color:var(--good);color:var(--good);
     background:color-mix(in srgb,var(--good) 16%,transparent)}
   .copy-hint{font-size:.74rem;color:var(--muted)}
+
+  /* 리포트 자가비평 */
+  .rv-list{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:10px}
+  .rv-item{border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:var(--surface2)}
+  .rv-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .rv-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+  .rv-cat{font-size:.7rem;font-weight:700;color:var(--muted);border:1px solid var(--border);
+    border-radius:6px;padding:1px 7px}
+  .rv-src{font-size:.68rem;font-weight:600;color:var(--accent);
+    background:color-mix(in srgb,var(--accent) 12%,transparent);border-radius:6px;padding:1px 7px}
+  .rv-title{font-weight:700;font-size:.9rem;color:var(--text)}
+  .rv-detail{font-size:.82rem;color:var(--muted);margin-top:5px;line-height:1.5}
+  .rv-ev{font-size:.74rem;color:var(--muted);margin-top:4px;font-variant-numeric:tabular-nums}
 
   /* 리스트/재료/체크 */
   .sub-h{font-weight:700;font-size:.86rem;margin:12px 0 6px;color:var(--text)}

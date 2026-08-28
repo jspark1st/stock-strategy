@@ -28,6 +28,9 @@ PPLX_URL = "https://api.perplexity.ai/chat/completions"
 PPLX_MODEL = "sonar"
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
+# 리포트 자가비평 담당 — 저렴·긴 컨텍스트라 Gemini 고급(pro) 우선, 실패 시 flash 폴백.
+# .env `critic_model` 로 오버라이드(콤마 체인). 최신 고급 모델을 기본으로 둔다.
+CRITIC_MODELS = ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.0-flash"]
 # 종합 단계 모델 체인. Opus 5 가 과부하(529)면 Sonnet 5 로 내려가 서술을 살린다.
 # (모델을 임의로 낮추지 않되, '아예 못 쓰는 것'보다는 한 단계 아래가 낫다.)
 CLAUDE_MODELS = ["claude-opus-5", "claude-sonnet-5"]
@@ -51,7 +54,36 @@ def resolve_models(env: dict | None = None) -> dict:
         "perplexity": (str(env.get("perplexity_model") or "").strip() or PPLX_MODEL),
         "gemini": _chain("gemini_model", GEMINI_MODELS),
         "claude": _chain("claude_model", CLAUDE_MODELS),
+        "critic": _chain("critic_model", CRITIC_MODELS),
     }
+
+
+def gemini_generate(sys_prompt: str, user_prompt: str, env: dict,
+                    models: list[str] | None = None, max_tokens: int = 2000,
+                    temperature: float = 0.2) -> str | None:
+    """범용 Gemini 호출 — 모델 체인을 순서대로 시도(404/실패 시 다음). 원문 텍스트 반환.
+
+    비평자(critic) 등 서술 파이프 외 용도에서 재사용. 키 없으면 None.
+    """
+    key = env.get("google_gemini_api")
+    if not key:
+        return None
+    payload = {"contents": [{"role": "user", "parts": [{"text": user_prompt}]}],
+               "systemInstruction": {"parts": [{"text": sys_prompt}]},
+               "generationConfig": {"temperature": temperature,
+                                    "maxOutputTokens": max_tokens}}
+    for model in (models or resolve_models(env)["critic"]):
+        try:
+            r = httpx.post(GEMINI_URL.format(model=model), params={"key": key},
+                           json=payload, timeout=TIMEOUT)
+            if r.status_code == 404:
+                continue
+            r.raise_for_status()
+            parts = r.json()["candidates"][0]["content"]["parts"]
+            return "".join(p.get("text", "") for p in parts)
+        except Exception:  # noqa — 다음 모델/포기
+            continue
+    return None
 # Opus 5 는 적응형 사고(adaptive thinking)가 기본 ON 이라 사고 토큰도 max_tokens 를 먹는다.
 # 4000 이면 JSON 이 중간에 잘릴 수 있어 넉넉히 잡는다(비용은 실제 출력분만 청구).
 CLAUDE_MAX_TOKENS = 16000

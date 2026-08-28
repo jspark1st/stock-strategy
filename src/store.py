@@ -15,9 +15,15 @@
 """
 from __future__ import annotations
 
+import datetime
 import json
 import sqlite3
 from pathlib import Path
+
+
+def _now() -> str:
+    """기록용 타임스탬프(로컬 KST). 채점/비평 등 호출자가 시각을 안 넘길 때 폴백."""
+    return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS daily (
@@ -109,6 +115,28 @@ CREATE TABLE IF NOT EXISTS paper_trades (
   created_at   TEXT,
   closed_at    TEXT,
   UNIQUE(market, trade_date)
+);
+-- 리포트 자가비평 저널 — 매 회차 보고서를 객관적으로 평가한 문장을 누적한다.
+-- (a) 규칙 기반(source='rule', code 로 빈도 집계) + (b) LLM 비평(source='llm').
+-- 누적본을 review_digest 로 클러스터링해 '개선 백로그'로 승격 → 보고서를 점진 강화한다.
+-- 자동 반영은 하지 않는다(단일레짐 과최적 방지) — 기록·표면화, 결정은 사람.
+CREATE TABLE IF NOT EXISTS report_review (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  trade_date   TEXT NOT NULL,
+  market       TEXT NOT NULL,          -- KOSPI / KOSDAQ / BTC / ALL(교차)
+  report_type  TEXT NOT NULL DEFAULT 'close',
+  slot         TEXT NOT NULL DEFAULT '',
+  created_at   TEXT,
+  source       TEXT NOT NULL,          -- rule / llm
+  category     TEXT NOT NULL,          -- 모순 / 부족 / 개선 / 관측
+  code         TEXT,                   -- 규칙 식별자(rule) — 빈도 집계 키
+  severity     TEXT,                   -- high / med / low
+  title        TEXT NOT NULL,
+  detail       TEXT,                   -- 근거 문장
+  evidence     TEXT,                   -- 수치 근거(선택)
+  resolved     INTEGER NOT NULL DEFAULT 0,
+  resolved_at  TEXT,
+  UNIQUE(trade_date, market, report_type, slot, source, title)
 );
 """
 
@@ -705,3 +733,95 @@ def grade_btc_pending(conn: sqlite3.Connection, now_date: str, now_slot: str,
         g["slot"] = prev["slot"]
         out.append(g)
     return out
+
+
+# ── 리포트 자가비평 저널 ──────────────────────────────────────────────────
+_SEV_RANK = {"high": 3, "med": 2, "low": 1}
+
+
+def record_reviews(conn: sqlite3.Connection, trade_date: str, market: str,
+                   report_type: str, slot: str, findings: list[dict],
+                   now: str | None = None) -> int:
+    """비평 findings 를 report_review 에 upsert(멱등 — 15:00→16:30 재실행 안전).
+
+    findings 각 항목: {source, category, code, severity, title, detail, evidence}.
+    같은 (날짜·시장·유형·슬롯·source·title) 이면 내용만 갱신(id 유지). 반환=반영 건수.
+    """
+    now = now or _now()
+    n = 0
+    for f in findings or []:
+        title = (f.get("title") or "").strip()
+        if not title:
+            continue
+        conn.execute(
+            "INSERT INTO report_review "
+            "(trade_date,market,report_type,slot,created_at,source,category,code,"
+            " severity,title,detail,evidence) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?) "
+            "ON CONFLICT(trade_date,market,report_type,slot,source,title) DO UPDATE SET "
+            "category=excluded.category, code=excluded.code, severity=excluded.severity, "
+            "detail=excluded.detail, evidence=excluded.evidence, created_at=excluded.created_at",
+            (trade_date, market, report_type, slot, now,
+             f.get("source") or "rule", f.get("category") or "관측", f.get("code"),
+             f.get("severity") or "low", title, f.get("detail"), f.get("evidence")))
+        n += 1
+    conn.commit()
+    return n
+
+
+def reviews_for(conn: sqlite3.Connection, trade_date: str, market: str | None = None,
+                report_type: str = "close", slot: str = "") -> list[dict]:
+    """렌더용 — 특정 회차의 비평을 심각도 순으로. market=None 이면 그 날짜 전체."""
+    q = ("SELECT source,category,code,severity,title,detail,evidence,resolved "
+         "FROM report_review WHERE trade_date=?")
+    args: list = [trade_date]
+    if market is not None:
+        q += " AND market=? AND report_type=? AND slot=?"
+        args += [market, report_type, slot]
+    rows = [dict(r) for r in conn.execute(q, args).fetchall()]
+    rows.sort(key=lambda r: (-_SEV_RANK.get(r.get("severity"), 0),
+                             0 if r.get("source") == "rule" else 1))
+    return rows
+
+
+def review_digest(conn: sqlite3.Connection, since: str | None = None,
+                  min_count: int = 2) -> dict:
+    """누적 비평을 개선 백로그로 집계 — 규칙 code 별 빈도×심각도 랭킹 + 미해결 LLM 발견.
+
+    since(YYYY-MM-DD) 이후만. 반환 {recurring:[{code,title,n,severity,last}], llm_open:[...], n_total}.
+    """
+    where = "WHERE resolved=0"
+    args: list = []
+    if since:
+        where += " AND trade_date>=?"
+        args.append(since)
+    total = conn.execute(f"SELECT COUNT(*) FROM report_review {where}", args).fetchone()[0]
+    # 규칙: code 별 반복 집계(빈도가 곧 '구조적 결함'의 증거)
+    rec = []
+    for r in conn.execute(
+        f"SELECT code, MAX(title) title, MAX(severity) severity, COUNT(*) n, "
+        f"MAX(trade_date) last FROM report_review {where} AND source='rule' AND code IS NOT NULL "
+        f"GROUP BY code HAVING n>=? ORDER BY n DESC, severity DESC", args + [min_count]):
+        rec.append(dict(r))
+    rec.sort(key=lambda d: (-d["n"], -_SEV_RANK.get(d.get("severity"), 0)))
+    # LLM: 최근 미해결 발견(중복 title 은 최신만)
+    llm = [dict(r) for r in conn.execute(
+        f"SELECT trade_date, market, category, severity, title, detail "
+        f"FROM report_review {where} AND source='llm' "
+        f"ORDER BY trade_date DESC, id DESC LIMIT 40", args)]
+    return {"recurring": rec, "llm_open": llm, "n_total": total}
+
+
+def resolve_review(conn: sqlite3.Connection, code: str | None = None,
+                   title: str | None = None) -> int:
+    """개선 완료 표시 — code 또는 title 로 일괄 resolved=1."""
+    if code:
+        cur = conn.execute("UPDATE report_review SET resolved=1, resolved_at=? "
+                           "WHERE code=? AND resolved=0", (_now(), code))
+    elif title:
+        cur = conn.execute("UPDATE report_review SET resolved=1, resolved_at=? "
+                           "WHERE title=? AND resolved=0", (_now(), title))
+    else:
+        return 0
+    conn.commit()
+    return cur.rowcount
