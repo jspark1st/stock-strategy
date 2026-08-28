@@ -449,8 +449,16 @@ def score_close(inputs: CloseInputs, calib: dict | None = None,
     optional_completeness = round(
         sum(1 for v in optional_detail.values() if v) / max(len(optional_detail), 1), 2)
 
-    # ── 신뢰도 (P0-4): 데이터 완전성 × 신호 일치도. 표본 보정은 파이프라인(store)에서 곱함 ──
-    confidence_base = round(data_completeness * signal_agreement, 2)
+    # ── 신뢰도 (P0-4): **데이터 품질 지표**. 표본 보정은 파이프라인(store)에서 곱함 ──
+    # 2026-08-28: 신호 일치도를 곱에서 **제거**(불일치 이중계상 제거).
+    #   불일치는 이미 위에서 p_up 을 0.5 쪽으로 최대 20% 수축시키고, 진입 게이트는 그 p_up 에
+    #   대해 별도 확률 임계(min_prob)를 건다. 신뢰도에 또 곱하면 같은 사실을 두 번 벌주는 꼴이라
+    #   `confidence = 완전성 × 일치도` 가 실측에서 상시 0 이 됐다(코어 5~6팩터에서 min(bull,bear)
+    #   ≥0.35 는 평상시 분포 — 2026-08-28 양 시장 모두 일치도 0.00 → 신뢰도 0.00 → 진입 영구차단).
+    #   신뢰도는 이제 이름·표기 그대로 '데이터가 충분한가'만 뜻한다. 방향 확신은 확률 임계가 맡는다.
+    #   ※ 게이트를 느슨하게 하려는 변경이 아니다 — 임계(min_confidence)는 그대로 두고 지표의
+    #     중복 정의만 고친 것. 실제로 이 변경 후에도 확률 임계·등급 게이트는 그대로 차단한다.
+    confidence_base = round(data_completeness, 2)
 
     grade, gate = grade_and_gate(total)
 
@@ -463,7 +471,12 @@ def score_close(inputs: CloseInputs, calib: dict | None = None,
         p_up_raw=round(p_up_raw, 4),
         p_down=round(p_down, 4),
         calibration=({"source": calib["source"], "n": calib["n"],
-                      "a": calib.get("a")} if calib else None),
+                      "a": calib.get("a"),
+                      # 기울기 하한 고착 = 총점이 방향 정보를 못 담는 상태(확률≈기저율 상수).
+                      # 화면·서술이 확률을 '예측'으로 과장하지 않게 그대로 실어 보낸다.
+                      "slope_at_floor": calib.get("slope_at_floor"),
+                      "prob_span_pp": calib.get("prob_span_pp"),
+                      "raw_slope": calib.get("raw_slope")} if calib else None),
         gate=gate,
         provisional=provisional,
         data_sufficient=True,

@@ -8,6 +8,7 @@ auto_final(16:30) 뒤 1회 실행 → 이상 징후를 텔레그램으로 보고
   2. 간밤틸트 head-to-head(preopen vs close) — 유일한 검증 edge가 라이브서 실제 도움 되나.
   3. 오늘 기록 누락(거래일인데 close/preopen 미기록) · 채점 정체(오래된 pending).
   4. BTC 고아 pending(중복→영구 미채점) 누적.
+  5. 진입 게이트 통과율 — 연속 0회면 '지표 고장으로 영구 차단' 의심(paper L1 표본이 안 쌓임).
 정직 규율: n<40 이면 적중률은 '측정 중'으로만(성적 아님).
 실행: .venv/bin/python scripts/health_check.py [--no-telegram]
 """
@@ -29,6 +30,8 @@ DB = str(ROOT / "data" / "history.db")
 MIN_N = 40                 # 이 미만이면 적중률은 참고만(성적 아님)
 DIVERGE_WARN = 20.0        # 종가→종가 vs 종가→시가 적중률 괴리 경보(%p)
 STALE_PENDING_DAYS = 3     # 이보다 오래된 스톡 pending 이 남아있으면 채점 정체 의심
+GATE_WINDOW = 30           # 진입 게이트 통과율 관측 창(회차)
+GATE_ZERO_N = 10           # 이만큼 연속 통과 0 이면 지표 고장 의심 경보
 
 
 def _rate(rows, key):
@@ -77,6 +80,20 @@ def run(db: str = DB) -> tuple[str, list[str]]:
         out.append(f"• 간밤틸트 head-to-head: 도움 {better}·해침 {worse}·동일 {tie} (n{better+worse+tie})")
         if worse > better and better + worse + tie >= 10:
             flags.append(f"⚠ 간밤틸트가 라이브서 도움보다 해침 많음({better}<{worse}) — 계수 재검토 신호.")
+
+    # ── 진입 게이트 통과율(2026-08-28 신설) ──
+    # 게이트가 '보수적'인 것과 '구조적으로 절대 안 열리는 것'은 다르다. 후자면 paper L1 이
+    # 영원히 표본 0 이라 로드맵(L2 이상)이 멈춘다. 실제로 7주간 통과 0회였는데 아무도 몰랐다.
+    gs = store.gate_stats(conn, window=GATE_WINDOW)
+    if gs["n"]:
+        top = list(gs["blocked_reasons"].items())[:3]
+        out.append(f"• 진입 게이트 통과 {gs['passed']}/{gs['n']}회"
+                   + (f" · 주 차단사유 {', '.join(f'{k}({v})' for k, v in top)}" if top else ""))
+        if gs["passed"] == 0 and gs["n"] >= GATE_ZERO_N:
+            flags.append(f"⚠ 진입 게이트 {gs['n']}회 연속 통과 0 — 지표 고장/임계 불가능 여부 점검 "
+                         f"(차단사유: {', '.join(k for k, _ in top)}). paper L1 표본이 안 쌓인다.")
+    else:
+        out.append("• 진입 게이트 기록 없음(2026-08-28 이후 회차부터 누적)")
 
     # ── 채점 정체(오래된 스톡 pending) ──
     last_graded = cur.execute(

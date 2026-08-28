@@ -1,18 +1,24 @@
 {
   "KOSPI": {
     "close": {
-      "a": 0.010397,
-      "b": 0.035819,
+      "a": 0.005,
+      "b": 0.11165,
       "n": 149,
-      "source": "bootstrap"
+      "source": "bootstrap:open",
+      "slope_at_floor": true,
+      "prob_span_pp": 8.8,
+      "raw_slope": 0.003371
     }
   },
   "KOSDAQ": {
     "close": {
       "a": 0.005,
-      "b": -0.100721,
+      "b": 0.261532,
       "n": 149,
-      "source": "bootstrap"
+      "source": "bootstrap:open",
+      "slope_at_floor": true,
+      "prob_span_pp": 7.5,
+      "raw_slope": -0.010554
     },
     "vol_tilt": {
       "k": 0.2,

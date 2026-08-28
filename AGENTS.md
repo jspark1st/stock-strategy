@@ -35,6 +35,9 @@
 
 이 전략의 가치는 오직 **"확률이 실제로 맞는가"**로 결정된다. 다음 지표를 올리는 게 개발의 본질이다:
 - **적중률**(방향 정오) · **Brier**(낮을수록, 기저보다 나아야) · **ROC-AUC**(0.5=동전, 높을수록)
+- **주 라벨 = 종가매수 → 익일 시가매도**(2026-08-28 전환). 그전엔 close→close 로 채점했는데 라이브에서
+  둘이 갈렸다(라벨 75% vs 실거래 30%) — 실제 청산 방식과 다른 걸 채점하면 성적이 거짓이 된다.
+  close→close 는 보조로만 병기한다.
 - **캘리브레이션**(70% 예측이 실제 70% 근처인가)
 
 측정 도구: `PYTHONUTF8=1 python scripts/run_backtest.py --count 250 --tune`
@@ -56,7 +59,7 @@ train/test 분할로 과최적화 노출.)
 | 단계 | 내용 | 현재 |
 |---|---|---|
 | **L0** | 리포트만 생성 | ✅ |
-| **L1** | Paper trade 기록(가상 체결·비용차감) | ✅ **가동**(마감 게이트 통과 시 종가 진입→익일 시가 청산, 표본 축적 중) |
+| **L1** | Paper trade 기록(가상 체결·비용차감) | ⚠️ **배선됐으나 표본 0** — 게이트가 7주간 통과 0회(2026-08-28 발견·수정). 이제 통과율이 DB에 기록되고 연속 0회면 경보 |
 | **L2** | 주문 후보 생성 → 사람 승인 | 다음(L1 순손익 실증 후) |
 | **L3** | 조건부 자동 주문 | 검증 후 |
 | **L4** | 자동 진입·청산 | 충분한 실증 후 |
@@ -78,7 +81,7 @@ cron(평일): `0 8` preopen · `0 15` close · `30 16` final. 자동 push→Verc
 PYTHONUTF8=1 python scripts/run_backtest.py --count 250 --tune   # 방향예측 성적·튜닝(개발 중심)
 PYTHONUTF8=1 python scripts/run_close.py                          # 마감 파이프라인
 PYTHONUTF8=1 python scripts/run_preopen.py                        # 개장전 재평가
-PYTHONUTF8=1 .venv/bin/python -m pytest tests/ -q                  # 250 passed (2026-08-25)
+PYTHONUTF8=1 .venv/bin/python -m pytest tests/ -q                  # 305 passed (2026-08-28)
 ```
 
 ## 문서 지도 (이 순서로 파고든다)

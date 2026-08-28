@@ -52,6 +52,10 @@ fi
 "$PY" scripts/health_check.py >> "$LOG" 2>&1 || \
   echo "[$(date '+%F %T')] (참고) 헬스체크 실패 — 무시하고 진행" >> "$LOG"
 
+# 6) 자가학습 DB 백업 — 채점이 막 반영된 직후 스냅샷(유일본 보호). 실패해도 배포는 진행.
+"$PY" scripts/backup_db.py >> "$LOG" 2>&1 || \
+  echo "[$(date '+%F %T')] ALERT: DB 백업 실패(auto_final)" >> out/alerts.log
+
 # 크로스트랙 배포 직렬화(공유 락, 대기 120s — auto_close.sh 주석 참조).
 exec 8>"out/.deploy.lock"
 if ! flock -w 120 8; then

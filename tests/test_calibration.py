@@ -103,7 +103,11 @@ def test_score_close_applies_calibration():
     d0 = scoring.score_close(_inputs()).to_report_dict()
     d1 = scoring.score_close(_inputs(), calib=calib).to_report_dict()
     # 메타에 기울기 a 도 실린다(렌더가 '기울기 하한=총점 무영향'을 고지하는 데 사용).
-    assert d1["calibration"] == {"source": "store", "n": 80, "a": 0.03}
+    assert {k: d1["calibration"][k] for k in ("source", "n", "a")} == {
+        "source": "store", "n": 80, "a": 0.03}
+    # 기울기 고착 플래그 키가 항상 실린다(렌더가 확률 격하 표기에 쓴다).
+    for k in ("slope_at_floor", "prob_span_pp", "raw_slope"):
+        assert k in d1["calibration"]
     assert d1["p_up_raw"] == d0["p_up_raw"]        # raw 는 캘리브레이션과 무관 보존
     assert d1["p_up"] != d0["p_up"]                # 값이 실제로 달라짐
     assert scoring.PROB_CLIP_LO <= d1["p_up"] <= scoring.PROB_CLIP_HI
@@ -143,20 +147,42 @@ def test_score_close_applies_direction_tilt():
 
 # ── store.fit_calibrator: 채점이력 → 캘리브레이터 ────────────────────
 def test_store_fit_calibrator(tmp_path):
+    """주 라벨(2026-08-28~) = 실거래 지평 close→open. 구 라벨은 label="close" 로만."""
     conn = store.connect(tmp_path / "h.db")
     # 채점이력 없음 → None(폴백)
     assert store.fit_calibrator(conn, "KOSPI", "close") is None
-    # 합성 채점행 삽입: 총점↑일수록 상승, 기저상승 60%
+    # 합성 채점행: 총점↑일수록 상승. close→close 와 close→open 을 **다르게** 넣어
+    # 기본 적합이 실제로 open 을 쓰는지 구분한다.
     for i in range(80):
         total = 30 + (i % 40)
         up = 1 if (i * 7) % 10 < 6 else 0
+        open_chg = 0.5 if (i * 3) % 10 < 4 else -0.5      # 기저 40% (close 라벨과 다름)
+        conn.execute(
+            "INSERT INTO daily (market, report_type, trade_date, total, realized_up, "
+            "outcome_open_chg_pct, graded_at) VALUES (?,?,?,?,?,?,?)",
+            ("KOSPI", "close", f"2026-01-{i+1:02d}", total, up, open_chg, "2026-01-01"))
+    conn.commit()
+    c = store.fit_calibrator(conn, "KOSPI", "close")          # 기본 = open
+    assert c is not None and c["source"] == "store:open" and c["n"] == 80
+    c_close = store.fit_calibrator(conn, "KOSPI", "close", label="close")
+    assert c_close is not None and c_close["source"] == "store:close"
+    # 두 라벨이 실제로 다른 적합을 낸다(주 라벨 전환이 무의미한 리네이밍이 아님을 고정)
+    assert (c["a"], c["b"]) != (c_close["a"], c_close["b"])
+    # 다른 시장은 여전히 None
+    assert store.fit_calibrator(conn, "KOSDAQ", "close") is None
+    conn.close()
+
+
+def test_fit_calibrator_open_label_ignores_ungraded_open(tmp_path):
+    """close→close 는 채점됐지만 open 컬럼이 결측인 과거 행은 주 라벨 적합에서 빠진다."""
+    conn = store.connect(tmp_path / "h2.db")
+    for i in range(80):
         conn.execute(
             "INSERT INTO daily (market, report_type, trade_date, total, realized_up, graded_at) "
             "VALUES (?,?,?,?,?,?)",
-            ("KOSPI", "close", f"2026-01-{i+1:02d}", total, up, "2026-01-01"))
+            ("KOSPI", "close", f"2026-02-{i+1:02d}", 30 + (i % 40),
+             1 if (i * 7) % 10 < 6 else 0, "2026-02-01"))
     conn.commit()
-    c = store.fit_calibrator(conn, "KOSPI", "close")
-    assert c is not None and c["source"] == "store" and c["n"] == 80
-    # 다른 시장은 여전히 None
-    assert store.fit_calibrator(conn, "KOSDAQ", "close") is None
+    assert store.fit_calibrator(conn, "KOSPI", "close") is None            # open 결측 → 폴백
+    assert store.fit_calibrator(conn, "KOSPI", "close", label="close") is not None
     conn.close()
