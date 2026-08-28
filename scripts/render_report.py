@@ -1208,10 +1208,19 @@ def build_report_text(r: dict) -> str:
         L.append(f"\n## 총점 {fmt(r.get('total'))} · 등급 {r.get('grade','')} "
                  f"· 세션 LONG {pct(r.get('p_long'))} / SHORT {pct(r.get('p_short'))}")
     else:
+        # 복사용 평문도 히어로와 **같은 격하**를 따른다. 이 텍스트는 다른 LLM 에 붙여넣는 용도라,
+        # 여기서만 '익일 상승확률'로 남으면 기저율 상수가 예측인 것처럼 그대로 전파된다.
+        cal = r.get("calibration") or {}
+        degen = bool(cal.get("slope_at_floor"))
+        lbl = "상승 기저율(예측 아님)" if degen else "익일 시가 상승확률"
         L.append(f"\n## 총점 {fmt(r.get('total'))} · 등급 {r.get('grade','')} "
-                 f"· 익일 상승확률 {pct(r.get('p_up'))} / 하락 {pct(r.get('p_down'))}")
+                 f"· {lbl} {pct(r.get('p_up'))} / 하락 {pct(r.get('p_down'))}")
+        if degen:
+            span = cal.get("prob_span_pp")
+            L.append(f"- ⚠ 캘리브 기울기 하한 고착 — 총점이 확률을 거의 못 움직인다"
+                     + (f"(관측 총점 전 구간이 만드는 확률 폭 {span:.1f}%p)" if span is not None else "")
+                     + ". 이 값은 방향 예측이 아니라 이 시장의 기저 상승률에 가깝다.")
         if r.get("p_up_raw") is not None:
-            cal = r.get("calibration") or {}
             note = f" (원시 {pct(r['p_up_raw'])} → 캘리브 {pct(r.get('p_up'))}"
             if cal.get("source") and cal["source"] != "sot":
                 note += f" · {cal['source']} n={cal.get('n')} · 단일 상승레짐 기저율 앵커, 하락장 미검증"

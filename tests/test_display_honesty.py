@@ -127,8 +127,9 @@ def _full_report():
 
 def test_report_text_has_core_sections():
     t = rr.build_report_text(_full_report())
+    # 2026-08-28: 확률 라벨이 **지평을 명시**한다("익일 시가" — 익일 종가가 아니다).
     for must in ("# 장마감전 분석 · 코스피 · 2026-08-27", "총점 53.7", "등급 약세",
-                 "익일 상승확률", "항목별 점수", "종가 강도", "투자자 수급",
+                 "익일 시가 상승확률", "항목별 점수", "종가 강도", "투자자 수급",
                  "진입 판정: 차단", "익일 시나리오", "주의 신호"):
         assert must in t, must
 

@@ -301,3 +301,18 @@ def test_learning_loop_failures_are_alerted():
         assert "_alert(" in window, f"{why} 실패가 경보로 승격되지 않는다"
         assert not re.search(r"except Exception:.*\n\s+pass", window), \
             f"{why} 경로에 pass-only 핸들러가 남아 있다"
+
+
+def test_copy_text_matches_headline_demotion():
+    """복사용 평문(타 LLM 붙여넣기용)도 히어로와 같은 격하를 따라야 한다.
+
+    여기만 '익일 상승확률'로 남으면 기저율 상수가 예측인 척 그대로 전파된다.
+    """
+    rep = {"market": {"kospi_close": 100.0}, "total": 36.2, "grade": "위험",
+           "p_up": 0.558, "p_down": 0.442, "p_up_raw": 0.132,
+           "calibration": {"source": "bootstrap:open", "n": 149, "a": 0.005,
+                           "slope_at_floor": True, "prob_span_pp": 8.8}}
+    txt = rr.build_report_text(rep)
+    assert "상승 기저율(예측 아님)" in txt
+    assert "익일 상승확률" not in txt
+    assert "기울기 하한 고착" in txt

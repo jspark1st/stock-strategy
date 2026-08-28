@@ -542,7 +542,8 @@ Keep this section updated as work advances. Status legend: ✅ done · 🔶 part
   - ✅ 회귀 테스트 23개 추가(`tests/test_pipeline_logic.py`) — 총 66개 통과.
 
 ### Claude Code 프로젝트 설정 (`.claude/`)
-- **agents/** (overnight 맞춤, 7개. 타 프로젝트 fan-out/HQ/재택 에이전트는 제거함)
+- **agents/** (overnight 맞춤, 8개. 타 프로젝트 fan-out/HQ/재택 에이전트는 제거함)
+  - `pipeline-fanout-auditor` — **전면 감사 오케스트레이터**. 8축 병렬(배선·스코어링·수집·화면·학습지평·크론·BTC격리·pytest) + 적대검증. 읽기전용·opus
   - `scoring-auditor` — 스코어링 SoT·과거 함정 감사. 읽기전용·opus
   - `pipeline-runner` — close/preopen/btc **dry-run** 실행·산출 검사
   - `data-collector-debug` — LS·네이버·Tavily·(BTC) Binance 수집 디버그
@@ -776,7 +777,7 @@ Keep this section updated as work advances. Status legend: ✅ done · 🔶 part
   - 📄 **문서 정합** — CLAUDE.md Commands/Env 의 구서버(KS5F) 잔재 정정(.venv 필수·`.env` 경로·pytest
     명령), 테스트수 212→250, "미커밋 워킹트리(커밋금지)" 배너에 낡음 경고, AGENTS.md 불변식에 BTC 캐리
     별도트랙 인지, HANDOFF_BTC 에 캐리 모듈 반영. 테스트 +4(`test_naver_numopt`).
-  - 커밋은 **브랜치 `fix/audit-followups`**(사용자 지시대로 브랜치에). main 미병합.
+  - 커밋은 브랜치 `fix/audit-followups` 에 했고 **이후 main 에 병합·브랜치 삭제됨**(2026-08-28 재점검 확인).
 
 ### 2026-08-25 — 월간 자동 엣지 재검증 크론 (테스트 258→263)
 open#0ⓐ('다레짐 재검증')를 **자동화**. 크론은 매일 예측·채점을 기록만 하고, "엣지(간밤신호 0.60·
