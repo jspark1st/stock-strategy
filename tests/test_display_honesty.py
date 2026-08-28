@@ -167,3 +167,26 @@ def test_accuracy_hidden_under_40():
     html = rr.build_accuracy(r)
     assert "측정 시작" in html
     assert "실거래 적중률" not in html  # 숫자 자체를 숨긴다
+
+
+# ── 날짜 내비게이션 계약 (2026-08-28: select → 월 달력) ──────────────────────
+def test_date_nav_is_calendar_with_select_fallback():
+    """아카이브 120일이면 select 는 스크롤 지옥 → 월 달력으로 대체.
+
+    **점진적 향상 계약**: manifest fetch 성공 시에만 달력이 mount 되고, 실패(file://·구버전
+    아카이브)하면 기존 select 가 그대로 남아야 한다. select 를 마크업에서 없애면 폴백이 사라진다.
+    """
+    html = rr.render({"trade_date": "2026-08-28", "reports": [], "placeholders": []})
+    assert "window.__mountCal=function" in html      # 달력 위젯
+    assert ".cal-pop{" in html and ".cal-d.sel{" in html
+    assert 'select class="stock-datesel"' in html    # 폴백 유지(필수)
+    assert 'class="date-nav cal-wrap"' in html       # 달력 앵커
+    # 데이터 없는 날은 비활성으로 남는다 — '언제 리포트가 있나'가 한눈에 보이게
+    assert "data-d=" in html and "disabled" in html
+
+
+def test_calendar_keeps_self_healing_manifest_fetch():
+    """과거 아카이브 페이지도 최신 날짜를 갖는 자가치유(BTC 와 동일)를 깨지 않는다."""
+    html = rr.render({"trade_date": "2026-08-28", "reports": [], "placeholders": []})
+    assert "/archive/stock/manifest.json" in html
+    assert "cache:'no-store'" in html

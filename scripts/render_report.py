@@ -2066,6 +2066,40 @@ TEMPLATE = r"""<!doctype html>
   .stock-datesel{border:1px solid var(--border);background:var(--surface2);color:var(--text);
     border-radius:8px;padding:5px 9px;font:inherit;font-size:.8rem;font-weight:600;
     min-height:32px;max-width:9.5rem}
+  /* 날짜 달력 — 아카이브가 120일이라 select 는 곧 스크롤 지옥이 된다. 월 그리드로 대체하고,
+     데이터 없는 날은 흐리게(비활성) 둬 '언제 리포트가 있나'가 한눈에 보이게 한다.
+     manifest fetch 성공 시에만 mount → 실패하면 기존 select 가 그대로 남는다(점진적 향상). */
+  .cal-wrap{position:relative}
+  .cal-btn{display:flex;align-items:center;gap:6px;width:100%;border:1px solid var(--border);
+    background:var(--surface2);color:var(--text);border-radius:8px;padding:6px 9px;font:inherit;
+    font-size:.8rem;font-weight:700;min-height:34px;cursor:pointer;font-variant-numeric:tabular-nums}
+  .cal-btn:hover{border-color:var(--accent)}
+  .cal-btn .cal-caret{margin-left:auto;color:var(--muted);font-size:.7rem}
+  .cal-pop{position:absolute;z-index:60;top:calc(100% + 6px);left:0;width:246px;
+    background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px;
+    box-shadow:0 10px 30px rgba(0,0,0,.35)}
+  .cal-pop[hidden]{display:none}
+  .cal-head{display:flex;align-items:center;gap:6px;margin-bottom:8px}
+  .cal-title{flex:1;text-align:center;font-weight:700;font-size:.82rem;font-variant-numeric:tabular-nums}
+  .cal-nav{border:1px solid var(--border);background:var(--surface2);color:var(--text);
+    border-radius:7px;width:28px;height:28px;font:inherit;cursor:pointer;line-height:1}
+  .cal-nav:disabled{opacity:.32;cursor:default}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+  .cal-dow{text-align:center;font-size:.64rem;color:var(--muted);font-weight:700;padding:2px 0}
+  .cal-d{border:0;background:transparent;color:var(--muted);border-radius:7px;height:30px;
+    font:inherit;font-size:.76rem;font-variant-numeric:tabular-nums;opacity:.42;cursor:default}
+  .cal-d.on{color:var(--text);opacity:1;font-weight:700;cursor:pointer;
+    background:color-mix(in srgb,var(--accent) 12%,transparent)}
+  .cal-d.on:hover{background:color-mix(in srgb,var(--accent) 26%,transparent)}
+  .cal-d.sel{background:var(--accent);color:#fff}
+  .cal-d.sun{color:var(--down)}
+  .cal-d.sat{color:var(--accent)}
+  .cal-d.on.sel{color:#fff}
+  .cal-foot{display:flex;justify-content:space-between;align-items:center;margin-top:8px;
+    font-size:.7rem;color:var(--muted)}
+  .cal-latest{border:1px solid var(--border);background:var(--surface2);color:var(--text);
+    border-radius:7px;padding:4px 8px;font:inherit;font-size:.7rem;font-weight:600;cursor:pointer}
+  @media(max-width:820px){ .cal-pop{width:min(92vw,300px)} .cal-d{height:36px} }
   .nav-group{margin-bottom:12px}
   .nav-title{font-size:.68rem;color:var(--muted);font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin:6px 8px}
   .nav-item{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:10px 12px;
@@ -2314,7 +2348,7 @@ TEMPLATE = r"""<!doctype html>
   <aside class="sidebar" id="sidebar">
     <div class="brand">📊 easystock</div>
     <div class="brand-sub">by junaitech</div>
-    <div class="date-nav"><label class="slot-lab">📅 날짜
+    <div class="date-nav cal-wrap"><label class="slot-lab">📅 날짜
       <select class="stock-datesel" onchange="if(this.value) location=this.value">
         <option value="/" selected>{{DATE}}</option>
       </select></label></div>
@@ -2455,9 +2489,62 @@ TEMPLATE = r"""<!doctype html>
 </script>
 {{BTC_DATESEL_SYNC}}
 <script>
-/* 헤더 날짜 드롭다운을 로드 시 /archive/stock/manifest.json 으로 재구성 — 과거 아카이브
-   페이지도 항상 전체 날짜를 갖는다(BTC 와 동일 자가치유). 최신일은 라이브('/'), 나머지는
-   /archive/stock/<날짜>.html. fetch 실패(file://)면 구워진 옵션 유지. */
+/* 헤더 날짜 선택 — /archive/stock/manifest.json 으로 로드 시 재구성(과거 아카이브 페이지도
+   항상 전체 날짜를 갖는 자가치유). 아카이브 보관이 120일이라 select 는 곧 스크롤 지옥이 되므로
+   **월 달력**으로 대체한다. 데이터 있는 날만 활성 → '언제 리포트가 있나'가 한눈에 보인다.
+   점진적 향상: manifest fetch 가 성공할 때만 mount, 실패(file://)면 기존 select 가 그대로 남는다.
+   window.__mountCal 로 노출해 BTC 슬롯 선택기도 같은 위젯을 쓸 수 있게 한다. */
+window.__mountCal=function(o){
+  /* o = {anchor, hide, dates[내림차순], hrefOf(d), cur, label} */
+  var dates=o.dates, set={}, i;
+  for(i=0;i<dates.length;i++) set[dates[i]]=1;
+  var cur=(o.cur&&set[o.cur])?o.cur:dates[0];
+  var minD=dates[dates.length-1], maxD=dates[0];
+  var wrap=document.createElement('div'); wrap.className='cal-wrap';
+  var btn=document.createElement('button');
+  btn.type='button'; btn.className='cal-btn'; btn.setAttribute('aria-expanded','false');
+  btn.innerHTML='<span>📅</span><span class="cal-cur">'+cur+'</span><span class="cal-caret">▾</span>';
+  var pop=document.createElement('div'); pop.className='cal-pop'; pop.hidden=true;
+  wrap.appendChild(btn); wrap.appendChild(pop);
+  o.anchor.appendChild(wrap);
+  if(o.hide) o.hide.style.display='none';
+
+  var view=new Date(cur.slice(0,4), Number(cur.slice(5,7))-1, 1);
+  function ym(d){ return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2); }
+  function draw(){
+    var y=view.getFullYear(), m=view.getMonth();
+    var first=new Date(y,m,1), start=first.getDay(), days=new Date(y,m+1,0).getDate();
+    var h='<div class="cal-head">'
+      + '<button type="button" class="cal-nav" data-mv="-1"'+(ym(view)<=minD.slice(0,7)?' disabled':'')+'>‹</button>'
+      + '<div class="cal-title">'+y+'년 '+(m+1)+'월</div>'
+      + '<button type="button" class="cal-nav" data-mv="1"'+(ym(view)>=maxD.slice(0,7)?' disabled':'')+'>›</button>'
+      + '</div><div class="cal-grid">';
+    var dow=['일','월','화','수','목','금','토'];
+    for(i=0;i<7;i++) h+='<div class="cal-dow">'+dow[i]+'</div>';
+    for(i=0;i<start;i++) h+='<div></div>';
+    for(var d=1;d<=days;d++){
+      var iso=y+'-'+('0'+(m+1)).slice(-2)+'-'+('0'+d).slice(-2);
+      var on=!!set[iso], cls='cal-d'+(on?' on':'')+(iso===cur?' sel':'');
+      var wd=new Date(y,m,d).getDay();
+      if(!on&&wd===0) cls+=' sun'; if(!on&&wd===6) cls+=' sat';
+      h+='<button type="button" class="'+cls+'"'+(on?(' data-d="'+iso+'"'):' disabled')+'>'+d+'</button>';
+    }
+    h+='</div><div class="cal-foot"><span>'+dates.length+'일 보관</span>'
+      +'<button type="button" class="cal-latest" data-d="'+maxD+'">최신으로</button></div>';
+    pop.innerHTML=h;
+  }
+  function open(v){ pop.hidden=!v; btn.setAttribute('aria-expanded',v?'true':'false'); if(v) draw(); }
+  btn.addEventListener('click',function(e){ e.stopPropagation(); open(pop.hidden); });
+  pop.addEventListener('click',function(e){
+    e.stopPropagation();
+    var t=e.target.closest ? e.target.closest('button') : null; if(!t) return;
+    if(t.dataset.mv){ view.setMonth(view.getMonth()+Number(t.dataset.mv)); draw(); return; }
+    if(t.dataset.d){ var href=o.hrefOf(t.dataset.d); if(href) location=href; }
+  });
+  document.addEventListener('click',function(){ open(false); });
+  document.addEventListener('keydown',function(e){ if(e.key==='Escape') open(false); });
+  return wrap;
+};
 (function(){
   try{
     var sel=document.querySelector('select.stock-datesel'); if(!sel) return;
@@ -2470,10 +2557,11 @@ TEMPLATE = r"""<!doctype html>
       if(!dates.length) return;
       var newest=dates[0];
       if(!cur||dates.indexOf(cur)<0) cur=newest;
-      sel.innerHTML=dates.map(function(d){
-        var href=(d===newest)?'/':('/archive/stock/'+d+'.html');
-        return '<option value="'+href+'"'+(d===cur?' selected':'')+'>'+d+'</option>';
-      }).join('');
+      window.__mountCal({
+        anchor: sel.parentElement.parentElement, hide: sel.parentElement,
+        dates: dates, cur: cur,
+        hrefOf: function(d){ return (d===newest)?'/':('/archive/stock/'+d+'.html'); }
+      });
     }).catch(function(){});
   }catch(e){}
 })();
