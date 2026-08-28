@@ -257,7 +257,11 @@ BTC 상세는 **HANDOFF_BTC.md** (이 파일의 주식 로그보다 그쪽이 So
 ### 8/21~8/22 BTC (요약 — 상세 HANDOFF_BTC.md)
 - 8/21 심층검사: 죽은 팩터 3개·영문 태거·나스닥 22:00 결측·청산 캐스케이드·게이트 딕트 정규화 등.
 - 8/22 화면: 관점 다수결/코어 정렬/가중 일치도 분리, 동점 표기, 성적 n<40 숨김, 슬롯 UI(날짜+정규 2칩+수동 목록).
-- **게이트 walk-forward 끝.** 150일·335슬롯·게이트 통과 **0회**(코어 정렬이 매번 탈락 — 체결 팩터 이력 없음).
+- **게이트 walk-forward 끝.** 150일·335슬롯·게이트 통과 **0회**. 백테스트 사유는 `코어 정렬
+  335/335` 로 찍히나 이는 체결(flow) 이력 부재로 인한 **재현 아티팩트** — 읽지 말 것.
+  **2026-08-28 라이브 보강**: 라이브도 38/38 NO_TRADE. 단 라이브 차단은 코어 정렬이 아니라
+  **수렴(괴리) 게이트** — 8/28 실측은 6조건 중 5개 통과, SNS 심리만 역방향이라 막혔다.
+  같은 구간 확률추종 −9.44R·항상 롱 −13.88R → **막은 게 방어였다.** → HANDOFF_BTC.md
   임계를 이 숫자로 느슨하게 하지 말 것. 확률추종/항상롱은 비용 후 음수 R.
 - **BTC 코딩은 여기서 접음.** 관측만. 주식과 섞지 말 것.
 
@@ -542,12 +546,13 @@ Keep this section updated as work advances. Status legend: ✅ done · 🔶 part
   - ✅ 회귀 테스트 23개 추가(`tests/test_pipeline_logic.py`) — 총 66개 통과.
 
 ### Claude Code 프로젝트 설정 (`.claude/`)
-- **agents/** (overnight 맞춤, 8개. 타 프로젝트 fan-out/HQ/재택 에이전트는 제거함)
+- **agents/** (overnight 맞춤, 9개. 타 프로젝트 fan-out/HQ/재택 에이전트는 제거함)
   - `pipeline-fanout-auditor` — **전면 감사 오케스트레이터**. 8축 병렬(배선·스코어링·수집·화면·학습지평·크론·BTC격리·pytest) + 적대검증. 읽기전용·opus
   - `scoring-auditor` — 스코어링 SoT·과거 함정 감사. 읽기전용·opus
   - `pipeline-runner` — close/preopen/btc **dry-run** 실행·산출 검사
   - `data-collector-debug` — LS·네이버·Tavily·(BTC) Binance 수집 디버그
-  - `ui-honesty-auditor` — 화면 vs `entry.allow`/`preopen_state` 정합
+  - `ui-honesty-auditor` — 화면 vs `entry.allow`/`preopen_state` 정합. 읽기전용
+  - `ui-polisher` — 대시보드 UI 다듬기(레이아웃·토큰·모바일·다크/라이트). 정직성 유지·구현
   - `fact-checker` — 번들·소스 대조. n<40 성적 과장 탐지
   - `claude-md-verifier` — 인수인계 문서 vs 서버·venv·크론
   - `test-runner` — `.venv` pytest 층 선택 실행
@@ -744,7 +749,9 @@ Keep this section updated as work advances. Status legend: ✅ done · 🔶 part
   - ✅ **BTC 트랙 1·2단계 라이브** — 별도 스코어링·크론 09:30/22:00(주말 포함)·`btc_bundle` 병합.
     8/21 심층검사에서 팩터 3개 사망·영문 태거·22:00 나스닥 0.00 허위완전성·청산 캐스케이드 미발동
     등을 고침. 표기 버그(동점 None, 자가학습 오해, n<40 성적 노출) 수정. 슬롯 UI=날짜+정규 2칩+수동.
-    **게이트 WF: 335슬롯 통과 0.** 코딩 접고 관측. → **HANDOFF_BTC.md**
+    **게이트 WF: 335슬롯 통과 0 · 라이브도 38/38 통과 0**(2026-08-28 확인). 백테스트의
+    '코어 정렬 탈락'은 아티팩트, 라이브 실질 병목은 수렴(괴리) 게이트. 고장이 아니라 엄격 —
+    같은 구간 대안 전략은 전부 음수 R. 코딩 접고 관측. → **HANDOFF_BTC.md**
   - ✅ **사이드바 시장→단계** — 그룹 코스피/코스닥/비트코인 선물, 아이템 장 마감/개장 전.
     레거시 번들 `_NAV_REMAP`. 뷰 타이틀 `장 마감 · 코스피`.
   - ✅ **개장 전 상품 주문 카드** — 마감 카드 복사 + 렌더 시 형제 마감 카드 attach.
