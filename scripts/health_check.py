@@ -106,11 +106,23 @@ def run(db: str = DB) -> tuple[str, list[str]]:
         flags.append(f"⚠ 스톡 채점 정체 — 확정일 지난 미채점 {len(stale)}건: "
                      f"{[(r[0], r[1]) for r in stale][:4]}")
 
-    # ── BTC 고아 pending 누적 ──
-    btc_orphan = cur.execute(
-        "SELECT COUNT(*) FROM daily WHERE market='BTCUSDT' AND realized_up IS NULL").fetchone()[0]
-    if btc_orphan >= 5:
-        flags.append(f"⚠ BTC 미채점(고아) {btc_orphan}건 누적 — 중복입력 정리 필요(성적 오염).")
+    # ── BTC 미채점 ──
+    # 정정(2026-08-28): 예전엔 미채점 전부를 '고아'로 세어 매일 오경보를 냈다. 그러나
+    # `store.grade_btc_pending` 은 **정규 슬롯(0930/2200)만** 채점한다 — 수동 TUI 발행(HHMM)은
+    # 설계상 채점 대상이 아니고 성적에도 안 들어간다(오염 아님). 경보 대상은 '정규 슬롯인데
+    # 지평이 지났는데도 미채점' 뿐이다. 수동분은 참고로만 표기한다.
+    btc_manual = cur.execute(
+        "SELECT COUNT(*) FROM daily WHERE market='BTCUSDT' AND realized_up IS NULL "
+        "AND slot NOT IN ('0930','2200')").fetchone()[0]
+    btc_regular_stale = cur.execute(
+        "SELECT COUNT(*) FROM daily WHERE market='BTCUSDT' AND realized_up IS NULL "
+        "AND slot IN ('0930','2200') AND trade_date < ?",
+        (cur.execute("SELECT MAX(trade_date) FROM daily WHERE market='BTCUSDT'"
+                     ).fetchone()[0] or "9999",)).fetchone()[0]
+    if btc_manual:
+        out.append(f"• (참고) BTC 수동 슬롯 {btc_manual}건 — 설계상 미채점(성적 미포함)")
+    if btc_regular_stale >= 2:
+        flags.append(f"⚠ BTC 정규 슬롯 미채점 {btc_regular_stale}건 — 채점 루프 점검 필요.")
 
     # ── open_chg 백필 결측(1회성이지만 표시) ──
     missing_open = cur.execute(

@@ -278,3 +278,26 @@ def test_healthy_calibration_gate_pass_not_flagged():
            "atr": {"primary": {"kelly_pct": 0}}, "accuracy": {"n": 60}}
     codes = {f["code"] for f in report_review._per_report_rules(rep)}
     assert "gate_on_degenerate_prob" not in codes
+
+
+# ── 무성 실패 금지: 학습 루프를 끊는 예외는 반드시 경보로 승격 ────────────────
+def test_learning_loop_failures_are_alerted():
+    """예측기록·채점·paper·스냅샷 실패가 `pass` 로 삼켜지면 화면은 정상인데 학습이 멈춘다.
+
+    Gemini 가 몇 주간 조용히 죽어 있던 것과 같은 실패 유형 — 소스에 경보가 붙어 있는지 고정한다.
+    (동작 테스트가 아니라 구조 테스트: 해당 except 블록이 _alert 로 이어지는지 검사)
+    """
+    import re
+    from pathlib import Path
+    src = Path(__file__).resolve().parent.parent / "scripts" / "run_close.py"
+    text = src.read_text(encoding="utf-8")
+    for call, why in [("store.record_prediction", "예측 기록"),
+                      ('grade_with_candles(conn, market, "preopen"', "개장전 채점"),
+                      ("_paper_step(conn, market, cfg", "paper 체결(정의부 아닌 호출부)"),
+                      ("store.save_snapshot(", "스냅샷")]:
+        i = text.index(call)
+        # 호출 이후 20줄 안에 _alert 가 있어야 한다(그 사이 except 가 삼키지 않도록)
+        window = text[i:i + 1400]
+        assert "_alert(" in window, f"{why} 실패가 경보로 승격되지 않는다"
+        assert not re.search(r"except Exception:.*\n\s+pass", window), \
+            f"{why} 경로에 pass-only 핸들러가 남아 있다"

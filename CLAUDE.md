@@ -191,6 +191,29 @@ end-to-end 플로우(상태머신·학습루프·스코어링 파이프·크로�
   ("로컬 1벌만 존재 — VM 손실엔 무방비"). 설정됐는데 실패하면 예외 → 크론 경보.
   **사용자 작업 필요**: `.env` 에 원격 경로 1줄(권한 설정상 내가 `.env`에 접근 불가).
 
+## 2026-08-28 (3차) — 접근 가능한 잔여 정리 (테스트 308→311)
+
+- ✅ **주 라벨 표본 백필**(`scripts/backfill_open_horizon.py`) — 08-22 마이그레이션 전 채점분 6행에
+  `outcome_open_chg_pct`·`overnight_correct` 가 비어 **주 지표 표본에서 빠져 있었다**(가장 중요한
+  지표가 이유 없이 작아짐). 채점과 동일 산식으로 확정 일봉에서 소급. 멱등·빈 칸만 채움(기존 채점 불변).
+  **주 라벨 n=10 → 16, 적중 30% → 44%**(KOSPI 38% · KOSDAQ 50%). dry-run 기본, `--write` 로 반영.
+- ✅ **BTC '고아 pending' 오경보 정정** — health_check 가 미채점 전부를 고아로 세어 매일 울렸으나,
+  `store.grade_btc_pending` 은 **정규 슬롯(0930/2200)만** 채점한다 → 수동 TUI 발행(HHMM)은 설계상
+  미채점이고 성적에도 안 들어간다(오염 아님). 경보 대상을 '정규 슬롯인데 지평 지나도 미채점'으로 좁히고
+  수동분은 참고 표기. **DB 는 손대지 않았다**(데이터 삭제 없음 — 쿼리가 틀렸던 것).
+- ✅ **학습 루프 무성 실패 5곳 경보화** — `pass` 로 삼켜지면 화면은 정상인데 학습만 멈추는 것들:
+  ①`record_prediction`(예측 미기록 → 채점·캘리브 통째 누락) ②preopen 채점(유일 검증 엣지 검증 중단)
+  ③`_paper_step`(게이트를 연 목적인 L1 표본 미적립) ④거래량 표본 적재 ⑤불변 스냅샷.
+  전부 `_alert` 승격. 구조 테스트로 고정(`test_learning_loop_failures_are_alerted`) — Gemini 무성
+  사망과 같은 유형의 재발 방지. 나머지 pass-only 핸들러(stdout·파일삭제·차트·텔레그램)는 무해라 유지.
+
+### ⚠️ 사용자 작업 필요(내 권한으론 불가)
+- **`.env` 에 오프박스 백업 1줄**: `backup_remote=user@host:/path` (+선택 `backup_remote_key=~/.ssh/키`).
+  `.env`·`.env.example` 은 권한 설정상 Claude 접근 불가. 넣기 전까지 백업은 **같은 VM 안 로컬 1벌뿐**
+  (VM 자체 손실엔 무방비). 넣으면 `auto_backup.sh`(23:30)가 자동으로 scp 1벌 더 보낸다.
+- **원격 push**: 로컬 main 에 커밋만 해뒀다. 내일 15:00 `auto_close.sh` 가 `git push origin main` 할 때
+  **이 커밋들이 함께 원격으로 나간다**(별도 조치 불필요). 먼저 검토하려면 그 전에 확인할 것.
+
 ## Claude Code 인수인계 (2026-08-22 11:20 KST) — 여기부터 읽어라
 
 어제(8/21)부터 오늘 오전까지 Cursor 에서 한 작업. **주식과 BTC를 섞지 마라.**
@@ -198,7 +221,7 @@ BTC 상세는 **HANDOFF_BTC.md** (이 파일의 주식 로그보다 그쪽이 So
 
 ### 지금 서버·repo
 - **KS6F-JNT-3-VM-1** `~/overnight_report` (구 KS5F `~/stock_strategy` 는 폐기).
-- Python은 **`.venv/bin/python`** (시스템 python3 에 pytest/httpx 없음). 테스트 **308 passed** (2026-08-28, `.venv`).
+- Python은 **`.venv/bin/python`** (시스템 python3 에 pytest/httpx 없음). 테스트 **311 passed** (2026-08-28, `.venv`).
 - 라이브: https://easystock-junaitech.vercel.app — `public/index.html` push → Vercel.
 - 마지막 사이트 배포: `2ee469a` (2026-08-22 11:11, HTML만).
 
@@ -298,7 +321,7 @@ cd out && python3 -m http.server 8931 --bind 127.0.0.1
 #   then open http://127.0.0.1:8931/report_<date>.html
 
 # Tests — 반드시 .venv (시스템 python3 엔 pytest/httpx 없음)
-.venv/bin/python -m pytest tests/ -q                       # 308 passed (2026-08-28)
+.venv/bin/python -m pytest tests/ -q                       # 311 passed (2026-08-28)
 .venv/bin/python -m pytest tests/test_scoring.py -q         # scoring engine only
 .venv/bin/python -m pytest tests/test_scoring.py::<name> -q # single test
 ```

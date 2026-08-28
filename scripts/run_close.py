@@ -521,8 +521,10 @@ def build_report(cfg: dict, ls, client, conn, env, session_of: dict,
             if session.intraday and last.volume:
                 store.record_intraday_volume(conn, market, session.trade_ymd,
                                              now.strftime("%H:%M"), last.volume)
-        except Exception:  # noqa
-            pass
+        except Exception as e:  # noqa
+            # 거래량 완성계수 학습이 멈추면 15:00 거래대금 점수가 계속 기본값 근사로 남는다.
+            _alert(f"{cfg['label']} 거래량 표본 적재 실패({type(e).__name__}: {e}) — "
+                   f"완성계수 학습 정체")
         try:
             if not dry_run:
                 graded = store.grade_with_candles(conn, market, "close", candles, _now(),
@@ -537,8 +539,10 @@ def build_report(cfg: dict, ls, client, conn, env, session_of: dict,
         try:
             store.grade_with_candles(conn, market, "preopen", candles, _now(),
                                      session.pending_dates)
-        except Exception:  # noqa — 개장전 채점 실패가 마감 리포트를 막지 않는다
-            pass
+        except Exception as e:  # noqa — 개장전 채점 실패가 마감 리포트를 막지 않는다
+            # 이 루프가 멈추면 **유일하게 검증된 엣지(간밤 틸트)의 라이브 검증**이 끊긴다.
+            _alert(f"{cfg['label']} 개장전 예측 채점 실패({type(e).__name__}: {e}) — "
+                   f"간밤틸트 head-to-head 검증 중단")
         acc = store.accuracy(conn, market, "close")
         try:
             perf = store.performance(conn, market, "close")
@@ -616,8 +620,11 @@ def build_report(cfg: dict, ls, client, conn, env, session_of: dict,
     if conn is not None and not dry_run and not session.intraday:
         try:
             _paper_step(conn, market, cfg, rep, session, candles, appcfg)
-        except Exception:  # noqa — paper 실패가 리포트/배포를 막지 않는다
-            pass
+        except Exception as e:  # noqa — paper 실패가 리포트/배포를 막지 않는다
+            # 2026-08-28 게이트를 연 이유가 **paper 표본 축적**이다. 여기가 조용히 죽으면
+            # L2 승격 판단 근거가 영영 안 쌓이는데 화면상으론 아무 일도 없어 보인다.
+            _alert(f"{cfg['label']} paper 체결/청산 실패({type(e).__name__}: {e}) — "
+                   f"L1 표본 미적립")
 
     # ── 서술(3-LLM) — entry.allow(6조건 AND) 반영 후 ──
     ctx = _llm_ctx(cfg, rep, atr_dict, materials, session)
@@ -653,8 +660,11 @@ def build_report(cfg: dict, ls, client, conn, env, session_of: dict,
     if conn is not None and not dry_run:
         try:
             store.record_prediction(conn, rep, created_at=_now(), report_type="close")
-        except Exception:  # noqa
-            pass
+        except Exception as e:  # noqa — 기록 실패가 리포트를 막지는 않는다
+            # **조용히 넘기면 안 되는 실패다**: 예측이 DB 에 안 들어가면 익일 채점도 없고
+            # 자가학습·캘리브레이션·게이트 통과율이 통째로 비는데, 화면은 정상으로 보인다.
+            _alert(f"{cfg['label']} 예측 기록 실패({type(e).__name__}: {e}) — "
+                   f"이 회차는 학습 DB 에 남지 않는다(채점·캘리브 누락)")
         try:
             import hashlib
             stage = "close_intraday" if session.intraday else "close_final"
@@ -671,8 +681,8 @@ def build_report(cfg: dict, ls, client, conn, env, session_of: dict,
                                                     "market": rep.get("market")},
                                 {"subscores": rep.get("subscores")}, model_out, risk_dec,
                                 rhash, _now())
-        except Exception:  # noqa — 스냅샷 실패가 리포트를 막지 않는다
-            pass
+        except Exception as e:  # noqa — 스냅샷 실패가 리포트를 막지 않는다
+            _alert(f"{cfg['label']} 불변 스냅샷 저장 실패({type(e).__name__}: {e}) — 감사추적 결손")
 
     # ── 컨펌 diff + 행동 판정: 마감 확정(16:30) 회차면 15:00 잠정본 대비 변화·행동 ──
     if not session.intraday and prov and cfg["id"] in prov:

@@ -81,7 +81,7 @@ cron(평일): `0 8` preopen · `0 15` close · `30 16` final. 자동 push→Verc
 PYTHONUTF8=1 python scripts/run_backtest.py --count 250 --tune   # 방향예측 성적·튜닝(개발 중심)
 PYTHONUTF8=1 python scripts/run_close.py                          # 마감 파이프라인
 PYTHONUTF8=1 python scripts/run_preopen.py                        # 개장전 재평가
-PYTHONUTF8=1 .venv/bin/python -m pytest tests/ -q                  # 308 passed (2026-08-28)
+PYTHONUTF8=1 .venv/bin/python -m pytest tests/ -q                  # 311 passed (2026-08-28)
 ```
 
 ## 문서 지도 (이 순서로 파고든다)
