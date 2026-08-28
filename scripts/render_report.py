@@ -2030,7 +2030,11 @@ TEMPLATE = r"""<!doctype html>
     padding:18px 14px;position:sticky;top:0;height:100vh;height:100dvh;overflow-y:auto;
     display:flex;flex-direction:column;gap:6px}
   .brand{font-weight:800;font-size:1.02rem}
-  .brand-sub{font-size:.74rem;color:var(--muted);margin-bottom:14px}
+  .brand-sub{font-size:.74rem;color:var(--muted);margin-bottom:8px}
+  .date-nav{margin:0 0 14px}
+  .stock-datesel{border:1px solid var(--border);background:var(--surface2);color:var(--text);
+    border-radius:8px;padding:5px 9px;font:inherit;font-size:.8rem;font-weight:600;
+    min-height:32px;max-width:9.5rem}
   .nav-group{margin-bottom:12px}
   .nav-title{font-size:.68rem;color:var(--muted);font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin:6px 8px}
   .nav-item{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:10px 12px;
@@ -2278,7 +2282,11 @@ TEMPLATE = r"""<!doctype html>
 <div class="app">
   <aside class="sidebar" id="sidebar">
     <div class="brand">📊 easystock</div>
-    <div class="brand-sub">by junaitech · {{DATE}}</div>
+    <div class="brand-sub">by junaitech</div>
+    <div class="date-nav"><label class="slot-lab">📅 날짜
+      <select class="stock-datesel" onchange="if(this.value) location=this.value">
+        <option value="/" selected>{{DATE}}</option>
+      </select></label></div>
     {{SIDEBAR}}
     <div class="side-foot">
       <button class="toggle" onclick="window.__toggleTheme()">🌓 라이트 / 다크</button>
@@ -2415,6 +2423,30 @@ TEMPLATE = r"""<!doctype html>
 })();
 </script>
 {{BTC_DATESEL_SYNC}}
+<script>
+/* 헤더 날짜 드롭다운을 로드 시 /archive/stock/manifest.json 으로 재구성 — 과거 아카이브
+   페이지도 항상 전체 날짜를 갖는다(BTC 와 동일 자가치유). 최신일은 라이브('/'), 나머지는
+   /archive/stock/<날짜>.html. fetch 실패(file://)면 구워진 옵션 유지. */
+(function(){
+  try{
+    var sel=document.querySelector('select.stock-datesel'); if(!sel) return;
+    var cur='', co=sel.options[sel.selectedIndex];
+    if(co){ var mm=(co.textContent||'').match(/\d{4}-\d{2}-\d{2}/); if(mm) cur=mm[0]; }
+    fetch('/archive/stock/manifest.json',{cache:'no-store'}).then(function(r){return r.json();})
+    .then(function(items){
+      if(!Array.isArray(items)||!items.length) return;
+      var dates=items.map(function(x){return x&&x.date;}).filter(Boolean).sort().reverse();
+      if(!dates.length) return;
+      var newest=dates[0];
+      if(!cur||dates.indexOf(cur)<0) cur=newest;
+      sel.innerHTML=dates.map(function(d){
+        var href=(d===newest)?'/':('/archive/stock/'+d+'.html');
+        return '<option value="'+href+'"'+(d===cur?' selected':'')+'>'+d+'</option>';
+      }).join('');
+    }).catch(function(){});
+  }catch(e){}
+})();
+</script>
 <script>
 window.__copyReport=function(btn){
   try{

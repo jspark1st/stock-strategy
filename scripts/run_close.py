@@ -55,6 +55,38 @@ from render_report import render
 KST = timezone(timedelta(hours=9))
 DB_LOCAL = ROOT / "data" / "history.db"
 CALIB_BOOTSTRAP = ROOT / "data" / "calibration.json"   # 재구성 이력 부트스트랩 프라이어
+STOCK_ARCH = ROOT / "public" / "archive" / "stock"     # 날짜별 대시보드 아카이브
+STOCK_MANIFEST = STOCK_ARCH / "manifest.json"
+STOCK_ARCH_KEEP = 120                                  # 보관 일수
+
+
+def _archive_stock_day(html: str, trade_date: str) -> None:
+    """하루 대시보드를 날짜별로 아카이브 + manifest 갱신(헤더 날짜 드롭다운용).
+
+    각 아카이브는 index 와 동일 HTML(날짜 셀렉트를 로드 시 manifest 로 재구성하는
+    스크립트 포함 → 과거 페이지도 최신 날짜 목록 자동 반영). STOCK_ARCH_KEEP 일만 보관.
+    """
+    STOCK_ARCH.mkdir(parents=True, exist_ok=True)
+    (STOCK_ARCH / f"{trade_date}.html").write_text(html, encoding="utf-8")
+    items = []
+    if STOCK_MANIFEST.exists():
+        try:
+            items = json.loads(STOCK_MANIFEST.read_text(encoding="utf-8"))
+        except Exception:  # noqa
+            items = []
+    items = [x for x in items if x.get("date") != trade_date]
+    items.append({"date": trade_date, "href": f"/archive/stock/{trade_date}.html"})
+    items.sort(key=lambda x: x.get("date", ""), reverse=True)
+    keep = items[:STOCK_ARCH_KEEP]
+    STOCK_MANIFEST.write_text(json.dumps(keep, ensure_ascii=False, indent=2),
+                              encoding="utf-8")
+    valid = {x["date"] for x in keep}
+    for f in STOCK_ARCH.glob("*.html"):
+        if f.stem not in valid:
+            try:
+                f.unlink()
+            except Exception:  # noqa
+                pass
 
 # 마감 후 데이터 확정까지의 여유 — 이 시각(16:00) 이후 실행이면 당일 일봉을 확정으로 본다.
 # 세 데이터 소스(네이버 일봉·실시간 지수·LS t1511) 모두 이 하나로 잠정/확정을 판정한다.
@@ -818,6 +850,10 @@ def main() -> int:
         pub = ROOT / "public"
         pub.mkdir(exist_ok=True)
         (pub / "index.html").write_text(html, encoding="utf-8")
+        try:
+            _archive_stock_day(html, trade_date)
+        except Exception as e:  # noqa — 아카이브 실패가 배포를 막지 않게
+            print(f"⚠ 대시보드 아카이브 실패({type(e).__name__}) — 스킵")
     bundle_name = f"bundle_{trade_date}.dryrun.json" if dry_run else f"bundle_{trade_date}.json"
     (out_dir / bundle_name).write_text(
         json.dumps({"trade_date": trade_date, "reports": reports,
