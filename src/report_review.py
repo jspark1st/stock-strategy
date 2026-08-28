@@ -219,19 +219,48 @@ def _facts_for_critic(r: dict) -> str:
     return json.dumps(d, ensure_ascii=False)
 
 
+def _salvage_objects(s: str) -> list:
+    """잘린 JSON 배열에서 **완성된 {...} 객체만** 건져낸다(pro 모델이 사고 토큰으로 응답을
+    끝맺지 못해 닫는 ] 가 없어도 앞의 온전한 항목은 살린다)."""
+    out, depth, start = [], 0, None
+    for k, ch in enumerate(s):
+        if ch == "{":
+            if depth == 0:
+                start = k
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0 and start is not None:
+                try:
+                    out.append(json.loads(s[start:k + 1]))
+                except Exception:  # noqa
+                    pass
+                start = None
+    return out
+
+
 def _parse_findings(txt: str | None) -> list[dict]:
     if not txt:
         return []
     s = txt.strip()
     if s.startswith("```"):
-        s = s.split("```", 2)[1] if "```" in s[3:] else s.strip("`")
-        s = s[s.find("["):] if "[" in s else s
-    i, j = s.find("["), s.rfind("]")
-    if i < 0 or j < 0:
+        s = s.strip("`")
+        if s[:4].lower() == "json":
+            s = s[4:]
+    i = s.find("[")
+    if i < 0:
         return []
-    try:
-        arr = json.loads(s[i:j + 1])
-    except Exception:  # noqa
+    s = s[i:]
+    arr = None
+    j = s.rfind("]")
+    if j > 0:
+        try:
+            arr = json.loads(s[:j + 1])
+        except Exception:  # noqa
+            arr = None
+    if arr is None:                       # 잘린 응답 → 완성 객체만 복구
+        arr = _salvage_objects(s)
+    if not arr:
         return []
     out = []
     for x in arr[:8]:
@@ -249,7 +278,8 @@ def _parse_findings(txt: str | None) -> list[dict]:
 def llm_findings(r: dict, env: dict) -> list[dict]:
     """최신 Gemini(critic 체인)로 보고서 비평. 키/응답 없으면 빈 리스트(degrade)."""
     try:
-        txt = llm.gemini_generate(_CRITIC_SYS, _facts_for_critic(r), env, max_tokens=1600)
+        # pro 모델은 사고 토큰을 먹어 JSON 이 잘릴 수 있어 넉넉히(살림 파서가 2차 방어).
+        txt = llm.gemini_generate(_CRITIC_SYS, _facts_for_critic(r), env, max_tokens=4000)
         return _parse_findings(txt)
     except Exception:  # noqa
         return []

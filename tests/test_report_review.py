@@ -102,6 +102,14 @@ def test_parse_findings_garbage_returns_empty():
     assert report_review._parse_findings(None) == []
 
 
+def test_parse_findings_salvages_truncated_array():
+    # pro 모델이 토큰 소진으로 배열을 못 닫아도(닫는 ] 없음) 완성 객체는 살린다.
+    truncated = ('[\n {"category":"모순","severity":"high","title":"완성됨","detail":"ok"},\n'
+                 ' {"category":"부족","severity":"med","title":"잘림","detail":"미완')
+    out = report_review._parse_findings(truncated)
+    assert [f["title"] for f in out] == ["완성됨"]    # 잘린 두 번째는 버림
+
+
 # ── DB 누적·다이제스트 ────────────────────────────────────────────────
 def _tmpdb():
     p = tempfile.mktemp(suffix=".db")
