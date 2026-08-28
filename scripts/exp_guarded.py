@@ -63,15 +63,23 @@ def build(mk, count, client):
                                       foreign_streak=backtest._streak(desc))).score
         total = backtest.predict({"scores": {"close": close_s, "flow": flow_s,
                                              "amt": amt_s, "quant": q}}, CORE_WEIGHTS)[0]
+        # 2026-08-28: **주 라벨(실거래 지평 close→open)** 을 함께 재구성한다. 기존 캐시는
+        # label(close→close)만 갖고 있어서, 이 틸트가 '검증됨'이라 부른 근거가 전부 구 라벨이었다.
+        op = getattr(nxt, "open", None)
         out.append({"total": total, "vol_ratio": vol_ratio,
-                    "label": 1 if (nxt.close - cd.close) > 0 else 0})
+                    "label": 1 if (nxt.close - cd.close) > 0 else 0,
+                    "overnight_label": (1 if (op - cd.close) > 0 else 0) if op else None})
     return out
 
 
-def load(mk, count, refresh, client):
+def load(mk, count, refresh, client, need_key="label"):
     p = OUT / f"guarded_{mk}.json"
     if p.exists() and not refresh:
-        return json.loads(p.read_text(encoding="utf-8"))
+        cached = json.loads(p.read_text(encoding="utf-8"))
+        # 구 캐시엔 overnight_label 이 없다 → 요청 라벨이 없으면 자동 재구성(조용한 오측정 방지).
+        if cached and need_key in cached[0]:
+            return cached
+        print(f"  (캐시에 {need_key} 없음 — 재구성)")
     s = build(mk, count, client)
     OUT.mkdir(exist_ok=True)
     p.write_text(json.dumps(s, ensure_ascii=False), encoding="utf-8")
@@ -99,26 +107,42 @@ def main() -> int:
     K = float(argv[argv.index("--k") + 1]) if "--k" in argv else 0.2
     CAP = float(argv[argv.index("--cap") + 1]) if "--cap" in argv else 0.10
     refresh = "--refresh" in argv
+    # --label open(기본·실거래 지평) | close(구 라벨) | both(둘 다 출력해 대조)
+    lab = argv[argv.index("--label") + 1] if "--label" in argv else "open"
+    labels = ["close", "open"] if lab == "both" else [lab]
     with naver._client() as c:
         for mk, ko in MARKETS:
-            s = load(mk, count, refresh, c)
-            tilt_on = (mk == "KOSDAQ")   # 가드: KOSDAQ 만(자기 검증 — KOSPI 는 틸트 0)
-            cal_only, cal_tilt = [], []
-            for t in range(WARMUP, len(s)):
-                tr = s[:t]; x = s[t]; y = x["label"]
-                cal = calibration.fit([(r["total"], r["label"]) for r in tr],
-                                      source="wf", iters=1500)
-                p = calibration.apply(cal, x["total"])
-                cal_only.append((p, y))
-                tilt = clamp(K * (x["vol_ratio"] - 1.0), -CAP, CAP) if tilt_on else 0.0
-                cal_tilt.append((clamp(p + tilt, 0.20, 0.80), y))
-            h0, b0, s0, a0 = metrics(cal_only)
-            h1, b1, s1, a1 = metrics(cal_tilt)
-            print(f"\n═══ {ko}({mk}) — walk-forward n={len(cal_only)} · 틸트 {'ON(K=%.2f,CAP=%.2f)'%(K,CAP) if tilt_on else 'OFF'} ═══")
-            print(f"  캘리브 단독   적중 {h0*100:4.1f}% · Brier {b0:.4f} · skill {s0:+.3f} · AUC {a0:.3f}")
-            print(f"  캘리브+틸트   적중 {h1*100:4.1f}% · Brier {b1:.4f} · skill {s1:+.3f} · AUC {a1:.3f}")
-    print("\n판단: KOSDAQ 에서 캘리브+틸트가 AUC·Brier 개선하고 KOSPI 는 동일(틸트0)하면 가드 반영 OK.")
+            need = "overnight_label" if "open" in labels else "label"
+            s = load(mk, count, refresh, c, need_key=need)
+            for L in labels:
+                key = "overnight_label" if L == "open" else "label"
+                run(s, mk, ko, key, L, K, CAP)
+    print("\n판단 기준: **주 라벨(open)** 에서 틸트가 AUC·Brier 를 개선해야 라이브 유지. "
+          "구 라벨(close)에서만 좋다면 그건 우리가 트레이드하지 않는 지평의 엣지다 → 제거.")
     return 0
+
+
+def run(s, mk, ko, key, lname, K, CAP):
+    """선택 라벨로 walk-forward — 캘리브 단독 vs 캘리브+틸트."""
+    s = [x for x in s if x.get(key) is not None]
+    tilt_on = (mk == "KOSDAQ")   # 가드: KOSDAQ 만(자기 검증 — KOSPI 는 틸트 0)
+    cal_only, cal_tilt = [], []
+    for t in range(WARMUP, len(s)):
+        tr = s[:t]; x = s[t]; y = x[key]
+        cal = calibration.fit([(r["total"], r[key]) for r in tr], source="wf", iters=1500)
+        p = calibration.apply(cal, x["total"])
+        cal_only.append((p, y))
+        tilt = clamp(K * (x["vol_ratio"] - 1.0), -CAP, CAP) if tilt_on else 0.0
+        cal_tilt.append((clamp(p + tilt, 0.20, 0.80), y))
+    h0, b0, s0, a0 = metrics(cal_only)
+    h1, b1, s1, a1 = metrics(cal_tilt)
+    tag = "종가→시가(주 라벨·실거래)" if lname == "open" else "종가→종가(구 라벨)"
+    print(f"\n═══ {ko}({mk}) — {tag} · walk-forward n={len(cal_only)} · "
+          f"틸트 {'ON(K=%.2f,CAP=%.2f)' % (K, CAP) if tilt_on else 'OFF'} ═══")
+    print(f"  캘리브 단독   적중 {h0*100:4.1f}% · Brier {b0:.4f} · skill {s0:+.3f} · AUC {a0:.3f}")
+    print(f"  캘리브+틸트   적중 {h1*100:4.1f}% · Brier {b1:.4f} · skill {s1:+.3f} · AUC {a1:.3f}")
+    if tilt_on:
+        print(f"  → 틸트 효과   AUC {a1-a0:+.3f} · Brier {b1-b0:+.4f} · skill {s1-s0:+.3f}")
 
 
 if __name__ == "__main__":

@@ -11,6 +11,8 @@
 
 보관: 기본 14벌 순환. 저장 위치는 **repo 밖**이 기본이다 — repo 를 통째로 날려도 살아남게.
   기본값 ~/overnight_report_backups (`.env` 의 `backup_dir` 로 변경 가능)
+오프박스(선택·권장): `.env` 에 `backup_remote=user@host:/path` 를 넣으면 scp 로 1벌 더 보낸다.
+  로컬 사본만으로는 **VM 자체 손실**에 무력하다 — 최소 1벌은 다른 호스트에 있어야 한다.
 
 실행: .venv/bin/python scripts/backup_db.py [--keep 14] [--dest DIR] [--quiet]
 종료코드: 0 성공 · 1 실패(크론이 경보로 승격).
@@ -20,6 +22,7 @@ from __future__ import annotations
 import gzip
 import shutil
 import sqlite3
+import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -36,22 +39,51 @@ DEFAULT_DEST = Path.home() / "overnight_report_backups"
 KEEP = 14
 
 
-def _env_dest() -> Path | None:
-    """`.env` 의 backup_dir(선택). 의존성 없는 파서 — config 관례와 동일."""
+def _env(key: str) -> str | None:
+    """`.env` 단일 키 조회. 의존성 없는 파서 — config 관례와 동일."""
     envf = ROOT / ".env"
     if not envf.exists():
         return None
     for line in envf.read_text(encoding="utf-8", errors="ignore").splitlines():
         line = line.strip()
-        if line.startswith("backup_dir") and "=" in line:
+        if line.startswith(key) and "=" in line:
             v = line.split("=", 1)[1].strip()
             if v:
-                return Path(v).expanduser()
+                return v
     return None
 
 
+def _env_dest() -> Path | None:
+    v = _env("backup_dir")
+    return Path(v).expanduser() if v else None
+
+
+def push_offbox(path: Path) -> str | None:
+    """오프박스 사본(선택) — `.env` 에 backup_remote 가 있으면 scp 로 1벌 더 보낸다.
+
+    **왜 필요한가:** 로컬 백업은 실수로 지운 것·DB 손상은 막아주지만 **VM 자체 손실**엔 무력하다.
+    학습 이력은 재구성이 불가능하므로 최소 1벌은 다른 호스트에 있어야 한다.
+    설정(둘 다 `.env`):
+        backup_remote=user@host:/srv/backups/overnight
+        backup_remote_key=~/.ssh/backup_key      # 선택(없으면 기본 키)
+    미설정이면 조용히 건너뛴다(로컬 백업은 그대로 유효). 설정돼 있는데 실패하면 예외 → 크론 경보.
+    """
+    remote = _env("backup_remote")
+    if not remote:
+        return None
+    key = _env("backup_remote_key")
+    cmd = ["scp", "-B", "-o", "StrictHostKeyChecking=accept-new", "-o", "ConnectTimeout=20"]
+    if key:
+        cmd += ["-i", str(Path(key).expanduser())]
+    cmd += [str(path), remote]
+    r = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+    if r.returncode != 0:
+        raise RuntimeError(f"오프박스 전송 실패({remote}): {r.stderr.strip()[:200]}")
+    return remote
+
+
 def backup(src: Path = SRC, dest: Path | None = None, keep: int = KEEP,
-           now: datetime | None = None) -> Path:
+           now: datetime | None = None, push_remote: bool = True) -> Path:
     """일관 스냅샷 1벌 생성 → 검증 → 압축 → 오래된 것 정리. 경로 반환."""
     if not src.exists():
         raise FileNotFoundError(f"원본 DB 없음: {src}")
@@ -93,6 +125,10 @@ def backup(src: Path = SRC, dest: Path | None = None, keep: int = KEEP,
         f.unlink(missing_ok=True)
     print(f"백업 {final} ({final.stat().st_size / 1024:.0f}KB · daily {rows}행 · "
           f"보관 {len(sorted(dest.glob('history_*.db.gz')))}/{keep}벌)")
+    if push_remote:
+        where = push_offbox(final)
+        print(f"  └ 오프박스 {where}" if where
+              else "  └ 오프박스 미설정(.env backup_remote) — 로컬 1벌만 존재(VM 손실엔 무방비)")
     return final
 
 

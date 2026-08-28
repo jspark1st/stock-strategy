@@ -163,6 +163,34 @@ end-to-end 플로우(상태머신·학습루프·스코어링 파이프·크로�
   정상 캘리브면 라벨은 **'익일 시가 상승 확률'**(지평을 라벨에 각인 — 익일 '종가'가 아니다).
 - 테스트 +13 (`tests/test_gate_and_horizon.py` — 5건 전부 회귀 고정). **305 passed.**
 
+## 2026-08-28 (2차) — "코딩으로 더 올릴 수 있나" 측정 3건 (테스트 305→308)
+
+재평가 후속. **엔지니어링 상한은 ~75점**(예측력 25 고정 시)이라 남은 레버가 얼마 없다는 판단 하에,
+"안 해본 코딩"을 measure-first 로 셋 처리. **둘은 음성(제거·미배선), 하나는 결정 반영.**
+
+- ❌ **KOSDAQ vol_tilt 철회** — 라이브에서 매일 확률에 ±10%p 넣던 유일한 '검증된 판별 신호'.
+  등재 근거가 **구 라벨(종가→종가)** 측정이었다. 주 라벨로 재측정(`exp_guarded.py --label both`):
+  · 구 라벨: AUC 0.457 → **0.542**(+0.085) · skill −0.020 → +0.006
+  · **주 라벨: AUC 0.461 → 0.488**(+0.026, 여전히 <0.5) · Brier −0.0002 · **적중률 변화 0**
+  우리가 청산하지 않는 지평의 엣지를 실거래 확률에 주입하던 것 → `VALIDATED_VOL_TILT` 비움
+  (`RETIRED_VOL_TILT` 로 이력 보존), `data/calibration.json` 재생성 시 자동 제거. DIVERGENCES #2 철회.
+- ❌ **미국 지수선물(15:00 KST) 미배선** — 마감 회차가 밤사이 갭을 예측하면서 **미국 정보가 0개**라
+  가장 유망해 보였던 후보(`us_futures_pct` 필드·스코어링 경로·yahoo 수집기가 전부 있는데 배선만 없음).
+  `scripts/exp_us_futures.py` 신설해 사전 조건 2개(①단독 AUC 95%CI 하한>0.5 ②walk-forward 증분)를
+  선언하고 측정 → **둘 다 실패**. KOSPI 전 피처 AUC 0.42~0.50(틸트 적용 시 오히려 −0.042·Brier +0.013),
+  KOSDAQ 최고 ES_asia 0.549[CI 0.428~0.670]·walk-forward Brier +0.002(악화). **코드 미반영, 측정만 보존.**
+  · 한계: 사용 표본 90/149(월요일·휴장 직후는 전일 미국마감 기준선이 12h 창 밖) → walk-forward n=30 저검정력.
+  · VIX_asia 는 AUC 정확히 0.500 = **상수**(VIX 현물은 아시아 세션에 거래 안 됨). 변동성 입력은
+    여전히 0개이며 이 방법으론 측정 불가 — VX 선물이 필요(미착수).
+- ✅ **news(재료) 점수 제외·표시 유지**(사용자 결정) — 라이브 18회차 점수가 **40/50 두 값뿐**,
+  총점 영향 ≤±1점·확률 ≤±0.5%p. 게다가 백테스트 재구성에 news 가 없어 **판별력 측정 자체가 불가**.
+  검증 불가 팩터에 가중을 주지 않는다는 규율대로 `news_na=True` 고정(가중 재배분), 팩트체크·주요재료
+  카드는 그대로 표시. 자가비평 R7 을 뒤집어 '**news 가 점수에 다시 들어오면**' 잡도록 변경.
+- ✅ **오프박스 백업 지원** — `backup_db.push_offbox()`: `.env` 에 `backup_remote=user@host:/path`
+  (+선택 `backup_remote_key`)를 넣으면 scp 로 1벌 더. 미설정이면 건너뛰고 그렇게 로그에 남긴다
+  ("로컬 1벌만 존재 — VM 손실엔 무방비"). 설정됐는데 실패하면 예외 → 크론 경보.
+  **사용자 작업 필요**: `.env` 에 원격 경로 1줄(권한 설정상 내가 `.env`에 접근 불가).
+
 ## Claude Code 인수인계 (2026-08-22 11:20 KST) — 여기부터 읽어라
 
 어제(8/21)부터 오늘 오전까지 Cursor 에서 한 작업. **주식과 BTC를 섞지 마라.**
@@ -170,7 +198,7 @@ BTC 상세는 **HANDOFF_BTC.md** (이 파일의 주식 로그보다 그쪽이 So
 
 ### 지금 서버·repo
 - **KS6F-JNT-3-VM-1** `~/overnight_report` (구 KS5F `~/stock_strategy` 는 폐기).
-- Python은 **`.venv/bin/python`** (시스템 python3 에 pytest/httpx 없음). 테스트 **305 passed** (2026-08-28, `.venv`).
+- Python은 **`.venv/bin/python`** (시스템 python3 에 pytest/httpx 없음). 테스트 **308 passed** (2026-08-28, `.venv`).
 - 라이브: https://easystock-junaitech.vercel.app — `public/index.html` push → Vercel.
 - 마지막 사이트 배포: `2ee469a` (2026-08-22 11:11, HTML만).
 
@@ -270,7 +298,7 @@ cd out && python3 -m http.server 8931 --bind 127.0.0.1
 #   then open http://127.0.0.1:8931/report_<date>.html
 
 # Tests — 반드시 .venv (시스템 python3 엔 pytest/httpx 없음)
-.venv/bin/python -m pytest tests/ -q                       # 305 passed (2026-08-28)
+.venv/bin/python -m pytest tests/ -q                       # 308 passed (2026-08-28)
 .venv/bin/python -m pytest tests/test_scoring.py -q         # scoring engine only
 .venv/bin/python -m pytest tests/test_scoring.py::<name> -q # single test
 ```

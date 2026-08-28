@@ -48,9 +48,9 @@ train/test 분할로 과최적화 노출.)
 - 초기(2026-08, 98일): 적중 51~52%·AUC 0.51~0.54 — 거의 동전던지기 + **과도한 비관 편향**.
 - **5차(캘리브레이션 반영)**: walk-forward(149일)에서 고정 시그모이드의 비관편향을 적응형
   캘리브레이션으로 제거 — **Brier 0.30→0.24·적중 +6~9%p**(양 시장). 라이브 파이프라인 반영 완료.
-- **5차(판별력 일부)**: **가드된 KOSDAQ 거래량 틸트** — vol_ratio 가 walk-forward 로 견고(AUC 0.648).
-  유계(±0.10)·KOSDAQ한정·게이트보호로 반영 → KOSDAQ AUC 0.488→0.577. KOSPI 는 원천피처 전부 과최적
-  (OOS≈0.50)이라 미적용.
+- **5차(판별력 일부) → 2026-08-28 철회**: KOSDAQ vol_tilt 는 **구 라벨(종가→종가)** 에서만 유효했다.
+  주 라벨(종가→익일 시가)로 재측정하니 AUC 0.461→0.488(<0.5)·Brier·적중률 불변 → **제거**.
+  현재 라이브에 적용 중인 판별 틸트는 **없다**(캘리브레이션만).
 - **남은 최우선 = 다레짐 재검증 + KOSPI 판별**: 모든 5차 결과가 2026 상반기 **단일 상승레짐** 위. 하락/
   횡보 표본이 쌓이면 재측정(vol_tilt 는 모멘텀성이라 특히). KOSPI 판별은 새 각도 필요. (CLAUDE.md 5차·open#0)
 
@@ -81,7 +81,7 @@ cron(평일): `0 8` preopen · `0 15` close · `30 16` final. 자동 push→Verc
 PYTHONUTF8=1 python scripts/run_backtest.py --count 250 --tune   # 방향예측 성적·튜닝(개발 중심)
 PYTHONUTF8=1 python scripts/run_close.py                          # 마감 파이프라인
 PYTHONUTF8=1 python scripts/run_preopen.py                        # 개장전 재평가
-PYTHONUTF8=1 .venv/bin/python -m pytest tests/ -q                  # 305 passed (2026-08-28)
+PYTHONUTF8=1 .venv/bin/python -m pytest tests/ -q                  # 308 passed (2026-08-28)
 ```
 
 ## 문서 지도 (이 순서로 파고든다)

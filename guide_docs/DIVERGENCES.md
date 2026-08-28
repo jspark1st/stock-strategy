@@ -11,13 +11,13 @@
 | # | 분기 | SoT | easystock | 근거·검증 | 라이브 | 코드 |
 |---|---|---|---|---|---|---|
 | 1 | **적응형 확률 캘리브레이션** | 고정 `sigmoid((total−55)/10)` | `sigmoid(a·total+b)` 데이터 적합, store 학습치>부트스트랩>SoT 폴백 | walk-forward Brier 0.30→0.24, 비관편향 제거(양시장). AUC 는 0.53→0.54 소폭 | ✅ | `calibration.py`, `scoring.score_close(calib=)` |
-| 2 | **가드된 KOSDAQ 거래량 틸트** | 없음 | `clamp(k·(vol_ratio−center), ±0.10)` p_up 가산, **KOSDAQ 한정** | walk-forward AUC 0.488→0.577 — 단 n≈89·CI 가 0.5 걸침(**미확정, 노이즈밴드**)·단일 상승레짐. cap·시장한정·게이트로 손상 제한 | ✅(참고) | `calibration.vol_tilt`, `data/calibration.json` |
+| 2 | ~~가드된 KOSDAQ 거래량 틸트~~ **철회(2026-08-28)** | 없음 | ~~`clamp(k·(vol_ratio−center), ±0.10)` p_up 가산~~ → **제거, SoT 로 복귀** | 등재 근거(AUC 0.457→0.542·skill 음→양)가 **구 라벨(종가→종가)** 측정이었다. 주 라벨(종가→익일 시가)로 재측정하니 AUC 0.461→**0.488(여전히 <0.5)**·Brier −0.0002·적중률 변화 0 = 엣지 아님. 우리가 트레이드하지 않는 지평의 엣지를 실거래 확률에 주입 중이었다 | ❌ 철회 | `exp_guarded.py --label open`, `fit_calibration.RETIRED_VOL_TILT` |
 | 3 | **오버나이트 σ_AM 주 타점** | 다일 보유 R배수(2~6·ATR) | 종가→**익일 오전** 예상변동폭 `±1σ_AM`(갭σ⊕오전버퍼) RR 1:1 을 primary. 다일 R배수는 참고 variants 로 강등 | 전략 지평(오버나이트 1회)과 정합. σ_AM 은 지수 갭 분포 실측 | ✅ | `atr.overnight_sigma`, `compute_plan` |
 | 4 | **ATR 정규화·국면·구조손절** | 원시 ATR | winsorized robust ATR(스파이크 억제)+변동성 국면 백분위+구조(스윙) 손절(타이트한 쪽) | SoT §8 "스파이크 후 ATR 과대" 경고 반영. 원본도 병기 | ✅ | `atr.py` |
 | 5 | **게이트 우선 사이징** | edge→Half-Kelly | 게이트 차단(등급·진입판정)이면 Kelly=0 강제·`×position_scale` | 규칙4(게이트가 확률을 이긴다). '위험인데 숏 25%' 모순 제거 | ✅ | `atr.py`, `strategy.entry_decision` |
 | 6 | **신호 일치도·데이터 완전성** | 없음 | 상·하방 가중 충돌 시 확신 수축(agreement) + 완전성 지표(제외 항목은 분모 제외) | 엇갈린 신호 과신 방지 | ✅ | `scoring.py` |
 | 7 | **뉴스 시황/재료 분리(이중계상 제거)** | 헤드라인 호·악재 카운트 | `kind`(시황\|재료)·`scope`(시장\|종목)로 **재료·시장·fresh** 만 점수. 국내 시황·수급 기사는 가격에 이미 반영돼 제외. 해외 마감은 재료 유지(외생 선행) | 실측 42.6→39.3 이 순환경로였음 | ✅ | `news.classify_kind/scope` |
-| 8 | **뉴스 재료 결측 시 제외·재배분** | news 항상 스코어(중립 50) | 당일 검증 재료 0건이면 뉴스를 **동시호가처럼 제외**(완전성 100% 유지 + 10% 가중 재배분) | 죽은 10% 가중이 실제 신호를 희석하던 것 제거(2026-08-22) | ✅ | `scoring.score_close`, `CloseInputs.news_not_applicable` |
+| 8 | **뉴스 재료 점수 제외(상시)** | news 6팩터 중 하나(가중 0.10) | 뉴스를 **항상 제외**하고 가중 재배분. 팩트체크·주요재료 카드는 **표시 유지**(맥락 정보) | 2026-08-22 엔 '재료 0건인 날만' 제외였으나, 라이브 18회차 실측 결과 점수가 **40/50 두 값뿐**(총점 영향 ≤±1점·확률 ≤±0.5%p)이고 **백테스트 재구성에 news 가 없어 판별력 측정 자체가 불가**. 검증 불가 팩터에 가중을 주지 않는다는 규율에 따라 2026-08-28 상시 제외. 되살리는 조건: 재구성 가능 + walk-forward 판별력 확인 | ✅ | `run_close`(news_na=True 고정), `CloseInputs.news_not_applicable` |
 | 9 | **quant 확장 서브스코어(0.15)** | 6팩터 | RSI·MACD·볼린저·OBV·추세정렬+마감 1시간봉을 7번째 팩터로(재정규화) | ⚠ **판별력 검증 없음**(하네스 미측정)·내부 공선성. 다레짐 후 검증 필요 | ✅(미검증) | `quant.py` |
 | 10 | **간밤 정량 재평가(개장전 한정)** | 없음 | 간밤 미국장 blend×K + 환율을 전일 p_up 에 유계 가산(±0.12). **인과상 개장전만**, 마감엔 미적용 | walk-forward 개장전 OOS AUC 0.505→0.597(KOSPI). 마감엔 미래참조라 금지 | ✅(preopen) | `overnight.py`, `run_preopen.py` |
 | 11 | **close→open 지평 병행 측정** | 라벨=익일 종가 | 라벨(next-close)은 유지하되 **실거래 지평(종가→익일 시가)** 정답률을 나란히 채점·표시 | exp_paper 가 드러낸 지평 불일치를 라이브·하네스가 관측 | ✅(측정) | `store.accuracy(overnight_*)`, `backtest.evaluate` |

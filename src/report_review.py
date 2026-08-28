@@ -93,6 +93,20 @@ def _per_report_rules(r: dict) -> list[dict]:
                       "캘리브레이터 기울기가 하한에 박혀 총점이 확률을 거의 못 움직인다(확률≈절편=상승레짐 기저율).",
                       f"a={a}, source={cal.get('source')}, n={cal.get('n')}"))
 
+    # R3-b 진입 허용 × 퇴화 확률 — 확률 임계가 '판별'이 아니라 '시장 기저율 상수' 비교가 된 상태.
+    # 2026-08-28 실측: 기울기가 하한이라 p_up ≈ 기저율(KOSPI 0.591·KOSDAQ 0.624)로 거의 고정 →
+    # `p_up ≥ min_prob(0.60)` 는 날마다 달라지는 판정이 아니라 **시장별로 항상 참/항상 거짓**이다
+    # (코스닥은 상시 통과, 코스피는 상시 미달). 즉 실질 게이트는 등급 하나뿐. 숨기지 말고 매일 표기.
+    ent = r.get("entry") or {}
+    if not btc and ent.get("allow") and (cal.get("slope_at_floor")
+                                         or (a is not None and a <= _SLOPE_FLOOR)):
+        out.append(_f("rule", "모순", "gate_on_degenerate_prob", "high",
+                      "진입 허용 — 단 확률 임계가 판별이 아님",
+                      "확률 임계를 통과했으나 그 확률은 총점과 거의 무관한 기저율 상수다. "
+                      "이 통과는 '오늘이 좋은 날'이라는 뜻이 아니라 '이 시장의 기저 상승률이 임계보다 높다'는 "
+                      "뜻이며, 실질적으로 등급 게이트만 작동 중이다. paper 표본으로만 취급할 것.",
+                      f"p_up={r.get('p_up')}, a={a}, span={cal.get('prob_span_pp')}%p"))
+
     # R4 판별 미확보 — p_up 이 기저율 밴드
     if not btc and p_up is not None and abs(p_up - 0.5) < _BAND:
         out.append(_f("rule", "관측", "no_discrimination", "low",
@@ -118,11 +132,15 @@ def _per_report_rules(r: dict) -> list[dict]:
                       f"완전성 {dc*100:.0f}% — 결측 항목 재배분으로 총점이 흔들릴 수 있다.",
                       f"missing={miss}"))
 
-    # R7 재료 항목 상시 제외 — 죽은 가중(개선). 반복되면 digest 가 승격.
-    if "news" in (r.get("excluded_keys") or []):
-        out.append(_f("rule", "개선", "news_dead", "low",
-                      "재료(뉴스) 항목이 제외됨 — 가중 활용 안 됨",
-                      "당일 검증 재료가 없어 뉴스 항목이 제외됐다. 자주 반복되면 재료 소스/판정을 개선하거나 가중을 재설계할 신호.",
+    # R7 재료 항목 — 2026-08-28 부터 **상시 제외가 설계**다(측정 불가 팩터에 가중을 주지 않는다).
+    # 따라서 '제외됐다'는 더는 결함이 아니다(매일 울려 백로그만 오염시킨다). 반대로 news 가
+    # 점수에 **다시 들어와 있으면** 그게 설계 위반이므로 그때만 잡는다.
+    if not btc and "news" not in (r.get("excluded_keys") or []) and any(
+            s.get("key") == "news" for s in (r.get("subscores") or [])):
+        out.append(_f("rule", "모순", "news_rescored", "med",
+                      "재료(뉴스)가 점수에 다시 반영됨",
+                      "재료는 백테스트로 판별력을 측정할 수 없어 2026-08-28 부터 점수 제외(표시만)로 결정됐다. "
+                      "다시 가중이 붙었다면 의도된 변경인지 확인 필요.",
                       None))
 
     # R8 신호 혼재(관측)

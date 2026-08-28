@@ -29,9 +29,17 @@ def _codes(findings):
 def test_rules_catch_known_defects():
     codes = _codes(report_review._per_report_rules(_report()))
     for c in ("gate_sizing", "confidence_zero", "calib_slope_floor",
-              "no_discrimination", "horizon_divergence", "incomplete_data",
-              "news_dead"):
+              "no_discrimination", "horizon_divergence", "incomplete_data"):
         assert c in codes, c
+    # news 제외는 2026-08-28 부터 **설계**다 — 더는 결함으로 잡지 않는다(매일 울려 백로그 오염).
+    assert "news_dead" not in codes
+
+
+def test_news_rescored_is_flagged():
+    """반대로 news 가 점수에 다시 들어오면 설계 위반으로 잡는다."""
+    rep = _report(excluded_keys=["call"],
+                  subscores=[{"key": "news", "label": "재료", "score": 40}])
+    assert "news_rescored" in _codes(report_review._per_report_rules(rep))
 
 
 def test_rules_clean_report_no_findings():

@@ -34,11 +34,22 @@ MARKETS = ["KOSPI", "KOSDAQ"]
 OUT = ROOT / "out"
 DEST = ROOT / "data" / "calibration.json"
 
-# 판별 틸트(유계) — walk-forward 검증분만 등재(scripts/exp_guarded.py). KOSDAQ 거래량비율:
-# 캘리브+틸트가 AUC 0.488→0.577·적중 +7.9%p·skill 음→양. KOSPI 는 과최적이라 제외(등재 안 함).
-VALIDATED_VOL_TILT = {
+# 판별 틸트(유계) — walk-forward 검증분만 등재(scripts/exp_guarded.py).
+#
+# **2026-08-28: KOSDAQ vol_tilt 등재 취소(비움).**
+# 등재 근거였던 "AUC 0.457→0.542·skill 음→양"은 **구 라벨(종가→종가)** 로 측정된 것이다.
+# 주 라벨(종가→익일 시가 = 우리가 실제로 청산하는 지평)로 재측정하니 사라졌다:
+#     구 라벨:  AUC 0.457 → 0.542 (+0.085) · skill −0.020 → +0.006
+#     주 라벨:  AUC 0.461 → 0.488 (+0.026) · Brier −0.0002 · skill +0.001 · 적중률 변화 0
+# 주 라벨에선 틸트를 넣어도 여전히 0.5 미만이고 Brier·적중률이 사실상 불변 = 엣지가 아니다.
+# 우리가 트레이드하지 않는 지평의 엣지를 실거래 확률에 ±10%p 로 주입하고 있었던 셈.
+# 파라미터는 **재검증용으로 남겨두되 등재하지 않는다**(다레짐 표본 후 exp_guarded --label open 재실행).
+VALIDATED_VOL_TILT: dict = {}
+
+RETIRED_VOL_TILT = {   # 이력 보존 — 되살리려면 주 라벨 walk-forward 통과가 조건
     "KOSDAQ": {"k": 0.20, "center": 1.0, "cap": 0.10,
-               "source": "exp_guarded-walkforward", "note": "vol_ratio 판별 신호(레짐 주의)"},
+               "source": "exp_guarded-walkforward(구 라벨 close→close)",
+               "retired": "2026-08-28 · 주 라벨에서 증분 소멸(AUC 0.488<0.5)"},
 }
 
 
@@ -89,6 +100,9 @@ def main() -> int:
             if mk in VALIDATED_VOL_TILT:
                 table[mk]["vol_tilt"] = VALIDATED_VOL_TILT[mk]
                 print(f"  └ vol_tilt(가드): {VALIDATED_VOL_TILT[mk]}")
+            elif table.get(mk, {}).pop("vol_tilt", None) is not None:
+                # 등재 취소분은 산출물에서도 지운다(라이브가 옛 파일을 계속 읽는 걸 막는다).
+                print(f"  └ vol_tilt 제거({mk}) — 주 라벨에서 미검증")
 
     calibration.save_bootstrap(DEST, table)
     print(f"\n저장: {DEST}")

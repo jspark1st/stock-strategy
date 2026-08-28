@@ -158,7 +158,7 @@ def test_backup_is_consistent_and_rotates(tmp_path):
     conn.close()
     dest = tmp_path / "backups"
     from datetime import datetime
-    made = [backup_db.backup(src=src, dest=dest, keep=2,
+    made = [backup_db.backup(src=src, dest=dest, keep=2, push_remote=False,
                              now=datetime(2026, 8, 20 + i, 23, 30)) for i in range(3)]
     assert all(p.exists() for p in made[-2:])
     assert not made[0].exists()                      # 순환으로 가장 오래된 것 제거
@@ -178,6 +178,26 @@ def test_backup_is_consistent_and_rotates(tmp_path):
 def test_backup_missing_source_raises(tmp_path):
     with pytest.raises(FileNotFoundError):
         backup_db.backup(src=tmp_path / "nope.db", dest=tmp_path / "b")
+
+
+def test_offbox_skipped_when_unconfigured(monkeypatch, tmp_path):
+    """backup_remote 미설정이면 조용히 건너뛴다 — 로컬 백업은 그대로 유효해야 한다."""
+    monkeypatch.setattr(backup_db, "_env", lambda k: None)
+    assert backup_db.push_offbox(tmp_path / "x.gz") is None
+
+
+def test_offbox_failure_is_loud(monkeypatch, tmp_path):
+    """설정돼 있는데 전송 실패면 예외 → 크론이 경보로 승격(조용한 백업 실패 금지)."""
+    monkeypatch.setattr(backup_db, "_env",
+                        lambda k: "u@h:/b" if k == "backup_remote" else None)
+
+    class _P:
+        returncode = 1
+        stderr = "Permission denied"
+
+    monkeypatch.setattr(backup_db.subprocess, "run", lambda *a, **k: _P())
+    with pytest.raises(RuntimeError, match="오프박스 전송 실패"):
+        backup_db.push_offbox(tmp_path / "x.gz")
 
 
 # ── ④ LLM: 빈 응답을 성공으로 취급하지 않는다 ───────────────────────────────
@@ -224,3 +244,37 @@ def test_gemini_no_key_is_not_an_error_state():
     from src.collectors import llm
     assert llm.gemini_call("s", "p", {}) is None
     assert llm._LAST_ERROR["gemini"] == "no key"
+
+
+# ── 게이트 통과가 '판별'인 척하지 않게 ───────────────────────────────────────
+def test_gate_pass_on_degenerate_prob_is_flagged():
+    """확률이 기저율 상수인데 임계를 통과하면, 그건 판별이 아니라 시장 기저율이다.
+
+    2026-08-28 실측: 기울기 하한 고착으로 p_up≈기저율(KOSPI .591/KOSDAQ .624) → `p_up≥0.60` 이
+    날짜별 판정이 아니라 **시장별 상수**가 됐다(코스닥 상시 통과). 조용히 두면 '모델이 골랐다'로 읽힌다.
+    """
+    from src import report_review
+    rep = {"market": {"kosdaq_close": 838.0}, "p_up": 0.61, "total": 57.3, "grade": "중립",
+           "entry": {"allow": True, "blocked_reasons": []},
+           "calibration": {"source": "bootstrap:open", "n": 149, "a": 0.005,
+                           "slope_at_floor": True, "prob_span_pp": 7.5},
+           "confidence": 0.52, "data_completeness": 1.0,
+           "confidence_detail": {"completeness": 1.0, "sample_factor": 0.52},
+           "excluded_keys": ["call", "news"], "signal_agreement": 0.5,
+           "atr": {"primary": {"kelly_pct": 0}}, "accuracy": {"n": 8}}
+    codes = {f["code"] for f in report_review._per_report_rules(rep)}
+    assert "gate_on_degenerate_prob" in codes
+
+
+def test_healthy_calibration_gate_pass_not_flagged():
+    from src import report_review
+    rep = {"market": {"kospi_close": 100.0}, "p_up": 0.72, "total": 70.0, "grade": "우호",
+           "entry": {"allow": True, "blocked_reasons": []},
+           "calibration": {"source": "store:open", "n": 200, "a": 0.05,
+                           "slope_at_floor": False, "prob_span_pp": 40.0},
+           "confidence": 0.8, "data_completeness": 1.0,
+           "confidence_detail": {"completeness": 1.0, "sample_factor": 0.8},
+           "excluded_keys": ["call", "news"], "signal_agreement": 0.8,
+           "atr": {"primary": {"kelly_pct": 0}}, "accuracy": {"n": 60}}
+    codes = {f["code"] for f in report_review._per_report_rules(rep)}
+    assert "gate_on_degenerate_prob" not in codes

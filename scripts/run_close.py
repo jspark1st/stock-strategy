@@ -438,15 +438,20 @@ def build_report(cfg: dict, ls, client, conn, env, session_of: dict,
     if fx:
         ms.usdkrw = fx.get("price")
 
+    # ── 재료(news): 2026-08-28 부터 **점수에서 제외, 표시만 유지** ─────────────
+    # 라이브 18회차 실측: 점수가 40 또는 50 **두 값뿐**(중립 50 기준 ±10), 가중 10% 를 곱해도
+    # 총점 영향 최대 ±1점 · 확률 ±0.5%p 미만. 사실상 죽은 가중이면서 '6팩터 모델'이라는 인상을
+    # 준다. 게다가 백테스트 재구성에 news 가 없어 **판별력을 측정할 방법 자체가 없다**(검증 불가
+    # 팩터에 가중을 주지 않는다 — 이 프로젝트 규율). 팩트체크·주요재료 카드는 그대로 두어
+    # 맥락 정보로 계속 보여주고, 가중치는 측정 가능한 팩터로 재배분한다.
+    # 되살리는 조건: 재료를 백테스트로 재구성 가능해지고 walk-forward 로 판별력이 확인될 때.
     if materials is not None:
         news_in = NewsInput(good_count=materials.good_count, bad_count=materials.bad_count)
         sources = materials.sources()
-        # 검증된 재료(호재·악재)가 하나도 없으면 뉴스를 중립 50 에 고정하지 않고 제외·재배분.
-        news_na = (materials.good_count == 0 and materials.bad_count == 0)
     else:
         news_in = NewsInput()
         sources = []
-        news_na = True   # 뉴스 수집 실패 — 중립 50 위조 대신 제외
+    news_na = True   # 상시 제외(가중 재배분). 화면 표시는 materials 카드가 담당.
 
     inputs = CloseInputs(
         trade_date=_iso(session.trade_ymd), close_strength=close_strength, breadth=breadth,
