@@ -1149,6 +1149,181 @@ def build_overnight(r: dict) -> str:
             f'<div class="note muted">총점·구조는 {anchor_lbl} 앵커, 방향확률만 간밤 반영(유계 보정).</div></div>')
 
 
+def build_report_text(r: dict) -> str:
+    """보고서 전체를 LLM(제미나이·ChatGPT·퍼플렉시티)에 그대로 붙여넣을 평문(markdown)으로.
+
+    '전체 복사' 버튼이 이 텍스트를 클립보드에 담는다 → 사용자가 다른 LLM 에서 이어서 질문.
+    확정 수치·게이트·경고·자가학습 성적까지 담되, 화면과 동일한 정직성 규율을 지킨다
+    (실거래 지평 병기, n<40 성적은 '측정중'). 결측 키에 강건(.get·None 가드).
+    """
+    btc = r.get("id") == "btc-perp" or r.get("report_type") == "btc_perp"
+    L: list[str] = []
+    # 헤더
+    if btc:
+        L.append(f"# BTCUSDT 무기한 선물 · {r.get('trade_date','')} {r.get('slot','') or ''}".rstrip())
+    else:
+        L.append(f"# {r.get('label','')} · {r.get('group','')} · {r.get('trade_date','')}".strip(" ·"))
+    defin = ("장중 잠정(마감 전 스냅샷)" if r.get("intraday_snapshot")
+             else ("개장전 재검토" if r.get("report_type") == "preopen" else "마감 확정"))
+    L.append(f"- 상태: {defin}" + (f" · 기준시각 {r['as_of']}" if r.get("as_of") else ""))
+    nar = r.get("narrative") or {}
+    head = nar.get("character") or r.get("headline")
+    if head:
+        L.append(f"\n{head}")
+    # 시장
+    m = r.get("market") or {}
+    mk = []
+    if m.get("kospi_close") is not None:
+        mk.append(f"코스피 {fmt(m['kospi_close'])} ({signed(m.get('kospi_chg_pct'),2)}%)")
+    if m.get("kosdaq_close") is not None:
+        mk.append(f"코스닥 {fmt(m['kosdaq_close'])} ({signed(m.get('kosdaq_chg_pct'),2)}%)")
+    if m.get("usdkrw") is not None:
+        mk.append(f"원달러 {fmt(m['usdkrw'])}")
+    if mk:
+        L.append("- 시장: " + " · ".join(mk))
+    # 총점/확률
+    if btc:
+        L.append(f"\n## 총점 {fmt(r.get('total'))} · 등급 {r.get('grade','')} "
+                 f"· 세션 LONG {pct(r.get('p_long'))} / SHORT {pct(r.get('p_short'))}")
+    else:
+        L.append(f"\n## 총점 {fmt(r.get('total'))} · 등급 {r.get('grade','')} "
+                 f"· 익일 상승확률 {pct(r.get('p_up'))} / 하락 {pct(r.get('p_down'))}")
+        if r.get("p_up_raw") is not None:
+            cal = r.get("calibration") or {}
+            note = f" (원시 {pct(r['p_up_raw'])} → 캘리브 {pct(r.get('p_up'))}"
+            if cal.get("source") and cal["source"] != "sot":
+                note += f" · {cal['source']} n={cal.get('n')} · 단일 상승레짐 기저율 앵커, 하락장 미검증"
+            L.append("-" + note + ")")
+    # 진입 판정
+    ent = r.get("entry") or {}
+    if ent:
+        allow = ent.get("allow")
+        L.append(f"- 진입 판정: {'허용' if allow else '차단'}"
+                 + (f" (방향 {ent.get('direction')})" if ent.get("direction") else "")
+                 + (f" · 사유: {', '.join(ent.get('blocked_reasons') or [])}"
+                    if not allow and ent.get("blocked_reasons") else ""))
+    gate = r.get("gate") or {}
+    if gate.get("reasons"):
+        L.append(f"- 게이트: {', '.join(gate['reasons'])}")
+    # 항목별 점수
+    subs = r.get("subscores") or []
+    if subs:
+        L.append("\n## 항목별 점수")
+        for s in subs:
+            lab = s.get("label") or s.get("key") or ""
+            w = s.get("weight")
+            wtxt = f" (가중 {w*100:.0f}%)" if isinstance(w, (int, float)) else ""
+            det = " · ".join(x for x in (s.get("observed"), s.get("comment")) if x)
+            L.append(f"- {lab} {fmt(s.get('score'))}{wtxt}" + (f" · {det}" if det else ""))
+    # 수급
+    fl = r.get("flows") or {}
+    if fl and not btc:
+        def _f(v):
+            return f"{v:+,.0f}억" if isinstance(v, (int, float)) else "미수집"
+        L.append("\n## 투자자 수급(억원)")
+        L.append(f"- 외국인 {_f(fl.get('foreign_net'))} · 기관 {_f(fl.get('inst_net'))} "
+                 f"· 개인 {_f(fl.get('retail_net'))} · 프로그램 {_f(fl.get('program_net'))}")
+    # 간밤(개장전)
+    ov = r.get("overnight") or {}
+    if ov.get("drivers"):
+        drv = " · ".join(f"{d.get('name')} {signed(d.get('chg_pct'),2)}%" for d in ov["drivers"])
+        L.append(f"\n## 간밤 미국장\n- 블렌드 {signed(ov.get('blend_pct'),2)}% · {drv}")
+    # ATR/오버나이트 타점
+    atr = r.get("atr") or {}
+    pr = atr.get("primary") or {}
+    if pr:
+        L.append("\n## 오버나이트 타점")
+        L.append(f"- {pr.get('label','타점')}: 진입 {fmt(pr.get('entry'))} / 손절 {fmt(pr.get('stop'))} "
+                 f"/ 목표 {fmt(pr.get('target'))} · 손익비 {fmt(pr.get('rr'))}")
+    oc = r.get("order_card") or {}
+    if oc:
+        el = oc.get("etf_levels") or {}
+        L.append(f"- 상품 주문({oc.get('instrument')}·{oc.get('shcode')}): "
+                 f"진입 {fmt(el.get('entry'))} / 손절 {fmt(el.get('stop'))} / 목표 {fmt(el.get('target'))}")
+    # 서술
+    if nar.get("conclusion"):
+        L.append(f"\n## 매매 결론\n{nar['conclusion']}")
+    scen = nar.get("scenarios")
+    if scen:
+        L.append("\n## 익일 시나리오")
+        if isinstance(scen, dict):
+            _lab = {"up": "상승", "down": "하락", "trigger": "트리거",
+                    "base": "기본", "bull": "상승", "bear": "하락"}
+            for k, v in scen.items():
+                if v:
+                    L.append(f"- {_lab.get(k, k)}: {v}")
+        elif isinstance(scen, list):
+            for s in scen:
+                if isinstance(s, dict):
+                    L.append(f"- {s.get('title') or s.get('name') or ''}: "
+                             f"{s.get('body') or s.get('text') or ''}".strip(": "))
+                else:
+                    L.append(f"- {s}")
+        else:
+            L.append(str(scen))
+    if nar.get("risks"):
+        rk = nar["risks"]
+        L.append("\n## 리스크\n" + ("\n".join(f"- {x}" for x in rk) if isinstance(rk, list) else str(rk)))
+    # 재료
+    fc = r.get("materials_fc") or {}
+    heads = fc.get("headlines") or nar.get("materials")
+    if heads and isinstance(heads, list):
+        lines = []
+        for h in heads[:10]:
+            if isinstance(h, dict):
+                title = (h.get("title") or "").strip()
+                if not title:
+                    continue
+                tag = h.get("tag")
+                lines.append(f"- [{tag}] {title}" if tag else f"- {title}")
+            elif str(h).strip():
+                lines.append(f"- {h}")
+        if lines:
+            L.append("\n## 주요 재료")
+            L.extend(lines)
+    # 경고
+    warns = r.get("warnings") or []
+    if warns:
+        L.append("\n## 주의 신호")
+        L.extend(f"- {w}" for w in warns)
+    # 자가학습 성적(정직 규율: n<40 은 측정중)
+    acc = r.get("accuracy") or {}
+    if acc.get("n"):
+        n = acc["n"]
+        if n < 40:
+            L.append(f"\n## 자가학습 성적\n- 표본 {n}회 — 측정중(40회 전엔 성적으로 읽지 말 것)")
+        else:
+            L.append(f"\n## 자가학습 성적(표본 {n}일)")
+            if acc.get("overnight_hit_rate") is not None:
+                L.append(f"- 실거래 적중률(종가→익일 시가) {pct(acc['overnight_hit_rate'])}"
+                         f" (n={acc.get('overnight_n')})")
+            L.append(f"- 라벨 적중률(종가→종가, 실행 아님) {pct(acc.get('hit_rate'))}"
+                     f" · Brier {fmt(acc.get('mean_brier'),3)}")
+    # 출처
+    srcs = r.get("sources") or []
+    if srcs:
+        us = []
+        for s in srcs[:12]:
+            u = s.get("url") if isinstance(s, dict) else s
+            if u:
+                us.append(u)
+        if us:
+            L.append("\n## 출처\n" + "\n".join(f"- {u}" for u in us))
+    L.append("\n※ 개인용 리스크 브리핑 · 투자자문 아님. 확정 수치는 API 원천, 확률은 방향 참고값.")
+    return "\n".join(L)
+
+
+def _copy_widget(r: dict) -> str:
+    """뷰 상단 '전체 복사' 버튼 + 숨김 텍스트(클립보드 소스)."""
+    txt = build_report_text(r)
+    return (f'<div class="view-actions">'
+            f'<button class="copy-btn" type="button" onclick="__copyReport(this)">'
+            f'📋 전체 복사</button>'
+            f'<span class="copy-hint">LLM에 붙여넣어 이어서 질문</span>'
+            f'<textarea class="copy-src" hidden aria-hidden="true">{esc(txt)}</textarea>'
+            f'</div>')
+
+
 def render_btc_view(r: dict, date: str) -> str:
     """BTCUSDT 전용 뷰. ETF/HTS/수급/3단계 루프 없음."""
     nar = r.get("narrative", {}) or {}
@@ -1205,6 +1380,7 @@ def render_btc_view(r: dict, date: str) -> str:
       {picker}
       <div class="basis"><span class="basis-k">기준</span> {as_of} · 마크 {fmt(mark,1)} ({chg_html})
         · {esc(r.get("nasdaq_txt") or "")} · 실시간 아님</div>
+      {_copy_widget(r)}
     </div>
     {headline_html}
     <div class="card hero">{build_hero(r)}</div>
@@ -1489,6 +1665,7 @@ def render_report_view(r: dict, date: str) -> str:
       {build_stage_strip(r)}
       <div class="muted">{build_market_line(r.get('market', {}))}</div>
       {build_basis(r)}
+      {_copy_widget(r)}
     </div>
 
     {headline_html}
@@ -1928,6 +2105,17 @@ TEMPLATE = r"""<!doctype html>
   .slot-empty,.slot-hint{font-size:.74rem;color:var(--muted)}
   .slot-hint{margin-left:auto}
 
+  /* 전체 복사 버튼 — 보고서 텍스트를 클립보드로(LLM 이어붙이기용) */
+  .view-actions{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap}
+  .copy-btn{border:1px solid var(--accent);
+    background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent);
+    border-radius:8px;padding:7px 14px;font:inherit;font-size:.82rem;font-weight:700;
+    min-height:36px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+  .copy-btn:hover{background:color-mix(in srgb,var(--accent) 24%,transparent)}
+  .copy-btn.copied{border-color:var(--good);color:var(--good);
+    background:color-mix(in srgb,var(--good) 16%,transparent)}
+  .copy-hint{font-size:.74rem;color:var(--muted)}
+
   /* 리스트/재료/체크 */
   .sub-h{font-weight:700;font-size:.86rem;margin:12px 0 6px;color:var(--text)}
   .tag-src{font-size:.66rem;background:var(--surface2);color:var(--muted);padding:1px 7px;border-radius:999px;font-weight:600}
@@ -2125,6 +2313,23 @@ TEMPLATE = r"""<!doctype html>
 })();
 </script>
 {{BTC_DATESEL_SYNC}}
+<script>
+window.__copyReport=function(btn){
+  try{
+    var ta=btn.parentElement.querySelector('.copy-src'); if(!ta) return;
+    var txt=ta.value;
+    function done(){ var o=btn.getAttribute('data-lbl')||btn.textContent;
+      btn.setAttribute('data-lbl',o); btn.textContent='✓ 복사됨';
+      btn.classList.add('copied');
+      setTimeout(function(){ btn.textContent=o; btn.classList.remove('copied'); },1600); }
+    function fallback(){ ta.hidden=false; ta.select();
+      try{document.execCommand('copy');}catch(e){} ta.hidden=true; done(); }
+    if(navigator.clipboard&&navigator.clipboard.writeText){
+      navigator.clipboard.writeText(txt).then(done,fallback);
+    } else fallback();
+  }catch(e){}
+};
+</script>
 </body>
 </html>"""
 

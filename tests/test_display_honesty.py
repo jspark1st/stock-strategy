@@ -104,6 +104,62 @@ def test_regime_badge_absent_for_sot_and_btc():
     assert "단일 상승레짐" not in rr.build_hero(btc)
 
 
+# ── D. 전체 복사(LLM 이어붙이기) ──────────────────────────────────────
+def _full_report():
+    return {"id": "kospi-close", "label": "장마감전 분석", "group": "코스피",
+            "trade_date": "2026-08-27", "total": 53.7, "grade": "약세",
+            "p_up": 0.5755, "p_down": 0.4245, "p_up_raw": 0.4675,
+            "calibration": {"source": "bootstrap", "n": 149, "a": 0.0104},
+            "market": {"kospi_close": 6912.37, "kospi_chg_pct": 1.53, "usdkrw": 1380.9},
+            "subscores": [{"key": "close", "label": "종가 강도", "weight": 0.2,
+                           "score": 65.5, "observed": "종가위치 0.46", "comment": "안정적"}],
+            "flows": {"foreign_net": 1354.0, "inst_net": 1814.0, "retail_net": -19120.0,
+                      "program_net": None},
+            "entry": {"allow": False, "direction": "long",
+                      "blocked_reasons": ["방향 확률 임계", "신뢰도 임계"]},
+            "warnings": ["동시호가 미발생 — 제외"],
+            "narrative": {"character": "코스피 대형주 쏠림 상승",
+                          "scenarios": {"up": "반도체 랠리 연장", "down": "금리 경계",
+                                        "trigger": "미국 증시"}},
+            "accuracy": {"n": 7, "hit_rate": 0.857, "overnight_hit_rate": 0.25,
+                         "overnight_n": 4}}
+
+
+def test_report_text_has_core_sections():
+    t = rr.build_report_text(_full_report())
+    for must in ("# 장마감전 분석 · 코스피 · 2026-08-27", "총점 53.7", "등급 약세",
+                 "익일 상승확률", "항목별 점수", "종가 강도", "투자자 수급",
+                 "진입 판정: 차단", "익일 시나리오", "주의 신호"):
+        assert must in t, must
+
+
+def test_report_text_scenarios_dict_not_raw_dumped():
+    t = rr.build_report_text(_full_report())
+    assert "{'up'" not in t            # raw dict repr 금지
+    assert "- 상승: 반도체 랠리 연장" in t
+    assert "- 트리거: 미국 증시" in t
+
+
+def test_report_text_respects_sample_discipline():
+    # n<40 성적은 숫자 대신 '측정중'만
+    t = rr.build_report_text(_full_report())
+    assert "측정중" in t
+    assert "85" not in t.split("자가학습")[-1]  # 85.7% 노출 안 함
+
+
+def test_report_text_regime_anchor_disclosed():
+    t = rr.build_report_text(_full_report())
+    assert "단일 상승레짐" in t          # 복사본에도 레짐 편향 고지
+
+
+def test_copy_widget_and_script_in_render():
+    r2 = dict(_full_report(), id="kosdaq-close", label="장마감전 분석", group="코스닥")
+    html = rr.render({"trade_date": "2026-08-27", "reports": [_full_report(), r2]})
+    assert html.count('class="copy-btn"') >= 2      # 코스피·코스닥 뷰 각각
+    assert html.count('class="copy-src"') >= 2
+    assert "window.__copyReport" in html
+
+
 def test_accuracy_hidden_under_40():
     r = {"accuracy": {"n": 7, "hit_rate": 0.857, "overnight_hit_rate": 0.25,
                       "overnight_n": 4}}
