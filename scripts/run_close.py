@@ -587,12 +587,15 @@ def build_report(cfg: dict, ls, client, conn, env, session_of: dict,
         rep["confidence"] = round(base_conf * sample_factor, 2)
         rep["confidence_sample_n"] = n
         # 산식 투명화(평가 지적: 표본 0인데 신뢰도가 나오는 근거 불명확). 신뢰도는 '검증 실적'이
-        # 아니라 데이터품질(완전성×신호일치도)을 검증표본 부족으로 할인한 값임을 노출.
+        # 아니라 **데이터 품질(완전성)**을 검증표본 부족으로 할인한 값임을 노출.
+        # 신호 일치도는 2026-08-28 부터 신뢰도 곱에서 빠졌다(p_up 수축으로만 반영 — 이중계상 제거).
         rep["confidence_detail"] = {
             "completeness": rep.get("data_completeness"),
-            "agreement": rep.get("signal_agreement"),
             "sample_factor": round(sample_factor, 2),
             "n": n, "min_sample": min_sample,
+            "agreement_note": (
+                f"신호 일치도 {(rep.get('signal_agreement') or 0):.0%} 는 신뢰도에 곱하지 않는다 "
+                f"— 익일확률 수축으로 이미 반영(이중계상 제거)"),
         }
     rep["entry"] = strategy.entry_decision(rep, appcfg)
     rep["lifecycle"] = strategy.resolve_lifecycle(
@@ -800,6 +803,15 @@ def main() -> int:
                   f"· 외국인 {fs} 기관 {ins} "
                   f"· 결측 {miss or '없음'} · 제외 {excl or '없음'}")
             print(f"    서술: {trace}")
+            # 무성 LLM 열화 경보(2026-08-28): '계산·검증'(Gemini) 담당이 몇 주간 조용히 죽어
+            # 있었는데 로그 한 줄 말고는 아무 신호가 없었다. 키가 있는데 실행 실패면 경보로 승격.
+            for eng in ("Gemini", "Claude", "검증"):
+                if any(t.startswith(f"{eng} 미실행") or t.startswith(f"{eng} 미실행(")
+                       for t in rep.get("narrative", {}).get("engine_trace", [])):
+                    why = next((t for t in rep["narrative"]["engine_trace"]
+                                if t.startswith(f"{eng} 미실행")), eng)
+                    if "no key" not in why:      # 키 미설정은 의도된 구성 → 경보 아님
+                        _alert(f"{cfg['label']} 서술 LLM 열화 — {why}")
 
     # ── 리포트 자가비평: 규칙 기반 + Gemini(최신) 비평을 DB 누적 + 리포트 첨부 ──
     # conn 이 닫히기 전에 실행(review_digest 조회 포함). 실패해도 파이프라인은 계속.

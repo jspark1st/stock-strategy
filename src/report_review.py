@@ -2,7 +2,7 @@
 
 두 계층:
   (a) 규칙 기반(rule) — 결정론·재현 가능·환각 없음. 이 프로젝트가 실제로 겪은 표시/정합 함정을
-      코드로 검사한다(게이트↔사이징 모순, 신뢰도 0, 캘리브 기울기 하한, 판별 미확보, 실거래↔라벨
+      코드로 검사한다(게이트↔사이징 모순, 신뢰도 0(데이터), 캘리브 기울기 하한, 판별 미확보, 실거래↔라벨
       괴리, 재료 상시 제외, 교차시장 확률 역전 등). **신뢰 핵심.**
   (b) LLM 비평(llm) — 최신 Gemini(고급) 가 보고서 팩트만 근거로 추가 비평(수치 날조 금지). 보조.
 
@@ -75,12 +75,15 @@ def _per_report_rules(r: dict) -> list[dict]:
                       "게이트/진입판정이 차단인데 ATR 타점 켈리 비중이 남아 있어 화면이 모순될 수 있다.",
                       f"kelly_pct={prim.get('kelly_pct')}"))
 
-    # R2 신뢰도 0 — 신호 완전 불일치(부족)
-    if r.get("confidence") == 0 or cd.get("agreement") == 0:
+    # R2 신뢰도 0 — 데이터 품질 결손(부족).
+    # 2026-08-28 전: 신호 일치도가 신뢰도에 곱해져 '완전 혼재 = 신뢰도 0 = 영구 차단'이었다.
+    # 이제 신뢰도는 데이터 품질만 뜻하므로 0 이면 진짜로 데이터가 없는 것이다(별개 사건).
+    # 신호 혼재 자체는 아래 R8(관측)이 계속 잡는다.
+    if r.get("confidence") == 0:
         out.append(_f("rule", "부족", "confidence_zero", "med",
-                      "신뢰도 0(신호 완전 혼재)",
-                      "신호 일치도 0으로 방향 확신이 없다 — 진입 임계에서 자동 차단되나, 리포트가 방향을 단정하지 않도록 주의.",
-                      f"agreement={cd.get('agreement')}, confidence={r.get('confidence')}"))
+                      "신뢰도 0(데이터 품질 결손)",
+                      "완전성·표본보정 곱이 0 — 데이터가 사실상 없다. 방향을 단정하면 안 된다.",
+                      f"completeness={cd.get('completeness')}, confidence={r.get('confidence')}"))
 
     # R3 캘리브 기울기 하한 — 총점이 확률에 영향 못 줌(레짐 관측)
     a = cal.get("a")
@@ -124,7 +127,7 @@ def _per_report_rules(r: dict) -> list[dict]:
 
     # R8 신호 혼재(관측)
     sa = r.get("signal_agreement")
-    if sa is not None and sa < 0.2 and not (r.get("confidence") == 0 or cd.get("agreement") == 0):
+    if sa is not None and sa < 0.2 and r.get("confidence") != 0:
         out.append(_f("rule", "관측", "mixed_signals", "low",
                       "항목 신호 혼재(상·하방 섞임)",
                       "서브스코어가 방향으로 정렬되지 않아 방향 확신이 낮다.",

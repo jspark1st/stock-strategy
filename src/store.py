@@ -146,11 +146,14 @@ CREATE TABLE IF NOT EXISTS report_review (
 VOL_FACTOR_DEFAULT = {"KOSPI": 0.93, "KOSDAQ": 0.96}
 MIN_VOL_SAMPLES = 8
 
-# 목표 레이블 고정(evaluation2 P0-6): 방향 모델의 '익일 상승/하락' 공식 정의.
-# = **다음 거래일 종가 수익률 부호**(realized_up = outcome_chg_pct > 0). 코드·UI·백테스트가
-# 이 하나만 쓴다. ATR 목표·손절 '도달 확률'은 이것과 다른 값(별도 path model, 미구현)이며,
-# 방향확률을 손익비 승률로 대체하지 않는다.
-DIRECTION_LABEL = "next_close_return_sign"
+# 목표 레이블 고정(evaluation2 P0-6) — **2026-08-28 전환**: 주 라벨 = 실제 거래 지평.
+# = **종가매수 → 익일 시가매도 수익률 부호**(overnight_correct / outcome_open_chg_pct > 0).
+# 전환 이유: 전략은 close→open 인데 채점은 close→close 였다. 라이브 실측에서 둘이 갈렸고
+# (라벨 75% n16 vs 실거래 30% n10) 표본이 늘어도 방향이 유지됐다 → 라벨이 틀린 것.
+# close→close(realized_up/correct)는 **폐기하지 않고 보조로 계속 기록**한다(캘리브 연속성·
+# 과거 표본 비교). 캘리브레이션·성적·게이트는 이제 주 라벨(open)을 쓴다.
+DIRECTION_LABEL = "next_open_return_sign"
+SECONDARY_LABEL = "next_close_return_sign"
 
 
 # 기존 DB에 나중에 추가된 컬럼 — CREATE TABLE IF NOT EXISTS 로는 안 붙으므로 명시 마이그레이션.
@@ -158,10 +161,16 @@ DIRECTION_LABEL = "next_close_return_sign"
 # close→open)의 실측을 close→close 라벨 옆에 **나란히** 기록한다(파괴 아님). 방향 라벨(캘리브레이션)
 # 은 여전히 next_close 이지만, 이 컬럼이 쌓이면 '실제 거래 지평'의 정답률을 별도로 측정·비교할 수
 # 있다(백테스트 exp_paper 가 드러낸 지평 불일치를 라이브 채점으로도 관측). open item #1.
+# entry_allow / entry_blocked: **진입 게이트 판정을 매 회차 기록**한다(2026-08-28).
+# 이게 없어서 '게이트가 7주 내내 한 번도 열리지 않았다'는 사실을 아무도 몰랐다 —
+# paper_trades 가 0행인 이유가 시장 탓인지 지표 버그인지 사후 구분이 불가능했다.
+# 이제 통과율·차단사유가 DB에 남고 health_check 가 '연속 0회 통과'를 경보한다.
 _MIGRATIONS = [("daily", "p_up_raw", "REAL"),
                ("daily", "mfe_pct", "REAL"), ("daily", "mae_pct", "REAL"),
                ("daily", "outcome_open_chg_pct", "REAL"),
-               ("daily", "overnight_correct", "INTEGER")]
+               ("daily", "overnight_correct", "INTEGER"),
+               ("daily", "entry_allow", "INTEGER"),
+               ("daily", "entry_blocked", "TEXT")]
 
 
 def connect(path: str | Path) -> sqlite3.Connection:
@@ -249,6 +258,11 @@ def record_prediction(conn: sqlite3.Connection, rep: dict, created_at: str,
         "flows_json": json.dumps(rep.get("flows", {}), ensure_ascii=False),
         "narrative_json": json.dumps(rep.get("narrative", {}), ensure_ascii=False),
     }
+    # 진입 게이트 판정 각인 — 통과율/차단사유를 사후 측정 가능하게(딕트 없으면 미기록).
+    ent = rep.get("entry")
+    if isinstance(ent, dict) and ent.get("allow") is not None:
+        row["entry_allow"] = 1 if ent.get("allow") else 0
+        row["entry_blocked"] = ",".join(ent.get("blocked_reasons") or [])
     cols = ",".join(row)
     ph = ",".join(f":{k}" for k in row)
     upd = ",".join(f"{k}=excluded.{k}" for k in row if k not in
@@ -381,7 +395,8 @@ def accuracy(conn: sqlite3.Connection, market: str, report_type: str = "close",
         extra = " AND slot IN (" + ",".join("?" * len(slots)) + ")"
         extra_args = list(slots)
     cur = conn.execute(
-        "SELECT p_up, realized_up, correct, brier, overnight_correct FROM daily "
+        "SELECT p_up, realized_up, correct, brier, overnight_correct, "
+        "outcome_open_chg_pct FROM daily "
         "WHERE market=? AND report_type=? AND graded_at IS NOT NULL" + extra +
         " ORDER BY trade_date DESC LIMIT ?",
         (market, report_type, *extra_args, window))
@@ -391,7 +406,11 @@ def accuracy(conn: sqlite3.Connection, market: str, report_type: str = "close",
         return {"n": 0, "hit_rate": None, "mean_brier": None,
                 "pred_mean_p_up": None, "realized_up_rate": None,
                 "calibration_bias": None,
-                "overnight_hit_rate": None, "overnight_n": 0}
+                "overnight_hit_rate": None, "overnight_n": 0,
+                "primary_horizon": DIRECTION_LABEL, "primary_hit_rate": None,
+                "primary_n": 0, "primary_brier": None,
+                "primary_realized_up_rate": None, "primary_calibration_bias": None,
+                "secondary_hit_rate": None, "secondary_n": 0}
     # 적중률 분모는 **방향을 낸 행(correct 존재)만** — p_up=None(데이터부족) 채점행이 분모에
     # 섞이면 적중률이 부당하게 낮아진다(그 행은 correct=None 이라 분자엔 안 들어가므로).
     graded_dir = [r["correct"] for r in rows if r["correct"] is not None]
@@ -403,35 +422,100 @@ def accuracy(conn: sqlite3.Connection, market: str, report_type: str = "close",
     pred_mean = sum(p_ups) / len(p_ups) if p_ups else None
     real_rate = sum(ups) / len(ups) if ups else None
     bias = (pred_mean - real_rate) if (pred_mean is not None and real_rate is not None) else None
-    # 실제 거래 지평(종가매수→익일 시가매도) 방향 정답률 — close→close 옆에 나란히.
+    # ── 주 지평(실제 거래: 종가매수→익일 시가매도) ─────────────────────────
+    # 2026-08-28 부터 이쪽이 '성적'이다. close→close 는 보조로 계속 병기.
     ov = [r["overnight_correct"] for r in rows if r["overnight_correct"] is not None]
+    ov_pairs = [(r["p_up"], 1 if r["outcome_open_chg_pct"] > 0 else 0) for r in rows
+                if r["p_up"] is not None and r["outcome_open_chg_pct"] is not None]
+    ov_brier = (sum((p - y) ** 2 for p, y in ov_pairs) / len(ov_pairs)) if ov_pairs else None
+    ov_real = (sum(y for _, y in ov_pairs) / len(ov_pairs)) if ov_pairs else None
+    ov_pred = (sum(p for p, _ in ov_pairs) / len(ov_pairs)) if ov_pairs else None
+    ov_bias = (ov_pred - ov_real) if (ov_pred is not None and ov_real is not None) else None
+    prim_hit = round(sum(ov) / len(ov), 3) if ov else None
     return {
         "n": n,
+        # 주 지평(실거래) — 화면·경보·캘리브가 이 값을 쓴다.
+        "primary_horizon": DIRECTION_LABEL,
+        "primary_hit_rate": prim_hit,
+        "primary_n": len(ov),
+        "primary_brier": round(ov_brier, 4) if ov_brier is not None else None,
+        "primary_realized_up_rate": round(ov_real, 3) if ov_real is not None else None,
+        "primary_calibration_bias": round(ov_bias, 3) if ov_bias is not None else None,
+        # 보조 지평(close→close, 구 라벨) — 연속성·과거 비교용.
+        "secondary_hit_rate": round(hits / n_dir, 3) if n_dir else None,
+        "secondary_n": n_dir,
+        # 하위호환 키(기존 화면/테스트) — hit_rate 는 여전히 close→close 를 가리킨다.
         "hit_rate": round(hits / n_dir, 3) if n_dir else None,
         "mean_brier": round(sum(briers) / len(briers), 4) if briers else None,
         "pred_mean_p_up": round(pred_mean, 3) if pred_mean is not None else None,
         "realized_up_rate": round(real_rate, 3) if real_rate is not None else None,
         "calibration_bias": round(bias, 3) if bias is not None else None,
-        "overnight_hit_rate": round(sum(ov) / len(ov), 3) if ov else None,
+        "overnight_hit_rate": prim_hit,
         "overnight_n": len(ov),
     }
 
 
+def gate_stats(conn: sqlite3.Connection, market: str | None = None,
+               report_type: str = "close", window: int = 30) -> dict:
+    """진입 게이트 통과율 + 차단사유 빈도(2026-08-28).
+
+    '게이트가 구조적으로 절대 안 열리는' 상태를 사후가 아니라 **상시** 드러내기 위한 지표.
+    통과 0회가 이어지면 시장이 나빠서인지 지표가 고장나서인지 차단사유 분포로 판별한다.
+    """
+    args: list = []
+    where = "report_type=? AND entry_allow IS NOT NULL"
+    args.append(report_type)
+    if market:
+        where += " AND market=?"
+        args.append(market)
+    else:
+        where += " AND market IN ('KOSPI','KOSDAQ')"
+    rows = conn.execute(
+        f"SELECT entry_allow, entry_blocked FROM daily WHERE {where} "
+        f"ORDER BY trade_date DESC, market LIMIT ?", (*args, window)).fetchall()
+    n = len(rows)
+    passed = sum(r["entry_allow"] for r in rows)
+    reasons: dict[str, int] = {}
+    for r in rows:
+        for why in (r["entry_blocked"] or "").split(","):
+            why = why.strip()
+            if why:
+                reasons[why] = reasons.get(why, 0) + 1
+    return {
+        "n": n, "passed": passed,
+        "pass_rate": round(passed / n, 3) if n else None,
+        "blocked_reasons": dict(sorted(reasons.items(), key=lambda kv: -kv[1])),
+    }
+
+
 def fit_calibrator(conn: sqlite3.Connection, market: str, report_type: str = "close",
-                   min_n: int | None = None) -> dict | None:
-    """채점된 (total, realized_up) 이력으로 적응형 확률 캘리브레이션을 적합한다.
+                   min_n: int | None = None, label: str = "open") -> dict | None:
+    """채점된 (total, 실현방향) 이력으로 적응형 확률 캘리브레이션을 적합한다.
 
     라이브 총점 정의 그대로 학습하므로 부트스트랩(재구성 근사)보다 정확 → 우선한다.
     표본이 min_n 미만이면 None(→ 파이프라인이 부트스트랩/ SoT 로 폴백).
+
+    label: "open" = **주 라벨**(종가→익일 시가, 실제 거래 지평 · 2026-08-28 전환).
+           "close" = 구 라벨(종가→종가). 비교·회귀용으로만 남긴다.
+    확률이 '무엇의 확률인가'를 실제 청산 방식과 일치시키는 게 이 인자의 목적이다 —
+    close→close 로 적합한 확률로 시가에 파는 건 다른 분포에 베팅하는 것이었다.
     """
     from . import calibration
-    rows = conn.execute(
-        "SELECT total, realized_up FROM daily "
-        "WHERE market=? AND report_type=? AND graded_at IS NOT NULL "
-        "AND total IS NOT NULL AND realized_up IS NOT NULL",
-        (market, report_type)).fetchall()
-    pairs = [(r["total"], r["realized_up"]) for r in rows]
-    return calibration.fit(pairs, source="store",
+    if label == "open":
+        rows = conn.execute(
+            "SELECT total, outcome_open_chg_pct AS chg FROM daily "
+            "WHERE market=? AND report_type=? AND graded_at IS NOT NULL "
+            "AND total IS NOT NULL AND outcome_open_chg_pct IS NOT NULL",
+            (market, report_type)).fetchall()
+        pairs = [(r["total"], 1 if r["chg"] > 0 else 0) for r in rows]
+    else:
+        rows = conn.execute(
+            "SELECT total, realized_up FROM daily "
+            "WHERE market=? AND report_type=? AND graded_at IS NOT NULL "
+            "AND total IS NOT NULL AND realized_up IS NOT NULL",
+            (market, report_type)).fetchall()
+        pairs = [(r["total"], r["realized_up"]) for r in rows]
+    return calibration.fit(pairs, source=f"store:{label}",
                            min_n=min_n if min_n is not None else calibration.MIN_N)
 
 

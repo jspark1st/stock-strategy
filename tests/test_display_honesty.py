@@ -69,8 +69,8 @@ def test_accuracy_promotes_real_trade_horizon():
     assert "라벨 적중률" in html
     # 실거래 지평이 라벨보다 **앞**에 온다(주지표)
     assert html.index("실거래 적중률") < html.index("라벨 적중률")
-    # 라벨은 '실행 아님'을 명시
-    assert "실행 아님" in html
+    # 라벨(종가→종가)은 '보조/구 라벨'로 강등 표기
+    assert "구 라벨" in html
 
 
 # ── C. 레짐 편향 고지 ────────────────────────────────────────────────

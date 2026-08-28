@@ -265,6 +265,57 @@ def perplexity_research(ctx: dict, env: dict) -> dict | None:
 
 
 # ── 2) Gemini 1차 초안 + 교차검증 ─────────────────────────────────────────
+# ── Gemini 공용 호출기 (2026-08-28) ───────────────────────────────────────────
+# 왜 생겼나: `gemini_draft` 가 프로덕션에서 **조용히 죽어 있었다**. 사고(thinking) 토큰이
+# maxOutputTokens(1400)를 통째로 먹어 finishReason=MAX_TOKENS + 본문 0자 → `parts` KeyError →
+# `except: continue` → 3개 모델 전멸 → None. 로그엔 "Gemini 미실행" 한 줄뿐이라 몇 주간
+# '계산·검증' 담당 LLM 없이 리포트가 나갔다(2026-08-28 평가에서 발견).
+# 대책: ① 사고예산 0 우선 시도(미지원 모델이면 재시도) ② 출력 토큰 상향 ③ 빈 응답을 성공으로
+# 취급하지 않음 ④ 실패 사유를 _LAST_ERROR 에 남겨 파이프라인이 경보로 승격할 수 있게.
+GEMINI_MAX_TOKENS = 8192
+
+
+def gemini_call(sys_prompt: str, prompt: str, env: dict,
+                max_tokens: int = GEMINI_MAX_TOKENS) -> str | None:
+    """Gemini 호출 — 성공 시 본문 텍스트, 실패 시 None(+_LAST_ERROR['gemini'] 기록)."""
+    key = env.get("google_gemini_api")
+    if not key:
+        _LAST_ERROR["gemini"] = "no key"
+        return None
+    base = {"contents": [{"role": "user", "parts": [{"text": prompt}]}],
+            "systemInstruction": {"parts": [{"text": sys_prompt}]}}
+    last = "unknown"
+    for model in resolve_models(env)["gemini"]:
+        # 사고예산 0 → 실패 시 사고 허용(+큰 출력예산). 순서가 중요하다: 초안 작성엔 사고가
+        # 필수가 아닌데, 사고가 켜지면 예산 대부분을 먹고 본문이 잘린다.
+        for cfg in ({"temperature": 0.3, "maxOutputTokens": max_tokens,
+                     "thinkingConfig": {"thinkingBudget": 0}},
+                    {"temperature": 0.3, "maxOutputTokens": max_tokens}):
+            try:
+                r = httpx.post(GEMINI_URL.format(model=model), params={"key": key},
+                               json={**base, "generationConfig": cfg}, timeout=TIMEOUT)
+                if r.status_code == 404:
+                    last = "404 model"
+                    break                      # 이 모델은 없음 → 다음 모델
+                if r.status_code == 400 and "thinking" in r.text.lower():
+                    last = "400 thinkingConfig"
+                    continue                   # 사고예산 미지원 → 사고 허용으로 재시도
+                r.raise_for_status()
+                data = r.json()
+                cand = (data.get("candidates") or [{}])[0]
+                text = "".join(p.get("text", "")
+                               for p in (cand.get("content") or {}).get("parts", []))
+                if text.strip():
+                    _LAST_ERROR.pop("gemini", None)
+                    return text
+                # 본문 0자 = 실패다. 사고에 예산을 다 쓴 경우가 대부분.
+                last = f"empty({cand.get('finishReason')})"
+            except Exception as e:  # noqa — 다음 설정/모델
+                last = type(e).__name__
+    _LAST_ERROR["gemini"] = last
+    return None
+
+
 def gemini_draft(ctx: dict, research: dict | None, env: dict,
                  facts_fn=None) -> str | None:
     key = env.get("google_gemini_api")
@@ -284,22 +335,7 @@ def gemini_draft(ctx: dict, research: dict | None, env: dict,
         "1) 오늘 시장 성격  2) 익일 상승 시나리오  3) 익일 하락 시나리오\n"
         "4) 실시간 주의 신호(경계 리스크)  5) 주요 재료(호재/악재)\n"
         "6) 매매 결론(총점·p_up·ATR edge 근거로 매수/분할매수/관망/현금 중 택1).")
-    payload = {"contents": [{"role": "user", "parts": [{"text": prompt}]}],
-               "systemInstruction": {"parts": [{"text": sys}]},
-               "generationConfig": {"temperature": 0.3, "maxOutputTokens": 1400}}
-    for model in resolve_models(env)["gemini"]:
-        try:
-            r = httpx.post(GEMINI_URL.format(model=model), params={"key": key},
-                           json=payload, timeout=TIMEOUT)
-            if r.status_code == 404:
-                continue
-            r.raise_for_status()
-            data = r.json()
-            parts = data["candidates"][0]["content"]["parts"]
-            return "".join(p.get("text", "") for p in parts)
-        except Exception:  # noqa — 다음 모델/포기
-            continue
-    return None
+    return gemini_call(sys, prompt, env)
 
 
 # ── 3) Claude 최종 합성 + 수치검수 ────────────────────────────────────────
@@ -518,7 +554,8 @@ def build_narrative(ctx: dict, env: dict | None = None) -> Narrative:
         trace.append("Perplexity 미실행")
 
     draft = gemini_draft(ctx, research, env)
-    trace.append("Gemini 초안 ✓" if draft else "Gemini 미실행")
+    trace.append("Gemini 초안 ✓" if draft
+                 else f"Gemini 미실행({_LAST_ERROR.get('gemini', 'no key')})")
 
     final = claude_synthesize(ctx, research, draft, env)
     trace.append("Claude 합성 ✓" if final
@@ -608,7 +645,8 @@ def build_preopen(ctx: dict, env: dict | None = None) -> Narrative:
     if research:
         sources.extend(research.get("sources", []))
     draft = gemini_draft(ctx, research, env)
-    trace.append("검증 ✓" if draft else "검증 미실행")
+    trace.append("검증 ✓" if draft
+                 else f"검증 미실행({_LAST_ERROR.get('gemini', 'no key')})")
     final = claude_synthesize(ctx, research, draft, env, sys=_PREOPEN_SYS)
     trace.append("종합 ✓" if final
                  else f"종합 미실행({_LAST_ERROR.get('claude', 'no key')})")
@@ -804,22 +842,9 @@ def build_btc(ctx: dict, env: dict | None = None) -> Narrative:
                   + (("\n\n[리서치]\n" + research["text"]) if research else "")
                   + "\n\nA) p_long↔총점, 사분면 vs 서술, 게이트 vs 결론, RR·PnL 정합.\n"
                   "B) LONG/SHORT/FLAT 시나리오 초안. 새 수치 금지.")
-        payload = {"contents": [{"role": "user", "parts": [{"text": prompt}]}],
-                   "systemInstruction": {"parts": [{"text": orig_sys_note}]},
-                   "generationConfig": {"temperature": 0.3, "maxOutputTokens": 1400}}
-        for model in resolve_models(env)["gemini"]:
-            try:
-                r = httpx.post(GEMINI_URL.format(model=model), params={"key": key},
-                               json=payload, timeout=TIMEOUT)
-                if r.status_code == 404:
-                    continue
-                r.raise_for_status()
-                parts = r.json()["candidates"][0]["content"]["parts"]
-                draft = "".join(p.get("text", "") for p in parts)
-                break
-            except Exception:  # noqa
-                continue
-    trace.append("Gemini 초안 ✓" if draft else "Gemini 미실행")
+        draft = gemini_call(orig_sys_note, prompt, env)
+    trace.append("Gemini 초안 ✓" if draft
+                 else f"Gemini 미실행({_LAST_ERROR.get('gemini', 'no key')})")
     final = claude_synthesize(ctx, research, draft, env, sys=_BTC_CLAUDE_SYS,
                               facts_fn=btc_facts_block)
     trace.append("Claude 합성 ✓" if final

@@ -3,13 +3,14 @@
 
 라이브 store 채점이력이 N≥40 쌓이기 전까지 즉시 쓸 **프라이어**를 만든다. 하네스 재구성
 (과거 실데이터)으로 총점→익일방향을 적합해 `data/calibration.json` 에 저장한다.
+**2026-08-28: 주 라벨을 실거래 지평(종가→익일 시가, overnight_label)으로 전환.**
 run_close 는 store 학습치 > 이 부트스트랩 > SoT 폴백 순으로 캘리브레이터를 고른다.
 
 주의(문서화된 근사): 부트스트랩 총점은 재구성 가능한 코어 4팩터(close·flow·amt·quant)
 가중합이라, 라이브 총점(시장폭·재료 포함)과 스케일이 약간 다르다. 그래도 고정 시그모이드의
 검증된 비관편향(walk-forward Brier 0.30→0.24)보다 낫고, store 학습치가 쌓이면 대체된다.
 
-실행: .venv/bin/python scripts/fit_calibration.py [--count 250] [--report-type close]
+실행: .venv/bin/python scripts/fit_calibration.py [--count 250] [--report-type close] [--label open]
 캐시(out/backtest_samples_<MK>.json)가 있으면 재사용, 없으면 네이버에서 재구성.
 """
 from __future__ import annotations
@@ -55,6 +56,8 @@ def main() -> int:
     argv = sys.argv[1:]
     count = int(argv[argv.index("--count") + 1]) if "--count" in argv else 250
     rtype = argv[argv.index("--report-type") + 1] if "--report-type" in argv else "close"
+    # --label open(기본, 실거래 지평) | close(구 라벨, 비교용)
+    label = argv[argv.index("--label") + 1] if "--label" in argv else "open"
 
     table: dict = {}
     if DEST.exists():
@@ -66,8 +69,12 @@ def main() -> int:
     with naver._client() as c:
         for mk in MARKETS:
             s = _samples(mk, count, c)
-            pairs = [(backtest.predict(x, CORE_WEIGHTS)[0], x["label"]) for x in s]
-            calib = calibration.fit(pairs, source="bootstrap")
+            # 주 라벨 = 실제 거래 지평(종가→익일 시가). 2026-08-28 전환 — 구 라벨(close→close)
+            # 로 적합한 확률로 시가에 파는 건 다른 분포에 베팅하는 것이었다(라이브 괴리 45%p).
+            key = "overnight_label" if label == "open" else "label"
+            pairs = [(backtest.predict(x, CORE_WEIGHTS)[0], x[key]) for x in s
+                     if x.get(key) is not None]
+            calib = calibration.fit(pairs, source=f"bootstrap:{label}")
             if calib is None:
                 print(f"{mk}: 적합 실패(표본 {len(s)}, min_n={calibration.MIN_N}) — 건너뜀")
                 continue

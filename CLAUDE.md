@@ -124,6 +124,45 @@ end-to-end 플로우(상태머신·학습루프·스코어링 파이프·크로�
   (`news_not_applicable`) → 완전성 100% 유지 + 10% 가중을 실제 팩터로 재배분(감사 지적 해소).
   `models.CloseInputs`·`scoring.score_close`·`run_close` 배선. `test_scoring.py` +2.
 
+## 2026-08-28 — 전면 재평가(63/100) 후 구조 결함 5건 수정 (테스트 292→305)
+
+라이브 DB·로그·실측으로 시스템 전체를 재평가(`guide_docs/source/evaluation6.md`). 문서 주장이
+아니라 **측정**으로 검증한 결과 구조 결함 5건이 나왔고, 사용자 승인하 순서대로 전부 수정.
+브랜치 `fix/gate-and-horizon`.
+
+- 🔴 **① 진입 게이트가 구조적으로 절대 안 열렸다(7주 통과 0회 · paper_trades 0행)**
+  `confidence = 완전성 × 신호일치도` 인데 일치도는 `min(bull_w,bear_w) ≥ 0.35` 면 **0 으로 포화** —
+  코어 5~6팩터 분포에선 평상시가 그렇다(8/28 양 시장 모두 일치도 0.00 → 신뢰도 0.00 → 영구차단).
+  불일치는 **이미 p_up 을 최대 20% 수축**시키고 게이트가 그 p_up 에 확률 임계를 또 건다 = 이중계상.
+  → `confidence = 데이터 완전성`(× 표본보정)으로 정정. **임계(min_confidence 0.5)는 안 건드림** —
+  통과율을 올리려는 완화가 아니라 지표의 중복 정의를 고친 것. 확률·등급 게이트는 그대로 차단한다.
+  → `daily.entry_allow`·`entry_blocked` 컬럼 신설(멱등 마이그레이션, 라이브 DB 적용 완료) +
+  `store.gate_stats()` + health_check 가 **연속 10회 통과 0 이면 경보**. 재발을 사람이 아니라
+  시스템이 발견한다(이번엔 7주간 아무도 몰랐다).
+- 🔴 **② 채점 주 라벨을 실거래 지평(종가→익일 시가)으로 전환** — 전략은 close→open 인데 채점은
+  close→close 였다. 라이브 괴리가 **라벨 75%(n16) vs 실거래 30%(n10)**, 표본이 늘어도 방향 유지 →
+  라벨이 틀린 것. `store.DIRECTION_LABEL = next_open_return_sign`, `accuracy()` 가 `primary_*`
+  (open) / `secondary_*`(close) 로 분리, `fit_calibrator(label="open")` 기본, 부트스트랩도
+  `overnight_label` 로 재적합(`fit_calibration.py --label`). close→close 는 **폐기 않고 보조 기록**.
+  ⚠ 재적합 결과 **양 시장 모두 기울기가 하한(0.005)에 고착**, KOSDAQ 은 **원시 기울기 −0.0106(역방향)**
+  → 총점은 어느 지평에서도 방향 정보를 갖지 않는다(단일레짐 149표본 기준).
+- 🟢 **③ 학습 DB 백업**(`scripts/backup_db.py` + `auto_backup.sh`, cron `30 23 * * *` + auto_final).
+  sqlite 온라인 백업 API(쓰기 중에도 일관) → `PRAGMA integrity_check` → gzip → 14벌 순환.
+  저장은 **repo 밖** `~/overnight_report_backups`(`.env` 의 `backup_dir` 로 변경). 검증 실패분은
+  남기지 않는다(깨진 백업이 '있다'가 더 위험). 복원 검증 완료(daily 47행·integrity ok).
+- 🟡 **④ Gemini(계산·검증 담당)가 프로덕션에서 무성 사망해 있었다** — `maxOutputTokens=1400` 을
+  **사고(thinking) 토큰 1,349가 먹어** finishReason=MAX_TOKENS·본문 0자 → `parts` KeyError →
+  `except: continue` → 3모델 전멸 → None. 로그엔 "Gemini 미실행" 한 줄뿐. 3-LLM 분업이 실제로는
+  2-LLM 이었고 빠진 게 하필 수치 정합성 교차검증. → `llm.gemini_call()` 공용 호출기(사고예산 0
+  우선 → 미지원이면 재시도, 출력 8192, **빈 응답을 성공으로 취급 안 함**, `_LAST_ERROR` 기록) +
+  run_close 가 키가 있는데 실패면 `_alert` 경보. 라이브 호출로 복구 확인. BTC 서술도 같은 버그라
+  호출부만 교체(스코어링·게이트 미변경 — BTC 잠금 준수).
+- 🟡 **⑤ p_up 헤드라인 격하** — 캘리브 기울기 하한 고착이면 그 값은 예측이 아니라 **기저율 상수**다
+  (총점 전 구간이 만드는 확률 폭 KOSPI 8.8%p·KOSDAQ 7.5%p). `calibration.fit` 이 `slope_at_floor`·
+  `prob_span_pp`·`raw_slope` 를 내고, 렌더가 라벨 자체를 **'상승 기저율(예측 아님)'** 로 낮춘다.
+  정상 캘리브면 라벨은 **'익일 시가 상승 확률'**(지평을 라벨에 각인 — 익일 '종가'가 아니다).
+- 테스트 +13 (`tests/test_gate_and_horizon.py` — 5건 전부 회귀 고정). **305 passed.**
+
 ## Claude Code 인수인계 (2026-08-22 11:20 KST) — 여기부터 읽어라
 
 어제(8/21)부터 오늘 오전까지 Cursor 에서 한 작업. **주식과 BTC를 섞지 마라.**
@@ -131,7 +170,7 @@ BTC 상세는 **HANDOFF_BTC.md** (이 파일의 주식 로그보다 그쪽이 So
 
 ### 지금 서버·repo
 - **KS6F-JNT-3-VM-1** `~/overnight_report` (구 KS5F `~/stock_strategy` 는 폐기).
-- Python은 **`.venv/bin/python`** (시스템 python3 에 pytest/httpx 없음). 테스트 **250 passed** (2026-08-25, `.venv`).
+- Python은 **`.venv/bin/python`** (시스템 python3 에 pytest/httpx 없음). 테스트 **305 passed** (2026-08-28, `.venv`).
 - 라이브: https://easystock-junaitech.vercel.app — `public/index.html` push → Vercel.
 - 마지막 사이트 배포: `2ee469a` (2026-08-22 11:11, HTML만).
 
@@ -231,7 +270,7 @@ cd out && python3 -m http.server 8931 --bind 127.0.0.1
 #   then open http://127.0.0.1:8931/report_<date>.html
 
 # Tests — 반드시 .venv (시스템 python3 엔 pytest/httpx 없음)
-.venv/bin/python -m pytest tests/ -q                       # 250 passed (2026-08-25)
+.venv/bin/python -m pytest tests/ -q                       # 305 passed (2026-08-28)
 .venv/bin/python -m pytest tests/test_scoring.py -q         # scoring engine only
 .venv/bin/python -m pytest tests/test_scoring.py::<name> -q # single test
 ```
@@ -701,6 +740,13 @@ open#0ⓐ('다레짐 재검증')를 **자동화**. 크론은 매일 예측·채�
   - 테스트 +5(`test_revalidate.py`: AUC·metrics·추세화살표·blend 재정규화). 총 **263 통과**.
 
 ### 이어서 할 곳 (open items)
+0-A. **[신설·최우선] 신 게이트 통과분 손익 축적** — 게이트가 7주 만에 열렸다(구 0/18 → 신 3/18).
+   paper L1 이 이제 표본을 쌓는다. **L2 승격 판단은 비용 차감 순손익으로만**, 현재 n=2 로 아무 말도
+   하지 말 것. `store.gate_stats()` · health_check(연속 10회 0이면 경보)로 감시.
+0-B. **[신설] KOSDAQ 캘리브 원시 기울기 음(−0.0106)** — 총점이 실거래 지평에서 **역방향**이며 하한
+   클램프가 가려주는 중. 다음 재적합에서도 유지되면 KOSDAQ 총점 구성 자체를 재검토(클램프는 방어지
+   해결이 아니다). 월간 `auto_revalidate` 가 관측. 상세 `guide_docs/source/evaluation6.md`.
+
 0. **[최우선] 방향예측 — 판별력(AUC) 계속** — 5차 처리분: 캘리브레이션(비관편향, 양시장) + **가드된
    KOSDAQ 거래량 틸트**(walk-forward AUC 0.488→0.577). 남은 것:
    ⓐ **다레짐 재검증**(핵심) — 캘리브레이터·vol_tilt·KOSDAQ flow 역전 모두 2026 상반기 **단일 상승레짐**

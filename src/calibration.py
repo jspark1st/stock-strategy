@@ -79,7 +79,16 @@ def fit(pairs: list[tuple[float, int]], l2: float = 1.0, iters: int = 5000,
     # 신호가 약/역이어도 절편(b)이 캘리브레이션을 담당 → SoT 비관편향으로 되돌아가지 않음.
     a_c = max(_MIN_SLOPE, min(_MAX_SLOPE, a))
     b = b + (a - a_c) * mu     # 클램프로 바뀐 기울기를 절편에서 보정(중심점 확률 보존)
-    return {"a": round(a_c, 6), "b": round(b, 6), "n": n, "source": source}
+    # 기울기가 **하한에 고착**하면 = 적합기가 "총점과 결과는 무관"을 학습한 것. 그 상태의 확률은
+    # 예측이 아니라 **기저율 상수**다(총점 20점 차이가 확률 ~2.5%p). 이걸 조용히 두면 화면에
+    # '익일 상승확률 59%'가 예측인 것처럼 보인다 → 플래그를 달아 렌더·서술이 격하 표기하게 한다.
+    # (2026-08-28: KOSPI·KOSDAQ 둘 다, close→close·close→open 두 라벨 모두 하한 고착 확인.)
+    degenerate = a <= _MIN_SLOPE
+    span = (max(ts) - min(ts)) * a_c        # 관측 총점 범위가 만드는 로짓 폭
+    return {"a": round(a_c, 6), "b": round(b, 6), "n": n, "source": source,
+            "slope_at_floor": bool(degenerate),
+            "prob_span_pp": round(abs(_sig(a_c * max(ts) + b) - _sig(a_c * min(ts) + b)) * 100, 1),
+            "raw_slope": round(a, 6)}
 
 
 # ── 판별 틸트(유계) — 시장별 거래량비율 신호 (하네스 walk-forward 검증분만) ──

@@ -154,8 +154,16 @@ def build_hero(r: dict) -> str:
     if btc:
         up_lbl, down_lbl = "세션 LONG 확률", "세션 SHORT 확률"
     else:
-        up_lbl, down_lbl = (("오늘 상승 확률", "오늘 하락 확률") if preopen
-                            else ("익일 상승 확률", "익일 하락 확률"))
+        # 2026-08-28: 확률의 지평을 **실제 청산 시점**으로 명시한다. 캘리브레이터가 이제
+        # close→open(종가매수→익일 시가매도)으로 적합되므로 '익일 종가'가 아니라 '익일 시가'다.
+        up_lbl, down_lbl = (("오늘 시가 대비 상승", "오늘 시가 대비 하락") if preopen
+                            else ("익일 시가 상승 확률", "익일 시가 하락 확률"))
+    # 확률 격하(P5): 캘리브 기울기가 하한에 고착 = 총점이 방향 정보를 못 담는 상태.
+    # 그 값은 예측이 아니라 **기저율**이므로 헤드라인 라벨 자체를 낮춘다(주석만으로는 부족 —
+    # 큰 숫자 옆의 '확률'이라는 단어가 계속 예측으로 읽힌다).
+    _cal0 = r.get("calibration") or {}
+    if not btc and _cal0.get("slope_at_floor"):
+        up_lbl, down_lbl = "상승 기저율(예측 아님)", "하락 기저율(예측 아님)"
     raw = r.get("p_up_raw")
     calib = ""
     if raw is not None and p_up is not None and abs(raw - p_up) > 1e-9:
@@ -191,8 +199,15 @@ def build_hero(r: dict) -> str:
     if not btc and cal_meta.get("source") and cal_meta["source"] != "sot":
         parts = [f'확률은 단일 상승레짐(표본 n={cal_meta.get("n")}) 기저율 앵커 · 하락장 미검증']
         a = cal_meta.get("a")
-        if a is not None and a <= 0.006:
-            parts.append('캘리브 기울기 하한 — 총점이 확률에 거의 영향 없음')
+        if cal_meta.get("slope_at_floor") or (a is not None and a <= 0.006):
+            span = cal_meta.get("prob_span_pp")
+            msg = '캘리브 기울기 하한 고착 — 총점이 확률에 거의 영향 없음'
+            if span is not None:
+                msg += f'(관측 총점 전 구간이 만드는 확률 폭 {span:.1f}%p)'
+            rs = cal_meta.get("raw_slope")
+            if rs is not None and rs < 0:
+                msg += ' · 원시 기울기 음(-) = 총점이 오히려 역방향 — 하한 클램프로 방어 중'
+            parts.append(msg)
         calib += ('<div class="hero-note" style="color:var(--caution)">※ '
                   + ' · '.join(parts) + '</div>')
     return f"""
@@ -246,12 +261,15 @@ def build_confidence(r: dict) -> str:
     chips.append(f'<span class="conf-chip">데이터 확정성 <b style="color:{dcol}">{defin}</b></span>')
     if conf is not None:
         cd = r.get("confidence_detail") or {}
-        # 산식 노출: 신뢰도 = 완전성 × 신호일치도 × 표본보정. '검증 실적'이 아니라 데이터품질을
+        # 산식 노출: 신뢰도 = 완전성 × 표본보정. '검증 실적'이 아니라 데이터품질을
         # 검증표본 부족으로 할인한 값임을 명시(표본 0인데 값이 나오는 근거를 투명하게).
-        if cd.get("completeness") is not None and cd.get("agreement") is not None:
+        # 신호 일치도는 2026-08-28 부터 곱에서 제외(익일확률 수축으로만 반영 — 이중계상 제거).
+        if cd.get("completeness") is not None and cd.get("sample_factor") is not None:
             nn, ms = cd.get("n", 0), cd.get("min_sample")
+            legacy = (f'일치도 {cd["agreement"]*100:.0f}% × '
+                      if cd.get("agreement") is not None else "")
             formula = (f' <span class="muted">= 완전성 {cd["completeness"]*100:.0f}% × '
-                       f'일치도 {cd["agreement"]*100:.0f}% × 표본보정 {cd["sample_factor"]:.2f}'
+                       f'{legacy}표본보정 {cd["sample_factor"]:.2f}'
                        f'(표본 {nn}/{ms} — 검증 실적 아님, 부족분 할인)</span>')
         else:
             nn = r.get("confidence_sample_n")
@@ -931,27 +949,31 @@ def build_accuracy(r: dict) -> str:
     # 전략이 실제 체결하는 지평은 종가매수→익일 시가매도(close→open)다. 라벨(종가→종가)은
     # 캘리브레이션 연속성용일 뿐 — 둘이 크게 갈리므로(라벨 85% vs 실거래 25% 같은 사례) 실거래
     # 지평을 **주지표로 앞에** 놓고, 라벨은 '실행 아님'을 명시해 뒤로 강등한다.
-    ohr = acc.get("overnight_hit_rate")
-    ovn = acc.get("overnight_n") or 0
+    # 2026-08-28: 주 라벨이 close→open 으로 전환됨 → Brier·편향도 주 지평 값을 앞세운다.
+    ohr = acc.get("primary_hit_rate", acc.get("overnight_hit_rate"))
+    ovn = acc.get("primary_n", acc.get("overnight_n")) or 0
     if ohr is not None and ovn > 0:
         tile_list.append(_tile("실거래 적중률", pct(ohr),
                                "var(--up)" if ohr >= 0.5 else "var(--down)",
-                               sub=f"종가→익일 시가(실청산·n{ovn})"))
+                               sub=f"종가→익일 시가(주 라벨·n{ovn})"))
+    pb = acc.get("primary_brier")
+    pbias = acc.get("primary_calibration_bias")
     tile_list += [
+        _tile("Brier(실거래)", fmt(pb, 3) if pb is not None else "—", sub="낮을수록 정확"),
+        _tile("캘리브레이션 편향", signed(pbias, 3) if pbias is not None else "—",
+              sub="실거래 지평 · +과대낙관/−과대비관"),
         _tile("라벨 적중률", pct(hr) if hr is not None else "—", hr_col,
-              sub="종가→종가(캘리브용·실행 아님)"),
-        _tile("Brier", fmt(acc.get('mean_brier'), 3), sub="낮을수록 정확"),
+              sub="종가→종가(구 라벨·보조)"),
         _tile("예측 평균 p_up", pct(acc.get('pred_mean_p_up'))),
-        _tile("실제 상승빈도", pct(acc.get('realized_up_rate'))),
-        _tile("캘리브레이션 편향", signed(bias, 3) if bias is not None else "—",
-              sub="+과대낙관/−과대비관"),
+        _tile("실제 시가상승 빈도", pct(acc.get('primary_realized_up_rate'))),
     ]
     tiles = "".join(tile_list)
     return f"""
   <div class="card">
     <h2>자가학습 정확도 <span class="pill pill-ghost">최근 성적</span></h2>
     <div class="tiles">{tiles}</div>
-    <div class="note muted">매일 예측을 DB에 누적하고 익일 실측으로 채점 → 확률 캘리브레이션에 반영.</div>
+    <div class="note muted">매일 예측을 DB에 누적하고 익일 실측으로 채점 → 확률 캘리브레이션에 반영.
+      주 라벨 = <b>종가매수→익일 시가매도</b>(실제 청산 지평, 2026-08-28 전환). 종가→종가는 보조.</div>
   </div>"""
 
 
