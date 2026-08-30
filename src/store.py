@@ -830,8 +830,18 @@ def record_reviews(conn: sqlite3.Connection, trade_date: str, market: str,
 
     findings 각 항목: {source, category, code, severity, title, detail, evidence}.
     같은 (날짜·시장·유형·슬롯·source·title) 이면 내용만 갱신(id 유지). 반환=반영 건수.
+
+    ⚠ LLM 비평은 **같은 회차 재실행 시 이전 것을 대체**한다(2026-08-28).
+    UNIQUE 키에 title 이 들어가는데 LLM 은 같은 지적도 회차마다 다른 문장으로 낸다
+    (실측: 8/28 KOSPI 한 날에 18건이 쌓였으나 실제 주제는 5~6개). 그대로 두면 백로그가
+    '결함 수'가 아니라 '파이프라인 실행 횟수'에 비례해 부풀고 영원히 안 줄어든다.
+    규칙(rule)은 title 이 결정론적이라 upsert 로 충분하므로 건드리지 않는다.
     """
     now = now or _now()
+    if any((f.get("source") == "llm") for f in (findings or [])):
+        conn.execute(
+            "DELETE FROM report_review WHERE trade_date=? AND market=? AND report_type=? "
+            "AND slot=? AND source='llm'", (trade_date, market, report_type, slot))
     n = 0
     for f in findings or []:
         title = (f.get("title") or "").strip()
@@ -880,11 +890,16 @@ def review_digest(conn: sqlite3.Connection, since: str | None = None,
         where += " AND trade_date>=?"
         args.append(since)
     total = conn.execute(f"SELECT COUNT(*) FROM report_review {where}", args).fetchone()[0]
-    # 규칙: code 별 반복 집계(빈도가 곧 '구조적 결함'의 증거)
+    # code 별 반복 집계(빈도가 곧 '구조적 결함'의 증거).
+    # 2026-08-28: source='rule' 한정을 풀었다 — LLM 비평도 고정 code 를 갖게 되면서
+    # 규칙이 못 잡는 발견(예: 완전성 100%인데 program_net 결측)이 여기 안 잡히던 문제 해소.
+    # 'other'(분류 실패)는 클러스터로 승격하지 않는다(잡동사니가 상위를 차지하지 않게).
     rec = []
     for r in conn.execute(
         f"SELECT code, MAX(title) title, MAX(severity) severity, COUNT(*) n, "
-        f"MAX(trade_date) last FROM report_review {where} AND source='rule' AND code IS NOT NULL "
+        f"MAX(trade_date) last, "
+        f"SUM(CASE WHEN source='llm' THEN 1 ELSE 0 END) n_llm "
+        f"FROM report_review {where} AND code IS NOT NULL AND code<>'other' "
         f"GROUP BY code HAVING n>=? ORDER BY n DESC, severity DESC", args + [min_count]):
         rec.append(dict(r))
     rec.sort(key=lambda d: (-d["n"], -_SEV_RANK.get(d.get("severity"), 0)))

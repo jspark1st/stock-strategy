@@ -166,3 +166,64 @@ def test_evaluate_attaches_reviews():
     finally:
         conn.close()
         os.unlink(p)
+
+
+# ── 2026-08-28: LLM 비평 중복 누적·클러스터 실패 수정 ────────────────────────
+def test_llm_findings_carry_stable_code():
+    """LLM 비평도 고정 code 를 받아야 digest 클러스터·resolve 가 동작한다."""
+    from src import report_review as rv
+    txt = ('[{"code":"gate_sizing","category":"모순","severity":"high",'
+           '"title":"진입 차단과 ATR 충돌","detail":"근거"}]')
+    f = rv._parse_findings(txt)
+    assert f and f[0]["code"] == "gate_sizing" and f[0]["source"] == "llm"
+
+
+def test_llm_unknown_code_falls_back_to_other():
+    """모델이 목록 밖 코드를 지어내면 클러스터링이 다시 깨지므로 other 로 고정."""
+    from src import report_review as rv
+    f = rv._parse_findings('[{"code":"내가지어낸코드","title":"x","detail":"d"}]')
+    assert f[0]["code"] == "other"
+
+
+def test_llm_rerun_supersedes_not_accumulates(tmp_path):
+    """같은 회차 재실행 시 LLM 비평은 **대체**된다 — 제목이 달라도 누적되면 안 된다.
+
+    실측 결함: 8/28 KOSPI 한 날에 18건이 쌓였으나 실제 주제는 5~6개(회차마다 다른 문장).
+    백로그가 '결함 수'가 아니라 '실행 횟수'에 비례하던 문제.
+    """
+    from src import store
+    conn = store.connect(tmp_path / "r.db")
+    run1 = [{"source": "llm", "category": "모순", "code": "gate_sizing",
+             "severity": "high", "title": "진입 차단과 ATR 충돌"},
+            {"source": "rule", "category": "관측", "code": "no_discrimination",
+             "severity": "low", "title": "방향 판별 미확보"}]
+    run2 = [{"source": "llm", "category": "모순", "code": "gate_sizing",
+             "severity": "high", "title": "진입 차단과 ATR 승인"},   # 같은 지적, 다른 문장
+            {"source": "rule", "category": "관측", "code": "no_discrimination",
+             "severity": "low", "title": "방향 판별 미확보"}]
+    store.record_reviews(conn, "2026-08-28", "KOSPI", "close", "", run1)
+    store.record_reviews(conn, "2026-08-28", "KOSPI", "close", "", run2)
+    rows = conn.execute("SELECT source,title FROM report_review").fetchall()
+    llm = [r for r in rows if r["source"] == "llm"]
+    assert len(llm) == 1 and llm[0]["title"] == "진입 차단과 ATR 승인"   # 최신만 남는다
+    assert len([r for r in rows if r["source"] == "rule"]) == 1          # 규칙은 upsert 유지
+    conn.close()
+
+
+def test_digest_clusters_llm_findings_too(tmp_path):
+    """규칙이 못 잡는 LLM 발견도 빈도 클러스터에 올라와야 백로그가 의미를 갖는다."""
+    from src import store
+    conn = store.connect(tmp_path / "d.db")
+    for i, d in enumerate(("2026-08-26", "2026-08-27", "2026-08-28")):
+        store.record_reviews(conn, d, "KOSPI", "close", "", [
+            {"source": "llm", "category": "부족", "code": "sample_short",
+             "severity": "high", "title": f"표본 부족 {i}"},
+            {"source": "llm", "category": "개선", "code": "other",
+             "severity": "low", "title": f"잡동사니 {i}"}])
+    dig = store.review_digest(conn, min_count=2)
+    codes = {r["code"] for r in dig["recurring"]}
+    assert "sample_short" in codes            # LLM 발견도 클러스터
+    assert "other" not in codes               # 분류 실패는 승격 안 함
+    row = next(r for r in dig["recurring"] if r["code"] == "sample_short")
+    assert row["n"] == 3 and row["n_llm"] == 3
+    conn.close()

@@ -216,13 +216,34 @@ def rule_findings(reports: list[dict]) -> tuple[dict, list[dict]]:
 
 
 # ── (b) LLM 비평(Gemini 최신) ────────────────────────────────────────────────
+# LLM 비평이 고를 수 있는 **고정 주제 코드**. 자유 제목만 받으면 같은 지적이 회차마다 다른
+# 문장으로 와서(실측: 8/28 KOSPI 18건이 실은 5~6개 주제) ①백로그가 실행 횟수만큼 부풀고
+# ②digest 의 빈도 클러스터링이 LLM 항목을 통째로 놓치고 ③resolve_review(code=) 로 못 닫는다.
+# 규칙 코드와 같은 이름을 쓰면 규칙·LLM 발견이 한 주제로 합쳐진다.
+LLM_CODES = {
+    "gate_sizing": "게이트 차단과 비중·타점·실행수단이 모순",
+    "gate_on_degenerate_prob": "진입 허용인데 확률이 판별이 아님",
+    "calib_slope_floor": "캘리브 기울기 하한 — 총점이 확률에 영향 없음",
+    "no_discrimination": "방향 판별 미확보(확률≈기저율)",
+    "horizon_divergence": "라벨(종가→종가)과 실거래(종가→시가) 괴리",
+    "confidence_zero": "신뢰도 0 — 데이터 품질 결손",
+    "incomplete_data": "필수/선택 데이터 결측·미수집",
+    "sample_short": "검증 표본 부족 — 성적을 실력으로 읽을 수 없음",
+    "mixed_signals": "항목 신호 혼재",
+    "news_rescored": "재료가 점수에 다시 반영됨",
+    "narrative_mismatch": "서술이 확정 수치·게이트와 어긋남",
+    "other": "위 어디에도 안 맞는 발견",
+}
+
 _CRITIC_SYS = (
     "너는 개인용 주식 방향예측 리포트를 **객관적으로 비평하는 감사자**다. 목표는 칭찬이 아니라 "
     "결함 발견이다. 아래 리포트 팩트만 근거로 ①내부 모순 ②부족한 점 ③이렇게 하면 더 좋을 개선점을 "
     "찾아라. **규칙: 팩트에 없는 수치·사실을 지어내지 마라. 인용 수치는 팩트에서만.** 한국어. "
+    "**code 는 아래 목록에서 정확히 하나 고른다**(같은 지적이 회차마다 다른 코드로 가면 안 된다. "
+    "맞는 게 없을 때만 other): " + " · ".join(f"{k}={v}" for k, v in LLM_CODES.items()) + ". "
     "출력은 반드시 JSON 배열만: "
-    '[{"category":"모순|부족|개선","severity":"high|med|low","title":"12자 내 요지",'
-    '"detail":"근거 1~2문장(팩트 수치 인용)"}]. 코드펜스·설명 없이 JSON 만.')
+    '[{"code":"위 목록 중 하나","category":"모순|부족|개선","severity":"high|med|low",'
+    '"title":"12자 내 요지","detail":"근거 1~2문장(팩트 수치 인용)"}]. 코드펜스·설명 없이 JSON 만.')
 
 
 def _facts_for_critic(r: dict) -> str:
@@ -292,7 +313,9 @@ def _parse_findings(txt: str | None) -> list[dict]:
             continue
         cat = x.get("category") if x.get("category") in ("모순", "부족", "개선") else "개선"
         sev = x.get("severity") if x.get("severity") in ("high", "med", "low") else "low"
-        out.append(_f("llm", cat, None, sev, title[:60], str(x.get("detail") or "")[:400]))
+        # code 는 고정 목록만 신뢰한다(모델이 새 코드를 지어내면 클러스터링이 다시 깨진다).
+        code = x.get("code") if x.get("code") in LLM_CODES else "other"
+        out.append(_f("llm", cat, code, sev, title[:60], str(x.get("detail") or "")[:400]))
     return out
 
 
