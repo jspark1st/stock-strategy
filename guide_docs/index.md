@@ -11,8 +11,10 @@
 |---|---|
 | 오늘 리포트가 안 나옴 / 크론이 죽음 | [`ops/`](ops/README.md) 「장애 시 어디를 보나」 |
 | 예측 정확도를 올리고 싶다 | [`code/measure.md`](code/measure.md) 하네스로 **측정 먼저** → 양성이면 [`code/`](code/README.md) 「개발 루프」 |
-| 화면·게이트·서술이 서로 안 맞는다 | [`defects/`](defects/README.md) 재발버그 표 → `/checkup` 또는 `pipeline-fanout-auditor` |
+| 화면·게이트·서술이 서로 안 맞는다 | [`defects/`](defects/README.md) → `/checkup`(찾기) 또는 `/quality`(찾아 고침) |
+| 논리 버그·코드 품질을 고친다 | `/quality` → `quality-fanout` |
 | 다음에 뭘 할지 고른다 | [`roadmap/`](roadmap/README.md) 「지금 우선순위」 |
+| 시스템 점수가 궁금하다 | `/evaluate` → `system-evaluator` (evaluation6과 같은 12항목) |
 | 이 실험 전에 이미 해봤나 | [`lessons/`](lessons/README.md) 「음성 결과」 (같은 각도 재추격 금지) |
 | 수집기가 비거나 API 스펙이 궁금 | [`code/reference.md`](code/reference.md) · `data-collector-debug` |
 | 문서가 낡은 것 같다 | `.venv/bin/python scripts/check_docs.py` · `claude-md-verifier` |
@@ -101,8 +103,8 @@ easystock 분기 전수표: **[`DIVERGENCES.md`](DIVERGENCES.md)** (캘리브레
 
 전면 점검·마감/개장전 실행은 `.claude/` 가 절차서다. 발견은 [`defects/`](defects/README.md)에 남긴다.
 
-- 에이전트(9): `pipeline-fanout-auditor`(8축 전면감사) · `scoring-auditor`(SoT·함정) · `pipeline-runner`(dry-run 실행) · `data-collector-debug`(수집) · `ui-honesty-auditor`(화면 vs 게이트) · `ui-polisher`(UI 구현) · `fact-checker`(번들 대조) · `claude-md-verifier`(문서 vs 현실) · `test-runner`(.venv pytest). 정의는 `.claude/agents/*.md`
-- 스킬: `/checkup`(전면 점검) · `/close-report`(마감) · `/preopen-report`(개장전) · `/scoring-audit`
+- 에이전트(11): `quality-fanout`(논리·품질 찾아 고침) · `system-evaluator`(12항목 채점) · `pipeline-fanout-auditor`(8축 전면감사·읽기전용) · `scoring-auditor`(SoT·함정) · `pipeline-runner`(dry-run 실행) · `data-collector-debug`(수집) · `ui-honesty-auditor`(화면 vs 게이트) · `ui-polisher`(UI 구현) · `fact-checker`(번들 대조) · `claude-md-verifier`(문서 vs 현실) · `test-runner`(.venv pytest). 정의는 `.claude/agents/*.md`
+- 스킬: `/quality`(찾아 고침) · `/triage`(누적 비평 백로그 → 분류·수정·폐쇄) · `/evaluate`(점수표) · `/checkup`(전면 점검) · `/close-report`(마감) · `/preopen-report`(개장전) · `/scoring-audit`
 - 워크플로: `checkup.js` · `scoring-audit.js` (명시 opt-in 시에만)
 
 ## 문서 갱신 규칙

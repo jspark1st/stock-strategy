@@ -860,10 +860,12 @@ def reviews_for(conn: sqlite3.Connection, trade_date: str, market: str | None = 
 
 
 def review_digest(conn: sqlite3.Connection, since: str | None = None,
-                  min_count: int = 2) -> dict:
+                  min_count: int = 2, accepted: tuple = ()) -> dict:
     """누적 비평을 개선 백로그로 집계 — 규칙 code 별 빈도×심각도 랭킹 + 미해결 LLM 발견.
 
-    since(YYYY-MM-DD) 이후만. 반환 {recurring:[{code,title,n,severity,last}], llm_open:[...], n_total}.
+    since(YYYY-MM-DD) 이후만. `accepted` = 문서화·수용된 한계 code(데이터 대기·설계) —
+    이들은 매 회차 재진술돼 백로그를 오염시키므로 **실행가능(actionable) 백로그에서 분리**한다.
+    반환 {recurring(=actionable), accepted, llm_open, n_total, resolution:{open,resolved,rate}}.
     """
     where = "WHERE resolved=0"
     args: list = []
@@ -871,6 +873,15 @@ def review_digest(conn: sqlite3.Connection, since: str | None = None,
         where += " AND trade_date>=?"
         args.append(since)
     total = conn.execute(f"SELECT COUNT(*) FROM report_review {where}", args).fetchone()[0]
+    # 해결률(헬스 지표) — 같은 항목이 안 닫히고 쌓이면 노이즈, 새 항목이 나고 닫히면 루프 작동.
+    res_where = "WHERE trade_date>=?" if since else ""
+    res_args = [since] if since else []
+    resolved_n = conn.execute(
+        f"SELECT COUNT(*) FROM report_review {res_where}{' AND' if since else 'WHERE'} resolved=1",
+        res_args).fetchone()[0]
+    _tot = total + resolved_n
+    resolution = {"open": total, "resolved": resolved_n,
+                  "rate": round(resolved_n / _tot, 3) if _tot else None}
     # code 별 반복 집계(빈도가 곧 '구조적 결함'의 증거).
     # 2026-08-28: source='rule' 한정을 풀었다 — LLM 비평도 고정 code 를 갖게 되면서
     # 규칙이 못 잡는 발견(예: 완전성 100%인데 program_net 결측)이 여기 안 잡히던 문제 해소.
@@ -884,12 +895,20 @@ def review_digest(conn: sqlite3.Connection, since: str | None = None,
         f"GROUP BY code HAVING n>=? ORDER BY n DESC, severity DESC", args + [min_count]):
         rec.append(dict(r))
     rec.sort(key=lambda d: (-d["n"], -_SEV_RANK.get(d.get("severity"), 0)))
-    # LLM: 최근 미해결 발견(중복 title 은 최신만)
+    # 이원화: 수용된 한계(데이터 대기·설계)는 실행가능 백로그에서 뺀다.
+    acc = set(accepted or ())
+    actionable = [d for d in rec if d.get("code") not in acc]
+    accepted_rec = [d for d in rec if d.get("code") in acc]
+    # LLM: 최근 미해결 발견(중복 title 은 최신만). 수용 code 는 제외.
+    _llm_where = where + " AND source='llm'"
+    if acc:
+        _llm_where += " AND (code IS NULL OR code NOT IN (%s))" % ",".join("?" * len(acc))
     llm = [dict(r) for r in conn.execute(
         f"SELECT trade_date, market, category, severity, title, detail "
-        f"FROM report_review {where} AND source='llm' "
-        f"ORDER BY trade_date DESC, id DESC LIMIT 40", args)]
-    return {"recurring": rec, "llm_open": llm, "n_total": total}
+        f"FROM report_review {_llm_where} "
+        f"ORDER BY trade_date DESC, id DESC LIMIT 40", args + list(acc))]
+    return {"recurring": actionable, "actionable": actionable, "accepted": accepted_rec,
+            "llm_open": llm, "n_total": total, "resolution": resolution}
 
 
 def resolve_review(conn: sqlite3.Connection, code: str | None = None,

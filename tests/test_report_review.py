@@ -227,3 +227,36 @@ def test_digest_clusters_llm_findings_too(tmp_path):
     row = next(r for r in dig["recurring"] if r["code"] == "sample_short")
     assert row["n"] == 3 and row["n_llm"] == 3
     conn.close()
+
+
+# ── 이원화(수용 vs 실행가능) + 해결률 ────────────────────────────────────
+def test_review_digest_dualizes_accepted_and_tracks_resolution():
+    fd, path = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+    try:
+        conn = store.connect(path)
+
+        def f(code, sev="med"):
+            return {"source": "rule", "category": "관측", "code": code, "severity": sev,
+                    "title": f"t-{code}", "detail": "", "evidence": ""}
+        for d in ("2026-08-28", "2026-08-29"):   # 각 code 2회(min_count=2)
+            store.record_reviews(conn, d, "BTCUSDT", "btc_perp", "2200",
+                                 [f("btc_gate_block"), f("no_discrimination"),
+                                  f("gate_sizing", "high"), f("narrative_mismatch", "high")])
+        acc_codes = tuple(report_review.ACCEPTED_CODES)
+        dg = store.review_digest(conn, accepted=acc_codes)
+        act = {d["code"] for d in dg["actionable"]}
+        acc = {d["code"] for d in dg["accepted"]}
+        assert {"gate_sizing", "narrative_mismatch"} <= act        # 실행가능
+        assert {"btc_gate_block", "no_discrimination"} <= acc      # 수용
+        assert not (act & acc) and "btc_gate_block" not in act     # 안 겹침·수용은 실행가능 제외
+        assert dg["resolution"]["open"] == 8 and dg["resolution"]["resolved"] == 0
+        # 닫으면 실행가능에서 빠지고 해결률에 반영
+        store.resolve_review(conn, code="gate_sizing")
+        conn.commit()
+        dg2 = store.review_digest(conn, accepted=acc_codes)
+        assert "gate_sizing" not in {d["code"] for d in dg2["actionable"]}
+        assert dg2["resolution"]["resolved"] == 2
+        conn.close()
+    finally:
+        os.unlink(path)

@@ -235,6 +235,20 @@ LLM_CODES = {
     "other": "위 어디에도 안 맞는 발견",
 }
 
+# 수용된 한계 — 문서화된 설계 결정이거나 '코딩이 아니라 데이터가 필요'한 항목. 매 회차 재진술돼
+# 백로그를 오염시키므로 실행가능(actionable) 백로그에서 분리한다(제거가 아니라 '데이터 대기/수용'
+# 섹션으로 분류). 근거: guide_docs/defects '결함 아님' · AGENTS.md '예측력은 다레짐 데이터 상한'.
+#   btc_gate_block   BTC 게이트 통과 0 = 엄격(설계, 완화 금지)
+#   no_discrimination 방향 판별 AUC≈0.5 = 단일레짐·데이터 한계
+#   calib_slope_floor 캘리브 하한 = 정직한 무신호(데이터 한계)
+#   sample_short      n<40 = 표본 축적 대기
+#   mixed_signals     신호 혼재 = 코어 소수 팩터의 상시 관측
+#   news_dead         재료 상시 제외 = 설계(검증 불가 팩터에 가중 안 줌)
+ACCEPTED_CODES = frozenset({
+    "btc_gate_block", "no_discrimination", "calib_slope_floor",
+    "sample_short", "mixed_signals", "news_dead",
+})
+
 _CRITIC_SYS = (
     "너는 개인용 주식 방향예측 리포트를 **객관적으로 비평하는 감사자**다. 목표는 칭찬이 아니라 "
     "결함 발견이다. 아래 리포트 팩트만 근거로 ①내부 모순 ②부족한 점 ③이렇게 하면 더 좋을 개선점을 "
@@ -356,7 +370,7 @@ def evaluate(conn, trade_date: str, reports: list[dict], env: dict | None = None
     digest = {}
     if conn is not None:
         try:
-            digest = store.review_digest(conn)
+            digest = store.review_digest(conn, accepted=tuple(ACCEPTED_CODES))
         except Exception:  # noqa
             digest = {}
     return {"cross": cross, "digest": digest}
