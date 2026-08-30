@@ -58,6 +58,7 @@ def build_report_summary(reports: list, kind: str, trade_date: str,
         blocked = (st.get("state") in ("NO_TRADE", "EXIT_OPEN")
                    or entry.get("allow") is False
                    or bool(gate.get("new_entry_blocked")))
+        manage = st.get("state") in ("REDUCE", "HOLD_FULL")   # 보유 관리(신규 진입 아님)
         tp = f"{total}" if total is not None else "미산출"
         # 개장전이면 간밤 반영으로 확률이 앵커→조정으로 바뀐다 → 둘 다 보여준다.
         anc = r.get("p_up_anchor")
@@ -65,7 +66,9 @@ def build_report_summary(reports: list, kind: str, trade_date: str,
             pp = f"{round(anc * 100)}%→{round(p_up * 100)}%"
         else:
             pp = f"{round(p_up * 100)}%" if p_up is not None else "—"
-        gate_txt = "관망/현금" if blocked else "진입 검토"
+        gate_txt = ("관망/현금" if blocked
+                    else ("보유 일부 축소" if st.get("state") == "REDUCE" else "보유 유지") if manage
+                    else "진입 검토")
         out.append(f"• {label}: {tp}·{grade}·익일↑{pp} · {gate_txt}")
         if st.get("state"):
             out.append(f"   개장 상태: {st['state']}{(' — ' + st['action']) if st.get('action') else ''}")

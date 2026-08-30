@@ -327,10 +327,16 @@ class ScoreResult:
         if not self.data_sufficient:
             miss = ", ".join(self.missing_keys)
             return f"데이터 부족(결측: {miss}) — 총점 미산출, 잠정 방향성만 참고."
-        # 판별 미확보 밴드(±8%p): 캘리브레이션 확률이 기저율(≈50%) 근처면 방향 edge 가 사실상
-        # 없어(단일레짐 AUC≈0.5) '58%' 같은 거짓 정밀도로 방향을 단정하지 않는다. build_hero 와
-        # 동일 임계 — 표시 전용, 게이트 임계와 무관.
-        if self.p_up is not None and abs(self.p_up - 0.5) < 0.08:
+        # 헤드라인 확률 격하 — build_hero 와 동일 규율(표시 전용, 게이트 임계와 무관):
+        #  ① slope_at_floor(캘리브 기울기 하한 고착)면 그 값은 예측이 아니라 기저율 → '기저율(예측
+        #     아님)'. 히어로 라벨과 정합(히어로만 격하되고 헤드라인은 '익일 상승확률'로 남던 불일치 수정).
+        #  ② 아니어도 ±8%p 밴드 안(단일레짐 AUC≈0.5)이면 '판별 미확보'로 거짓 정밀도 방지.
+        cal = getattr(self, "calibration", None) or {}
+        if self.p_up is None:
+            prob_str = "익일 방향확률 미산출"
+        elif cal.get("slope_at_floor"):
+            prob_str = f"상승 기저율(예측 아님) {self.p_up * 100:.0f}%"
+        elif abs(self.p_up - 0.5) < 0.08:
             prob_str = f"방향 중립·판별 미확보(캘리브 기저율 {self.p_up * 100:.0f}%)"
         else:
             prob_str = f"익일 상승확률 {self.p_up * 100:.0f}%"

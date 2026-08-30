@@ -224,6 +224,17 @@ def build_hero(r: dict) -> str:
 DIR_LABEL = {"long": ("매수 우위", "var(--up)"), "short": ("매도/현금", "var(--down)"),
              "watch": ("관망", "var(--neutral)")}
 
+# 개장전 08:50 4상태 — 전일 종가 진입분에 대한 '오늘' 행동이지 신규 매수가 아니다.
+# EXIT_OPEN/NO_TRADE 는 신규진입 0%(관망/청산), REDUCE/HOLD_FULL 은 보유 관리(축소/유지).
+# 넷 다 '매수 자격 통과·권장비중 N%·실행수단' 같은 신규매수 언어를 쓰면 안 된다.
+_PREOPEN_STATE_LABEL = {
+    "EXIT_OPEN": ("개장 즉시 청산", "var(--caution)"),
+    "NO_TRADE": ("관망", "var(--caution)"),
+    "REDUCE": ("보유 일부 축소", "var(--caution)"),
+    "HOLD_FULL": ("보유 유지", "var(--neutral)"),
+}
+_PREOPEN_MANAGE = ("REDUCE", "HOLD_FULL")   # 보유 관리(신규 매수 아님, 청산도 아님)
+
 
 def _conf_color(v, hi=0.95, mid=0.8) -> str:
     return "var(--good)" if v >= hi else ("var(--neutral)" if v >= mid else "var(--caution)")
@@ -548,29 +559,37 @@ def build_conclusion(r: dict) -> str:
     # True 로 남을 수 있어 preopen_state 를 함께 본다(청산 지시 옆 매수 배지 방지).
     pstate = (r.get("preopen_state") or {}).get("state")
     exit_open = pstate in ("NO_TRADE", "EXIT_OPEN")
+    manage = pstate in _PREOPEN_MANAGE            # 보유 축소/유지(신규 매수 아님)
+    no_new_entry = grade_blocked or entry_blocked or exit_open or manage
     dlabel, dcol = DIR_LABEL.get(atr.get("direction"), ("판단 보류", "var(--muted)"))
     if grade_blocked:
         dlabel, dcol = "신규 진입 차단", "var(--caution)"
     elif entry_blocked:
         dlabel, dcol = "진입 게이트 차단", "var(--caution)"
-    elif exit_open:
-        dlabel, dcol = ("개장 즉시 청산" if pstate == "EXIT_OPEN" else "관망"), "var(--caution)"
+    elif pstate in _PREOPEN_STATE_LABEL:
+        dlabel, dcol = _PREOPEN_STATE_LABEL[pstate]
     if not concl and not atr:
         return ""
     bits = []
     if gate:
         ps = gate.get("position_scale")
-        # 등급 차단·전체 진입 게이트 차단·청산상태면 실효 비중 0%(등급 배수만 보여주면 오해).
+        # 등급/진입 차단·청산은 신규비중 0%, 보유관리는 축소/유지(전일 등급배수를 신규매수처럼 보이지 않게).
         bits.append("신규 진입 <b>차단</b>" if grade_blocked
                     else "진입 게이트 <b>차단</b>" if entry_blocked
                     else "<b>청산/관망</b>" if exit_open
+                    else "<b>보유 일부 축소</b>" if pstate == "REDUCE"
+                    else "<b>보유 유지</b>" if pstate == "HOLD_FULL"
                     else f"비중 배수 <b>{ps:.0%}</b>" if ps is not None else "")
         bits.append(f"후보 최대 <b>{gate.get('max_candidates')}</b>종목")
-        bits.append("종가베팅 <b>" + ("검토 가능" if gate.get("close_betting") else "불가") + "</b>")
-    # 신규진입 차단/청산/NO_TRADE 면 인버스 등 '실행 수단'을 병기하지 않는다(관망/현금과 충돌).
-    no_position = grade_blocked or entry_blocked or exit_open
-    if no_position:
-        bits.append("실행 <b>관망/현금</b>")
+        # 종가베팅은 15:00 마감 전용 개념 — 개장전 리포트엔 표시하지 않는다.
+        if r.get("report_type") != "preopen":
+            bits.append("종가베팅 <b>" + ("검토 가능" if gate.get("close_betting") else "불가") + "</b>")
+    # 신규진입이 아니면(차단·청산·보유관리) 신규 매수 '실행 수단'을 병기하지 않는다.
+    if no_new_entry:
+        if manage:
+            bits.append("실행 <b>" + ("보유 일부 축소" if pstate == "REDUCE" else "보유 유지") + "</b>")
+        else:
+            bits.append("실행 <b>관망/현금</b>")
     elif atr.get("instrument"):
         bits.append(f"실행 수단 <b>{esc(atr['instrument'])}</b>")
     gate_html = (f'<div class="concl-gate">{" · ".join(b for b in bits if b)}</div>'
@@ -607,18 +626,19 @@ def build_atr_plan(r: dict) -> str:
     entry_reasons = ", ".join(entry.get("blocked_reasons") or [])
     pstate = (r.get("preopen_state") or {}).get("state")
     exit_open = pstate in ("NO_TRADE", "EXIT_OPEN")   # 개장 즉시 청산/관망 = 신규진입 없음
+    manage = pstate in _PREOPEN_MANAGE                # 보유 축소/유지 = 신규 매수 아님
     no_position = blocked or entry_blocked or exit_open
-    # 방향 배지(제목 옆 색배경 pill)도 차단/청산이면 '차단'으로 낮춘다 — build_conclusion 과 대칭.
-    # 등급차단·진입게이트차단·청산 어느 경로든 초록 '매수 우위' 배지가 남으면 결론카드('차단')와
-    # 정면 모순(2차 pill-ghost 회색 사유만으론 부족 — 가장 눈에 띄는 1차 배지가 매수색이면 오독).
+    no_new_entry = no_position or manage              # 신규 매수 언어를 쓰면 안 되는 모든 상태
+    # 방향 배지(제목 옆 색배경 pill)도 차단/청산/보유관리면 '매수 우위'로 두지 않는다 — build_conclusion 과
+    # 대칭. 가장 눈에 띄는 1차 배지가 매수색이면 결론카드(차단/축소/유지)와 정면 모순으로 읽힌다.
     if blocked:
         dlabel, dcol = "신규 진입 차단", "var(--caution)"
     elif entry_blocked:
         dlabel, dcol = "진입 게이트 차단", "var(--caution)"
-    elif exit_open:
-        dlabel, dcol = ("개장 즉시 청산" if pstate == "EXIT_OPEN" else "관망"), "var(--caution)"
-    # 차단/청산/NO_TRADE 면 인버스 등 체결수단을 명시하지 않는다(관망/현금이므로)
-    instr_txt = ("" if no_position
+    elif pstate in _PREOPEN_STATE_LABEL:
+        dlabel, dcol = _PREOPEN_STATE_LABEL[pstate]
+    # 신규 매수가 아니면 체결수단(신규 매수 실행)을 명시하지 않는다.
+    instr_txt = ("" if no_new_entry
                  else f" · 실제 체결 수단: {esc(atr.get('instrument') or 'KODEX 200 / 코스닥150')}")
     if blocked:
         qual = "등급 게이트 차단 — 신규 진입 없음"
@@ -627,6 +647,9 @@ def build_atr_plan(r: dict) -> str:
     elif exit_open:
         qual = ("개장 즉시 청산 — 신규 진입 없음" if pstate == "EXIT_OPEN"
                 else "관망 — 신규 진입 없음")
+    elif manage:
+        qual = ("보유 일부 축소 — 신규 매수 아님" if pstate == "REDUCE"
+                else "보유 유지 — 신규 매수 아님")
     elif p.get("qualified"):
         qual = "진입 자격 ✓"
     else:
@@ -648,11 +671,13 @@ def build_atr_plan(r: dict) -> str:
         _tile("손익비", f"1 : {fmt(p.get('rr'),1)}", "var(--accent)"),
         _tile("edge", signed(edge, 3) if edge is not None else "—", edge_col,
               f"손익분기 {fmt(p.get('p_breakeven'),2)}"),
-        _tile("권장비중", "0%" if no_position else f"{kelly:.0f}%",
-              "var(--caution)" if no_position else "var(--accent)",
+        _tile("권장비중", "0%" if no_position else ("—" if manage else f"{kelly:.0f}%"),
+              "var(--caution)" if no_new_entry else "var(--accent)",
               "등급 게이트 차단 → 0%" if blocked else
               f"진입 게이트 차단({entry_reasons or '조건 미충족'}) → 0%" if entry_blocked else
               ("개장 즉시 청산 → 0%" if pstate == "EXIT_OPEN" else "관망 → 0%") if exit_open else
+              ("개장 후 일부 축소 — 신규 매수 아님" if pstate == "REDUCE"
+               else "보유 유지 — 신규 매수 아님") if manage else
               (f"Half-Kelly × 게이트 {atr.get('position_scale', 1):.0%} · 상한 25%"
                if atr.get("position_scale", 1) != 1 else "Half-Kelly · 상한 25%")),
     ])
@@ -675,7 +700,7 @@ def build_atr_plan(r: dict) -> str:
     # (atr.compute_plan 은 entry.allow 를 모른 채 계산되므로 여기서 게이트를 다시 적용한다.)
     rows = ""
     for v in atr.get("variants", []):
-        vk = 0 if no_position else (v.get('kelly_pct') or 0)
+        vk = 0 if no_new_entry else (v.get('kelly_pct') or 0)
         rows += (f"<tr><td>{esc(v.get('label'))}</td><td>{fmt(v.get('stop'),2)}</td>"
                  f"<td>{fmt(v.get('target'),2)}</td><td>1:{fmt(v.get('rr'),1)}</td>"
                  f"<td style='color:{'var(--up)' if (v.get('edge') or 0)>0 else 'var(--down)'}'>"
@@ -693,6 +718,10 @@ def build_atr_plan(r: dict) -> str:
         _lead = "개장 즉시 청산(EXIT_OPEN)" if pstate == "EXIT_OPEN" else "관망(NO_TRADE)"
         obs_comment = (f"{_lead} — 관망/현금, 권장비중 0%. 아래 타점은 보유분 관리·참고용 수치일 뿐 "
                        "신규 베팅 근거가 아니다.")
+    elif manage and not blocked and not entry_blocked:
+        _lead = "개장 후 보유분 일부 축소" if pstate == "REDUCE" else "보유 유지"
+        obs_comment = (f"{_lead}(개장전 재평가) — 오늘 할 일은 신규 매수가 아니다. "
+                       "아래 타점은 전일 진입분 관리·참고용 수치이며 신규 베팅 근거가 아니다.")
     warn = ('<div class="atr-warn">⚠ 변동성 과열 — 정규화 ATR 적용(스톱 과대 방지), 구조 손절 우선</div>'
             if atr.get("price_limit_warn") else "")
     regime = atr.get("regime")
@@ -1226,10 +1255,13 @@ def build_report_text(r: dict) -> str:
     """
     btc = r.get("id") == "btc-perp" or r.get("report_type") == "btc_perp"
     preopen = r.get("report_type") == "preopen"
-    # 진입 차단이면 타점/주문은 참고 환산만. 개장전 청산상태(EXIT_OPEN)도 차단으로 취급한다
-    # — entry.allow 는 전일값이라 True 로 남을 수 있어, preopen_state 를 함께 본다(화면 카드와 정합).
+    pstate = (r.get("preopen_state") or {}).get("state")
+    # 진입 차단이면 타점/주문은 참고 환산만. 개장전 청산(EXIT_OPEN/NO_TRADE)도 차단으로 취급한다
+    # — entry.allow 는 전일값이라 True 로 남을 수 있어 preopen_state 를 함께 본다(화면 카드와 정합).
     blocked = ((r.get("entry") or {}).get("allow") is False
-               or (r.get("preopen_state") or {}).get("state") in ("NO_TRADE", "EXIT_OPEN"))
+               or pstate in ("NO_TRADE", "EXIT_OPEN"))
+    manage = pstate in _PREOPEN_MANAGE                 # 보유 축소/유지 = 신규 매수 아님
+    no_new_entry = blocked or manage
     L: list[str] = []
     # 헤더
     if btc:
@@ -1275,6 +1307,10 @@ def build_report_text(r: dict) -> str:
         if preopen:
             L.append("- ⚠ 총점·등급은 **전일 마감 앵커**(오늘 새로 산출한 값이 아님). "
                      "방향확률만 간밤 미국장으로 유계 보정한다.")
+            _pst = r.get("preopen_state") or {}
+            if _pst.get("state"):
+                L.append(f"- 개장 상태({_pst['state']}): {_pst.get('action', '')}".rstrip()
+                         + (f" · {_pst.get('reason')}" if _pst.get("reason") else ""))
         if degen:
             span = cal.get("prob_span_pp")
             L.append(f"- ⚠ 캘리브 기울기 하한 고착 — 총점이 확률을 거의 못 움직인다"
@@ -1289,14 +1325,16 @@ def build_report_text(r: dict) -> str:
     # 개장전 EXIT_OPEN 은 entry.allow 가 전일값이라 True 로 남으므로 원시 allow 를 쓰면 같은 복사
     # 텍스트 안에 '허용'과 '차단'이 공존한다(붙여넣기 LLM 오독). blocked 기준으로 통일한다.
     ent = r.get("entry") or {}
-    if ent or blocked:
-        _ps = (r.get("preopen_state") or {}).get("state")
+    if ent or no_new_entry:
         _dir = f" (방향 {ent.get('direction')})" if ent.get("direction") else ""
         if blocked:
-            reason = ("개장 즉시 청산" if _ps == "EXIT_OPEN"
-                      else "관망(NO_TRADE)" if _ps == "NO_TRADE"
+            reason = ("개장 즉시 청산" if pstate == "EXIT_OPEN"
+                      else "관망(NO_TRADE)" if pstate == "NO_TRADE"
                       else ", ".join(ent.get("blocked_reasons") or []) or "조건 미충족")
             L.append(f"- 진입 판정: 차단{_dir} · 사유: {reason}")
+        elif manage:
+            _act = "개장 후 보유 일부 축소" if pstate == "REDUCE" else "보유 유지"
+            L.append(f"- 진입 판정: 신규 매수 아님 — {_act}(전일 진입분 관리){_dir}")
         else:
             L.append(f"- 진입 판정: 허용{_dir}")
     gate = r.get("gate") or {}
@@ -1406,17 +1444,22 @@ def build_report_text(r: dict) -> str:
         if blocked:
             L.append("- ⚠ 진입 게이트 차단 — 관망/현금, 권장비중 0%. "
                      "아래 가격은 참고 환산값이며 실행 지시가 아니다.")
+        elif manage:
+            _act = "개장 후 보유 일부 축소" if pstate == "REDUCE" else "보유 유지"
+            L.append(f"- ⚠ {_act} — 신규 매수 아님. 아래 가격은 전일 진입분 관리·참고 환산값이다.")
         L.append(f"- {pr.get('label','타점')}: 진입 {fmt(pr.get('entry'))} / 손절 {fmt(pr.get('stop'))} "
                  f"/ 목표 {fmt(pr.get('target'))} · 손익비 {fmt(pr.get('rr'))}")
         for v in (atr.get("variants") or []):
             L.append(f"  · {v.get('label')}: 진입 {fmt(v.get('entry'))} / 손절 {fmt(v.get('stop'))} "
                      f"/ 목표 {fmt(v.get('target'))} · 손익비 {fmt(v.get('rr'))}"
-                     + (" · 자격" if (v.get("qualified") and not blocked) else ""))
+                     + (" · 자격" if (v.get("qualified") and not no_new_entry) else ""))
     oc = r.get("order_card") or {}
     if oc:
         el = oc.get("etf_levels") or {}
         if blocked:
             L.append("- ⚠ 진입 차단 — HTS 자동매도 설정 금지. 아래는 지수↔ETF 참고 환산(실행 아님).")
+        elif manage:
+            L.append("- ⚠ 보유 관리(신규 매수 아님) — 아래는 지수↔ETF 참고 환산(신규 진입 지시 아님).")
         L.append(f"- 상품 주문({oc.get('instrument')}·{oc.get('shcode')}): "
                  f"진입 {fmt(el.get('entry'))} / 손절 {fmt(el.get('stop'))} / 목표 {fmt(el.get('target'))}")
         if oc.get("disparity_pct") is not None or oc.get("tracking_error_pct") is not None:

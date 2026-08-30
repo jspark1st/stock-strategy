@@ -204,8 +204,11 @@ def facts_block(ctx: dict) -> str:
     # 등급통과·allow=False 케이스에서 LLM 이 '매수'라고 결론내던 정합성 버그 방지).
     entry_blocked = ("allow" in entry) and (entry.get("allow") is False)
     # EXIT_OPEN(개장 즉시 청산)도 신규진입 금지 상태다 — entry.allow 는 전일값이라 True 로 남을 수
-    # 있어 preopen_state 를 함께 본다(build_order_card·notify 와 정합).
+    # 있어 preopen_state 를 함께 본다(build_order_card·notify 와 정합). REDUCE/HOLD_FULL 은 보유
+    # 관리(신규 매수 아님)라 LLM 에도 신규매수 언어(실행수단·권장비중)를 주지 않는다.
+    manage = st in ("REDUCE", "HOLD_FULL")
     no_position = grade_blocked or entry_blocked or st in ("NO_TRADE", "EXIT_OPEN")
+    no_new_entry = no_position or manage
     # 등급은 통과했지만 진입판정이 막은 경우, LLM 에 사유를 명시해 준다.
     if entry_blocked and not grade_blocked:
         reasons = " / ".join(entry.get("blocked_reasons") or []) or "임계 미달"
@@ -216,12 +219,12 @@ def facts_block(ctx: dict) -> str:
         p = atr.get("primary") or {}
         # 신규진입 차단/NO_TRADE 면 실행수단(인버스 등)을 노출하지 않는다 — 관망/현금이므로
         # 인버스·숏을 '실행수단'으로 병기하면 정책과 충돌한다(NO_TRADE ≠ 숏 진입).
-        instr = "" if no_position else (
+        instr = "" if no_new_entry else (
             f" · 실행수단 {atr.get('instrument')}" if atr.get("instrument") else "")
         am = (f" · 지평 오버나이트(익일 오전) ±{atr.get('am_sigma_pct')}%(σ_AM)"
               if atr.get("am_sigma_pct") is not None else "")
-        # 차단 시엔 화면·결론과 동일하게 비중 0% 로 전달한다(모델에 8%·0% 상충 숫자를 주지 않게).
-        kelly_disp = 0 if no_position else p.get("kelly_pct")
+        # 차단/보유관리 시엔 화면·결론과 동일하게 비중 0% 로 전달한다(모델에 8%·0% 상충 숫자를 주지 않게).
+        kelly_disp = 0 if no_new_entry else p.get("kelly_pct")
         lines.append(
             f"[ATR타점(참고)] 방향 {atr.get('direction')} · 진입 {p.get('entry')} · "
             f"손절 {p.get('stop')} · 목표 {p.get('target')} · 손익비 1:{p.get('rr')} · "
@@ -232,6 +235,10 @@ def facts_block(ctx: dict) -> str:
     if no_position:
         lines.append("[포지션 정책] 신규진입 차단/NO_TRADE — 관망·현금만. 인버스·숏 등 어떤 "
                      "신규 실행수단도 제시 금지(보유분 리스크 관리 언급만 허용).")
+    elif manage:
+        _act = "개장 후 보유분 일부 축소" if st == "REDUCE" else "보유 유지"
+        lines.append(f"[포지션 정책] 개장전 {st} — 오늘 행동은 '{_act}'이지 신규 매수가 아니다. "
+                     "'매수 자격 통과'·신규 진입 권유·신규 실행수단 제시 금지(전일 진입분 관리만).")
     ov = m.get("overnight") or {}
     if ov.get("drivers"):
         drv = " · ".join(f"{d['name']} {d['chg_pct']:+.2f}%" for d in ov["drivers"])
@@ -522,6 +529,11 @@ def fallback_narrative(ctx: dict) -> dict:
             why = " / ".join(entry.get("blocked_reasons") or []) or "진입 조건 미충족"
         concl = (f"신규 진입 차단({why}) — 관망·현금 유지. 권장비중 0%. "
                  "보유분은 손절 라인 점검만.")
+    elif st in ("REDUCE", "HOLD_FULL"):
+        # 개장전 보유 관리 — 신규 매수 아님. '매수 자격 통과' 문장(아래 분기)이 나오면 안 됨.
+        _act = "개장 후 보유분 일부 축소" if st == "REDUCE" else "보유 유지"
+        concl = (f"{_act}(개장전 재평가) — 신규 매수 아님. 전일 진입분 관리만, 손절 라인 점검. "
+                 "권장비중은 신규 진입 기준이 아니다.")
     elif prim.get("qualified"):
         d = "매수" if atr.get("direction") != "short" else "하락 대응"
         concl = (f"{d} 자격 통과(edge {prim.get('edge', 0):+.1%}) · 권장비중 "

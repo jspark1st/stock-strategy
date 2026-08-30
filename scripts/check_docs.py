@@ -21,7 +21,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 # 현재정본으로 테스트 수를 '지금 값'으로 진술하는 파일만. 로그·스냅샷 제외.
-TESTCOUNT_FILES = ["AGENTS.md", "guide_docs/code/README.md"]
+# 현재정본 파일 + CLAUDE.md 의 '지금 서버·repo' 배너("N collected"). CLAUDE.md 진행 로그의
+# 과거 숫자("330 passed"·"테스트 292→305")는 collected/수집 어순이 아니라 매치되지 않는다.
+TESTCOUNT_FILES = ["AGENTS.md", "guide_docs/code/README.md", "CLAUDE.md"]
 # "318 collected" · "수집 기준 318" · "318 수집" 세 어순을 모두 잡는다.
 TESTCOUNT_PATS = [re.compile(p) for p in (
     r"(\d+)\s*collected", r"수집[^\d]{0,4}(\d+)", r"(\d+)\s*수집",

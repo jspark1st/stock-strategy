@@ -308,6 +308,47 @@ def test_exit_open_entry_gate_badge_downgraded():
     assert "진입 허용" in rr.build_entry_gate(ok)
 
 
+def test_reduce_hold_suppress_new_buy():
+    # 개장전 REDUCE(일부 축소)/HOLD_FULL(유지)는 신규 매수가 아니다 — 전일 close 의 '매수 자격
+    # 통과·권장비중 N%·실행수단'을 무수정 재노출하면 안 된다(EXIT_OPEN 스윕이 놓친 나머지 상태).
+    from src.collectors import llm
+    for state, label in (("REDUCE", "보유 일부 축소"), ("HOLD_FULL", "보유 유지")):
+        r = {"id": "kospi-preopen", "report_type": "preopen", "label": "개장 전",
+             "group": "코스피", "total": 58, "grade": "중립", "p_up": 0.56, "p_down": 0.44,
+             "entry": {"allow": True, "direction": "long"},
+             "gate": {"new_entry_blocked": False, "position_scale": 1.0,
+                      "max_candidates": 3, "close_betting": True},
+             "preopen_state": {"state": state, "action": "개장 후 일부 축소",
+                               "reason": "야간 컨펌 약화"},
+             "narrative": {"conclusion": "", "scenarios": {}},
+             "atr": {"direction": "long", "instrument": "KODEX 200",
+                     "comment": "매수 자격 통과 · 권장비중 15%",
+                     "primary": {"entry": 100, "stop": 98, "target": 102, "rr": 1.0,
+                                 "qualified": True, "kelly_pct": 15, "edge": 0.05}},
+             "order_card": {"instrument": "KODEX 200", "shcode": "069500",
+                            "etf_levels": {"entry": 100, "stop": 98, "target": 102}}}
+        atr = rr.build_atr_plan(r)
+        assert "진입 자격 ✓" not in atr and label in atr and "매수 자격 통과" not in atr
+        concl = rr.build_conclusion(r)
+        assert "매수 우위" not in concl and label in concl
+        copy = rr.build_report_text(r)
+        assert "진입 판정: 허용" not in copy and f"개장 상태({state})" in copy
+        fb = llm.fallback_narrative(r)
+        assert "자격 통과" not in fb["conclusion"] and "신규 매수 아님" in fb["conclusion"]
+        facts = llm.facts_block(r)
+        assert "[포지션 정책]" in facts and state in facts
+
+
+def test_headline_downgrades_on_slope_floor():
+    from src.models import ScoreResult
+    base = dict(data_sufficient=True, missing_keys=[], grade="약세", total=53.7, warnings=[])
+    degen = SimpleNamespace(**base, p_up=0.61, calibration={"slope_at_floor": True})
+    assert "기저율(예측 아님)" in ScoreResult.headline(degen)
+    assert "익일 상승확률" not in ScoreResult.headline(degen)
+    normal = SimpleNamespace(**base, p_up=0.68, calibration={"slope_at_floor": False})
+    assert "익일 상승확률" in ScoreResult.headline(normal)
+
+
 def test_gemini_generate_records_last_error():
     # critic 무성사망 관측: 키 없으면 _LAST_ERROR['critic'] 기록(소비처가 경보로 승격 가능).
     from src.collectors import llm
