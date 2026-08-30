@@ -74,21 +74,30 @@ def gemini_generate(sys_prompt: str, user_prompt: str, env: dict,
     key = env.get("google_gemini_api")
     if not key:
         return None
-    payload = {"contents": [{"role": "user", "parts": [{"text": user_prompt}]}],
-               "systemInstruction": {"parts": [{"text": sys_prompt}]},
-               "generationConfig": {"temperature": temperature,
-                                    "maxOutputTokens": max_tokens}}
+    base = {"contents": [{"role": "user", "parts": [{"text": user_prompt}]}],
+            "systemInstruction": {"parts": [{"text": sys_prompt}]}}
     for model in (models or resolve_models(env)["critic"]):
-        try:
-            r = httpx.post(GEMINI_URL.format(model=model), params={"key": key},
-                           json=payload, timeout=TIMEOUT)
-            if r.status_code == 404:
+        # gemini_call 과 동일한 사고예산 완화: 사고 토큰이 maxOutputTokens 를 먹어 본문 0자로
+        # 조용히 죽는 것(G6 클래스)을 막는다. 사고예산 0 우선 → 미지원이면 사고 허용 재시도.
+        for cfg in ({"temperature": temperature, "maxOutputTokens": max_tokens,
+                     "thinkingConfig": {"thinkingBudget": 0}},
+                    {"temperature": temperature, "maxOutputTokens": max_tokens}):
+            try:
+                r = httpx.post(GEMINI_URL.format(model=model), params={"key": key},
+                               json={**base, "generationConfig": cfg}, timeout=TIMEOUT)
+                if r.status_code == 404:
+                    break                      # 이 모델 없음 → 다음 모델
+                if r.status_code == 400 and "thinking" in r.text.lower():
+                    continue                   # 사고예산 미지원 → 사고 허용으로 재시도
+                r.raise_for_status()
+                cand = (r.json().get("candidates") or [{}])[0]
+                text = "".join(p.get("text", "")
+                               for p in (cand.get("content") or {}).get("parts", []))
+                if text.strip():
+                    return text
+                # 본문 0자 = 실패(사고에 예산 소진) → 다음 설정/모델
+            except Exception:  # noqa — 다음 설정/모델
                 continue
-            r.raise_for_status()
-            parts = r.json()["candidates"][0]["content"]["parts"]
-            return "".join(p.get("text", "") for p in parts)
-        except Exception:  # noqa — 다음 모델/포기
-            continue
     return None
 # Opus 5 는 적응형 사고(adaptive thinking)가 기본 ON 이라 사고 토큰도 max_tokens 를 먹는다.
 # 4000 이면 JSON 이 중간에 잘릴 수 있어 넉넉히 잡는다(비용은 실제 출력분만 청구).
@@ -187,7 +196,9 @@ def facts_block(ctx: dict) -> str:
     # 신선도·이벤트락 중 하나라도 미달이면 진입 불가 — 서술도 이걸 따라야 한다(코스닥
     # 등급통과·allow=False 케이스에서 LLM 이 '매수'라고 결론내던 정합성 버그 방지).
     entry_blocked = ("allow" in entry) and (entry.get("allow") is False)
-    no_position = grade_blocked or entry_blocked or st == "NO_TRADE"
+    # EXIT_OPEN(개장 즉시 청산)도 신규진입 금지 상태다 — entry.allow 는 전일값이라 True 로 남을 수
+    # 있어 preopen_state 를 함께 본다(build_order_card·notify 와 정합).
+    no_position = grade_blocked or entry_blocked or st in ("NO_TRADE", "EXIT_OPEN")
     # 등급은 통과했지만 진입판정이 막은 경우, LLM 에 사유를 명시해 준다.
     if entry_blocked and not grade_blocked:
         reasons = " / ".join(entry.get("blocked_reasons") or []) or "임계 미달"
@@ -493,9 +504,15 @@ def fallback_narrative(ctx: dict) -> dict:
     # 결정론 폴백도 화면 배지·facts_block 과 동일하게 이걸 따라야 '차단 배지 옆 매수 결론' 모순을 안 낸다.
     entry = ctx.get("entry") or {}
     entry_blocked = ("allow" in entry) and (entry.get("allow") is False)
-    if gate.get("new_entry_blocked") or entry_blocked:
-        why = (f"등급 {grade}" if gate.get("new_entry_blocked")
-               else " / ".join(entry.get("blocked_reasons") or []) or "진입 조건 미충족")
+    # EXIT_OPEN(개장 즉시 청산)도 매수 결론 금지 — 청산 지시 옆에 '매수 자격 통과' 문장이 나오던 누출.
+    st = (ctx.get("preopen_state") or {}).get("state")
+    if gate.get("new_entry_blocked") or entry_blocked or st in ("NO_TRADE", "EXIT_OPEN"):
+        if st == "EXIT_OPEN":
+            why = "개장 즉시 청산"
+        elif gate.get("new_entry_blocked"):
+            why = f"등급 {grade}"
+        else:
+            why = " / ".join(entry.get("blocked_reasons") or []) or "진입 조건 미충족"
         concl = (f"신규 진입 차단({why}) — 관망·현금 유지. 권장비중 0%. "
                  "보유분은 손절 라인 점검만.")
     elif prim.get("qualified"):

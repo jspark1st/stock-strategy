@@ -530,25 +530,31 @@ def build_conclusion(r: dict) -> str:
     entry = r.get("entry") or {}
     grade_blocked = gate.get("new_entry_blocked")
     entry_blocked = entry.get("allow") is False   # 전체 진입 게이트(신뢰도 등) 차단
+    # 개장전 청산상태(EXIT_OPEN)·관망(NO_TRADE)도 신규진입 없음 — entry.allow 는 전일값이라
+    # True 로 남을 수 있어 preopen_state 를 함께 본다(청산 지시 옆 매수 배지 방지).
+    pstate = (r.get("preopen_state") or {}).get("state")
+    exit_open = pstate in ("NO_TRADE", "EXIT_OPEN")
     dlabel, dcol = DIR_LABEL.get(atr.get("direction"), ("판단 보류", "var(--muted)"))
     if grade_blocked:
         dlabel, dcol = "신규 진입 차단", "var(--caution)"
     elif entry_blocked:
         dlabel, dcol = "진입 게이트 차단", "var(--caution)"
+    elif exit_open:
+        dlabel, dcol = ("개장 즉시 청산" if pstate == "EXIT_OPEN" else "관망"), "var(--caution)"
     if not concl and not atr:
         return ""
     bits = []
     if gate:
         ps = gate.get("position_scale")
-        # 등급 차단 또는 전체 진입 게이트 차단이면 실효 비중 0%(등급 배수만 보여주면 오해).
+        # 등급 차단·전체 진입 게이트 차단·청산상태면 실효 비중 0%(등급 배수만 보여주면 오해).
         bits.append("신규 진입 <b>차단</b>" if grade_blocked
                     else "진입 게이트 <b>차단</b>" if entry_blocked
+                    else "<b>청산/관망</b>" if exit_open
                     else f"비중 배수 <b>{ps:.0%}</b>" if ps is not None else "")
         bits.append(f"후보 최대 <b>{gate.get('max_candidates')}</b>종목")
         bits.append("종가베팅 <b>" + ("검토 가능" if gate.get("close_betting") else "불가") + "</b>")
-    # 신규진입 차단/NO_TRADE 면 인버스 등 '실행 수단'을 병기하지 않는다(관망/현금과 충돌).
-    no_position = (grade_blocked or entry_blocked
-                   or (r.get("preopen_state") or {}).get("state") == "NO_TRADE")
+    # 신규진입 차단/청산/NO_TRADE 면 인버스 등 '실행 수단'을 병기하지 않는다(관망/현금과 충돌).
+    no_position = grade_blocked or entry_blocked or exit_open
     if no_position:
         bits.append("실행 <b>관망/현금</b>")
     elif atr.get("instrument"):
@@ -585,15 +591,22 @@ def build_atr_plan(r: dict) -> str:
     entry = r.get("entry") or {}
     entry_blocked = entry.get("allow") is False
     entry_reasons = ", ".join(entry.get("blocked_reasons") or [])
-    no_position = (blocked or entry_blocked
-                   or (r.get("preopen_state") or {}).get("state") == "NO_TRADE")
-    # 차단/NO_TRADE 면 인버스 등 체결수단을 명시하지 않는다(관망/현금이므로)
+    pstate = (r.get("preopen_state") or {}).get("state")
+    exit_open = pstate in ("NO_TRADE", "EXIT_OPEN")   # 개장 즉시 청산/관망 = 신규진입 없음
+    no_position = blocked or entry_blocked or exit_open
+    # 차단/청산이면 방향 배지도 '차단'으로 낮춘다(매수 배지 옆 0% 모순 방지).
+    if no_position and not blocked and not entry_blocked:
+        dlabel, dcol = ("개장 즉시 청산" if pstate == "EXIT_OPEN" else "관망"), "var(--caution)"
+    # 차단/청산/NO_TRADE 면 인버스 등 체결수단을 명시하지 않는다(관망/현금이므로)
     instr_txt = ("" if no_position
                  else f" · 실제 체결 수단: {esc(atr.get('instrument') or 'KODEX 200 / 코스닥150')}")
     if blocked:
         qual = "등급 게이트 차단 — 신규 진입 없음"
     elif entry_blocked:
         qual = f"진입 게이트 차단 — {entry_reasons or '조건 미충족'}"
+    elif exit_open:
+        qual = ("개장 즉시 청산 — 신규 진입 없음" if pstate == "EXIT_OPEN"
+                else "관망 — 신규 진입 없음")
     elif p.get("qualified"):
         qual = "진입 자격 ✓"
     else:
@@ -615,10 +628,11 @@ def build_atr_plan(r: dict) -> str:
         _tile("손익비", f"1 : {fmt(p.get('rr'),1)}", "var(--accent)"),
         _tile("edge", signed(edge, 3) if edge is not None else "—", edge_col,
               f"손익분기 {fmt(p.get('p_breakeven'),2)}"),
-        _tile("권장비중", "0%" if (blocked or entry_blocked) else f"{kelly:.0f}%",
-              "var(--caution)" if (blocked or entry_blocked) else "var(--accent)",
+        _tile("권장비중", "0%" if no_position else f"{kelly:.0f}%",
+              "var(--caution)" if no_position else "var(--accent)",
               "등급 게이트 차단 → 0%" if blocked else
               f"진입 게이트 차단({entry_reasons or '조건 미충족'}) → 0%" if entry_blocked else
+              ("개장 즉시 청산 → 0%" if pstate == "EXIT_OPEN" else "관망 → 0%") if exit_open else
               (f"Half-Kelly × 게이트 {atr.get('position_scale', 1):.0%} · 상한 25%"
                if atr.get("position_scale", 1) != 1 else "Half-Kelly · 상한 25%")),
     ])
@@ -641,7 +655,7 @@ def build_atr_plan(r: dict) -> str:
     # (atr.compute_plan 은 entry.allow 를 모른 채 계산되므로 여기서 게이트를 다시 적용한다.)
     rows = ""
     for v in atr.get("variants", []):
-        vk = 0 if (blocked or entry_blocked) else (v.get('kelly_pct') or 0)
+        vk = 0 if no_position else (v.get('kelly_pct') or 0)
         rows += (f"<tr><td>{esc(v.get('label'))}</td><td>{fmt(v.get('stop'),2)}</td>"
                  f"<td>{fmt(v.get('target'),2)}</td><td>1:{fmt(v.get('rr'),1)}</td>"
                  f"<td style='color:{'var(--up)' if (v.get('edge') or 0)>0 else 'var(--down)'}'>"
@@ -655,6 +669,10 @@ def build_atr_plan(r: dict) -> str:
     if entry_blocked and not blocked:
         obs_comment = (f"진입 게이트 차단 — {entry_reasons or '조건 미충족'}. 권장비중 0%(관망/현금). "
                        "아래 타점은 보유분 관리·참고용 수치일 뿐 신규 베팅 근거가 아니다.")
+    elif exit_open and not blocked and not entry_blocked:
+        _lead = "개장 즉시 청산(EXIT_OPEN)" if pstate == "EXIT_OPEN" else "관망(NO_TRADE)"
+        obs_comment = (f"{_lead} — 관망/현금, 권장비중 0%. 아래 타점은 보유분 관리·참고용 수치일 뿐 "
+                       "신규 베팅 근거가 아니다.")
     warn = ('<div class="atr-warn">⚠ 변동성 과열 — 정규화 ATR 적용(스톱 과대 방지), 구조 손절 우선</div>'
             if atr.get("price_limit_warn") else "")
     regime = atr.get("regime")
@@ -1125,14 +1143,22 @@ def build_overnight(r: dict) -> str:
     # #5: 앵커가 15:00 잠정이면 '마감'이라 부르지 않는다(확정 회차면 '마감 확정').
     anchor_lbl = "전일 15:00 잠정" if ov.get("anchor_intraday") else "전일 마감 확정"
     trans = floor_note = ""
+    # 캘리브 기울기 하한 고착이면 이 확률은 예측이 아니라 기저율 — 히어로·복사와 같은 격하를 따른다
+    # (같은 개장전 뷰에서 히어로 '기저율(예측 아님)' 옆에 이 카드가 '상승확률'로 상충하던 문제).
+    degen = bool((r.get("calibration") or {}).get("slope_at_floor"))
     if ap is not None and pp is not None:
-        # #1/#2: '익일 상승확률'로 방향을 명시(‘익일확률’ 모호성 제거)
-        trans = (f'<div class="ov-trans">{anchor_lbl} <b>익일 상승확률 {ap*100:.0f}%</b> '
-                 f'<span class="cd-arrow">→</span> 간밤 재평가 '
-                 f'<b style="color:{dir_color(pp-ap)}">상승 {pp*100:.0f}%</b>'
+        up_word = "상승 기저율(예측 아님)" if degen else "익일 상승확률"
+        reval_word = "간밤 반영" if degen else "간밤 재평가 상승"
+        trans = (f'<div class="ov-trans">{anchor_lbl} <b>{up_word} {ap*100:.0f}%</b> '
+                 f'<span class="cd-arrow">→</span> {reval_word} '
+                 f'<b style="color:{dir_color(pp-ap)}">{pp*100:.0f}%</b>'
                  f'<span class="muted"> ({signed((pp-ap)*100)}%p, 하락 {(1-pp)*100:.0f}%)</span></div>')
+        if degen:
+            floor_note = ('<div class="note muted" style="color:var(--caution)">※ 캘리브 기울기 하한 '
+                          '고착 — 이 확률은 방향 예측이 아니라 이 시장의 기저 상승률. 간밤 틸트(%p)만 '
+                          '방향 신호로 참고.</div>')
         # #3: 하한(20%) 걸림으로 %p 변화가 0이면 명시 — '변화 없음'이 아니라 하한 도달
-        if abs(pp - ap) < 1e-9 and abs(ov.get("tilt", 0)) > 1e-9:
+        elif abs(pp - ap) < 1e-9 and abs(ov.get("tilt", 0)) > 1e-9:
             floor_note = ('<div class="note muted">※ 상승확률이 하한(20%)에 도달해 %p 변화 0 — '
                           '추가 하방 우위는 아래 <b>야간 컨펌 점수</b>로 반영(확률 아님).</div>')
     # #3: 배수를 '야간 컨펌 점수'로 라벨 + 무엇에 대한 확인인지 명시(p_up 에 곱하지 않음)
@@ -1180,7 +1206,10 @@ def build_report_text(r: dict) -> str:
     """
     btc = r.get("id") == "btc-perp" or r.get("report_type") == "btc_perp"
     preopen = r.get("report_type") == "preopen"
-    blocked = (r.get("entry") or {}).get("allow") is False  # 진입 차단이면 타점/주문은 참고 환산만
+    # 진입 차단이면 타점/주문은 참고 환산만. 개장전 청산상태(EXIT_OPEN)도 차단으로 취급한다
+    # — entry.allow 는 전일값이라 True 로 남을 수 있어, preopen_state 를 함께 본다(화면 카드와 정합).
+    blocked = ((r.get("entry") or {}).get("allow") is False
+               or (r.get("preopen_state") or {}).get("state") in ("NO_TRADE", "EXIT_OPEN"))
     L: list[str] = []
     # 헤더
     if btc:

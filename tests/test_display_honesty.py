@@ -250,6 +250,55 @@ def test_report_text_performance_hidden_under_40():
     assert "판별 성과" in t and "ROC-AUC" in t
 
 
+def _exit_open_report():
+    # 개장전 EXIT_OPEN: 전일 entry.allow=True 지만 간밤 급락으로 '개장 즉시 청산'.
+    return {"id": "kospi-preopen", "report_type": "preopen", "label": "개장 전",
+            "group": "코스피", "total": 55, "grade": "약세", "p_up": 0.55, "p_down": 0.45,
+            "entry": {"allow": True, "direction": "long"},
+            "gate": {"new_entry_blocked": False, "position_scale": 1.0,
+                     "max_candidates": 3, "close_betting": False},
+            "preopen_state": {"state": "EXIT_OPEN", "label": "개장 즉시 청산"},
+            "narrative": {"conclusion": "관망", "scenarios": {}},
+            "atr": {"direction": "long", "instrument": "KODEX 200",
+                    "comment": "매수 자격 통과 · 권장비중 15%",
+                    "primary": {"entry": 100, "stop": 98, "target": 102, "rr": 1.0,
+                                "qualified": True, "kelly_pct": 15, "edge": 0.05},
+                    "variants": [{"label": "단기", "stop": 95, "target": 110, "rr": 2.0,
+                                  "edge": 0.2, "kelly_pct": 10}]},
+            "order_card": {"instrument": "KODEX 200", "shcode": "069500",
+                           "etf_levels": {"entry": 100, "stop": 98, "target": 102}},
+            "subscores": [{"key": "close", "label": "종가 강도", "score": 40}]}
+
+
+def test_exit_open_suppresses_buy_all_paths():
+    # EXIT_OPEN(개장 즉시 청산)은 entry.allow 가 전일값이라 True 로 남는다 → 화면·복사·LLM 이
+    # 청산 지시 옆에 매수 카드를 내면 안 된다(G2/G4 신변종 재발 방지).
+    from src.collectors import llm
+    r = _exit_open_report()
+    atr = rr.build_atr_plan(r)
+    assert "진입 자격 ✓" not in atr
+    assert "개장 즉시 청산" in atr
+    assert "매수 자격 통과" not in atr           # obs comment 덮음
+    concl = rr.build_conclusion(r)
+    assert "개장 즉시 청산" in concl and "실행 수단" not in concl
+    copy = rr.build_report_text(r)
+    assert "진입 게이트 차단" in copy             # 복사 타점/주문에 차단 주석
+    facts = llm.facts_block(r)
+    assert "권장비중 0%" in facts
+    fb = llm.fallback_narrative(r)
+    assert "신규 진입 차단(개장 즉시 청산)" in fb["conclusion"]
+
+
+def test_build_overnight_respects_slope_floor():
+    base = {"report_type": "preopen",
+            "overnight": {"drivers": [{"name": "나스닥", "chg_pct": 0.5, "weight": 0.4}],
+                          "anchor_p_up": 0.58, "p_up": 0.61, "tilt": 0.03, "direction": "long"}}
+    degen = rr.build_overnight(dict(base, calibration={"slope_at_floor": True}))
+    assert "기저율(예측 아님)" in degen and "익일 상승확률" not in degen
+    normal = rr.build_overnight(dict(base, calibration={"slope_at_floor": False}))
+    assert "익일 상승확률" in normal and "기저율(예측 아님)" not in normal
+
+
 def test_copy_widget_and_script_in_render():
     r2 = dict(_full_report(), id="kosdaq-close", label="장마감전 분석", group="코스닥")
     html = rr.render({"trade_date": "2026-08-27", "reports": [_full_report(), r2]})

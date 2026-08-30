@@ -240,7 +240,18 @@ def main() -> int:
                 store.record_prediction(conn, rec, now.isoformat(timespec="seconds"),
                                         report_type="preopen")
         except Exception as e:  # noqa — 기록 실패가 리포트/배포를 막지 않는다
-            print(f"[preopen] 예측 기록 실패({type(e).__name__}: {e})")
+            # 무성 실패 금지(run_close 5곳과 동일 규율): 간밤 틸트(유일 검증 엣지) head-to-head
+            # 표본 적립이 조용히 멈추는 것을 alerts.log 로 사람에게 알린다.
+            msg = (f"[preopen] 예측 기록 실패({type(e).__name__}: {e}) — "
+                   "간밤 틸트 head-to-head 표본 적립 중단 가능")
+            print(msg)
+            try:
+                alog = ROOT / "out" / "alerts.log"
+                alog.parent.mkdir(exist_ok=True)
+                with open(alog, "a", encoding="utf-8") as f:
+                    f.write(f"[{now.isoformat(timespec='seconds')}] ALERT: {msg}\n")
+            except Exception:  # noqa
+                pass
         finally:
             if conn is not None:
                 conn.close()
