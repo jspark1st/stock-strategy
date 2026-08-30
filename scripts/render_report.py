@@ -589,9 +589,12 @@ def build_conclusion(r: dict) -> str:
                     else "<b>보유 유지</b>" if pstate == "HOLD_FULL"
                     else f"비중 배수 <b>{ps:.0%}</b>" if ps is not None else "")
         bits.append(f"후보 최대 <b>{gate.get('max_candidates')}</b>종목")
-        # 종가베팅은 15:00 마감 전용 개념 — 개장전 리포트엔 표시하지 않는다.
+        # 종가베팅은 15:00 마감 전용 개념 — 개장전 리포트엔 표시하지 않는다. 종가베팅=종가 신규진입
+        # 그 자체라, 차단/청산/보유관리(no_new_entry)면 close_betting 이 True(강세등급)여도 '불가'로
+        # 억제한다(등급게이트만 보는 close_betting 이 entry.allow 차단을 무시하고 새던 누출).
         if r.get("report_type") != "preopen":
-            bits.append("종가베팅 <b>" + ("검토 가능" if gate.get("close_betting") else "불가") + "</b>")
+            _cb = "불가" if no_new_entry else ("검토 가능" if gate.get("close_betting") else "불가")
+            bits.append(f"종가베팅 <b>{_cb}</b>")
     # 신규진입이 아니면(차단·청산·보유관리) 신규 매수 '실행 수단'을 병기하지 않는다.
     if no_new_entry:
         if manage:
@@ -2933,7 +2936,9 @@ BTC_DATESEL_SYNC = """<script>
         for(var s=0;s<want.length&&!pick;s++)
           for(var j=0;j<day.length;j++){ if(isReg(day[j])&&day[j].slot===want[s]){pick=day[j];break;} }
         if(!pick) pick=day.slice().sort(function(a,b){return (a.slot||'')<(b.slot||'')?1:-1;})[0];
-        return (pick&&pick.href)||'/#btc-perp';
+        var hr=(pick&&pick.href)||'/#btc-perp';
+        if(hr.indexOf('#')<0) hr+='#btc-perp';   // 앵커 없으면 붙인다 — 없으면 그 페이지 기본(코스피) 뷰로 열림
+        return hr;
       }
       if(!curDate||dates.indexOf(curDate)<0) curDate=dates[0];
       sel.innerHTML=dates.map(function(d){

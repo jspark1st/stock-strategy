@@ -521,7 +521,18 @@ def main() -> int:
                                 json.dumps(rep, ensure_ascii=False, default=str),
                                 "{}", "{}", "{}", "", now.strftime("%Y-%m-%d %H:%M:%S"))
         except Exception as e:  # noqa
-            print(f"⚠ DB 기록 ({type(e).__name__}: {e})")
+            # 무성 삼킴 금지(주식 run_close 5곳 승격과 동일 규율): 채점·예측기록·스냅샷 실패는
+            # BTC 성적·캘리브(fit_calibrator) 자가학습을 조용히 멈춘다. exit 0 이라 auto_btc.sh 도
+            # 안 울리므로 alerts.log 에 직접 남겨 사람이 읽게 한다.
+            msg = f"[BTC] DB 학습기록 실패({type(e).__name__}: {e}) — 예측/채점/스냅샷 누락, 자가학습 정체 가능"
+            print("⚠ " + msg)
+            try:
+                alog = ROOT / "out" / "alerts.log"
+                alog.parent.mkdir(exist_ok=True)
+                with open(alog, "a", encoding="utf-8") as f:
+                    f.write(f"[{now.strftime('%Y-%m-%d %H:%M:%S')}] ALERT: {msg}\n")
+            except Exception:  # noqa
+                pass
         conn.close()
         conn = None
         remote.push_db(DB_LOCAL, env)

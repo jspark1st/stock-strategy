@@ -339,6 +339,20 @@ def test_reduce_hold_suppress_new_buy():
         assert "[포지션 정책]" in facts and state in facts
 
 
+def test_close_betting_suppressed_when_blocked():
+    # 강세등급이면 gate.close_betting=True 지만, entry.allow=False(6조건 미달)면 매매결론의
+    # '종가베팅 검토 가능'을 '불가'로 억제해야 한다(종가베팅=종가 신규진입 그 자체 — 게이트 누출).
+    blocked = {"gate": {"new_entry_blocked": False, "close_betting": True,
+                        "position_scale": 1.0, "max_candidates": 3},
+               "entry": {"allow": False}, "atr": {"direction": "long", "primary": {}},
+               "narrative": {"conclusion": ""}}
+    c = rr.build_conclusion(blocked)
+    assert "종가베팅 <b>불가</b>" in c and "종가베팅 <b>검토 가능</b>" not in c
+    # 정상 허용 + 강세는 '검토 가능' 유지(과잉 억제 금지)
+    ok = dict(blocked, entry={"allow": True})
+    assert "종가베팅 <b>검토 가능</b>" in rr.build_conclusion(ok)
+
+
 def test_headline_downgrades_on_slope_floor():
     from src.models import ScoreResult
     base = dict(data_sufficient=True, missing_keys=[], grade="약세", total=53.7, warnings=[])
