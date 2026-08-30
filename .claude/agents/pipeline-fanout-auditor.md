@@ -5,6 +5,7 @@ description: >-
   LLM→학습 DB→페이퍼→렌더→크론 배선이 끊기거나 무시되는지, 논리 오류·재발 버그·
   죽은 호출이 있는지 점검. "전면 점검 / 파이프라인 점검 / 배선 확인 / 논리 오류·버그
   찾아줘 / 전체 감사 / fan-out 점검" 요청에 사용. 읽기 전용 — 코드를 고치지 않는다.
+  찾아 고치려면 quality-fanout.
 tools: Read, Grep, Glob, Bash, Task
 model: opus
 ---

@@ -40,12 +40,12 @@ description: >-
 - 한국 색관례(빨강 상승·파랑 하락), dataviz 스킬 팔레트 PASS, 라이트/다크 검증.
 
 ## 방법
-1. **기본은 `pipeline-fanout-auditor` 에 위임** (8축 병렬 + 적대검증 + 재발 체크리스트).
-   한 세션이 파일을 순차로 훑지 않는다. 축만 좁히면 `scoring-auditor` / `data-collector-debug` /
-   `ui-honesty-auditor` 를 직접 띄워도 된다.
-2. 각 축을 코드에서 검증하고 산식은 직접 계산.
-3. `.venv/bin/python -m pytest tests/ -q` 통과 확인.
-4. 발견을 **심각도 순 · 파일:심볼 · 실패 시나리오** 로 정리.
+1. **점수·다음 일이 목표면 `system-evaluator`** (`/evaluate`). evaluation6과 같은 12항목으로 채점.
+2. **결함 사냥만이면 `pipeline-fanout-auditor`.** **찾아 고치려면 `quality-fanout`** (`/quality`).
+   축만 좁히면 `scoring-auditor` / `data-collector-debug` / `ui-honesty-auditor`.
+3. 각 축을 코드에서 검증하고 산식은 직접 계산.
+4. `.venv/bin/python -m pytest tests/ -q` 통과 확인.
+5. 발견을 **심각도 순 · 파일:심볼 · 실패 시나리오** 로 정리.
 
 ## 출력
-축별 결과와 발견 목록. 수정이 필요하면 제안하고 **사용자 승인 후** 진행. 회귀 테스트를 새 결함마다 추가하는 것을 원칙으로.
+축별 결과와 발견 목록. **고치려면 `/quality` (`quality-fanout`)**. 찾기만 하면 여기서 끝.

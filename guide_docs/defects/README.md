@@ -1,7 +1,7 @@
 # defects — 같은 구멍이 다시 열리지 않게 한다
 
 이 시스템에서 반복된 실패 모드는 **화면은 정상인데 학습·게이트·서술이 거짓**인 것이다.
-전면 점검은 `/checkup` → `pipeline-fanout-auditor`(8축 병렬). 수정은 사용자 승인 후.
+전면 점검은 `/checkup` → `pipeline-fanout-auditor`(찾기만). **찾아 고치려면 `/quality` → `quality-fanout`.**
 
 ---
 
