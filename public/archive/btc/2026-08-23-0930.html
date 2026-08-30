@@ -136,6 +136,17 @@
   .stage-sep{color:var(--muted);font-weight:800}
   .stage-note{color:var(--muted);font-size:.82rem;margin-top:5px}
   .stage-note b{color:var(--text)}
+  /* 뷰 상단 탭 — 지평(단기/중기/장기) + 국면(장마감/개장전). A안 IA. */
+  .view-nav{display:flex;flex-direction:column;gap:6px;margin:2px 0 14px}
+  .vtabs{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+  .vtabs-lbl{font-size:.72rem;color:var(--muted);font-weight:700;min-width:2.4em}
+  .vtab{border:1px solid var(--border);background:var(--surface2);color:var(--muted);
+    border-radius:8px;padding:5px 12px;font:inherit;font-size:.82rem;font-weight:600;
+    text-decoration:none;min-height:32px;display:inline-flex;align-items:center}
+  .vtab.active{background:color-mix(in srgb,var(--accent) 20%,transparent);color:var(--accent);border-color:var(--accent)}
+  .vtab-off{opacity:.5;border-style:dashed;cursor:default}
+  a.vtab:hover{border-color:var(--accent)}
+  a.vtab:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   /* 확정 대조 테이블 */
   .cd-table{width:100%;border-collapse:collapse;margin-top:8px;font-variant-numeric:tabular-nums}
   .cd-table th{text-align:left;font-size:.78rem;color:var(--muted);font-weight:700;padding:4px 8px;border-bottom:1px solid var(--border)}
@@ -340,7 +351,7 @@
       <select class="stock-datesel" aria-label="날짜 선택" onchange="if(this.value) location=this.value">
         <option value="/" selected>2026-08-23</option>
       </select></label></div>
-    <nav class="nav" aria-label="리포트 목록"><div class="nav-group"><div class="nav-title">코스피</div><a class="nav-item" data-target="kospi-close" href="#kospi-close" aria-label="장마감전 분석 코스피"><span>장마감전 분석</span><span class="nav-score" style="color:var(--caution)">54.8</span></a><a class="nav-item" data-target="kospi-preopen" href="#kospi-preopen" aria-label="개장전 분석 코스피"><span>개장전 분석</span><span class="nav-score" style="color:var(--good)">66.2</span></a></div><div class="nav-group"><div class="nav-title">코스닥</div><a class="nav-item" data-target="kosdaq-close" href="#kosdaq-close" aria-label="장마감전 분석 코스닥"><span>장마감전 분석</span><span class="nav-score" style="color:var(--caution)">32.3</span></a><a class="nav-item" data-target="kosdaq-preopen" href="#kosdaq-preopen" aria-label="개장전 분석 코스닥"><span>개장전 분석</span><span class="nav-score" style="color:var(--neutral)">56.6</span></a></div><div class="nav-group"><div class="nav-title">비트코인 선물</div><a class="nav-item" data-target="btc-perp" href="#btc-perp" aria-label="BTCUSDT 비트코인 선물"><span>BTCUSDT</span><span class="nav-score" style="color:var(--caution)">51.8</span></a></div><div class="nav-group"><div class="nav-title">진단</div><a class="nav-item" data-target="report-review" href="#report-review" aria-label="리포트 비평 진단"><span>리포트 비평</span><span class="nav-badge">—</span></a></div></nav>
+    <nav class="nav" aria-label="리포트 목록"><div class="nav-group"><div class="nav-title">주식</div><a class="nav-item" data-target="kospi-close" data-views="kospi-close kospi-preopen" href="#kospi-close" aria-label="코스피 주식"><span>코스피</span><span class="nav-score" style="color:var(--caution)">54.8</span></a><a class="nav-item" data-target="kosdaq-close" data-views="kosdaq-close kosdaq-preopen" href="#kosdaq-close" aria-label="코스닥 주식"><span>코스닥</span><span class="nav-score" style="color:var(--caution)">32.3</span></a></div><div class="nav-group"><div class="nav-title">가상화폐</div><a class="nav-item" data-target="btc-perp" data-views="btc-perp" href="#btc-perp" aria-label="BTC 선물 가상화폐"><span>BTC 선물</span><span class="nav-score" style="color:var(--caution)">51.8</span></a><span class="nav-item ph" aria-disabled="true"><span>ETH 선물</span><span class="nav-badge">예정</span></span></div><div class="nav-group"><div class="nav-title">종합 리포트</div><span class="nav-item ph" aria-disabled="true"><span>종합 리포트</span><span class="nav-badge">예정</span></span></div><div class="nav-group"><div class="nav-title">진단</div><a class="nav-item" data-target="report-review" data-views="report-review" href="#report-review" aria-label="리포트 비평 진단"><span>리포트 비평</span><span class="nav-badge">—</span></a></div></nav>
     <div class="side-foot">
       <button class="toggle" type="button" aria-pressed="false" aria-label="라이트/다크 테마 전환"
         onclick="window.__toggleTheme()">🌓 라이트 / 다크</button>
@@ -354,7 +365,7 @@
         aria-controls="sidebar" onclick="window.__toggleSidebar()">☰</button>
       <strong>easystock</strong>
     </div>
-    <section class="view" data-view="kospi-close">
+    <section class="view" data-view="kospi-close"><div class="view-nav"><div class="vtabs"><span class="vtabs-lbl">지평</span><span class="vtab active">단기</span><span class="vtab vtab-off" aria-disabled="true">중기·예정</span><span class="vtab vtab-off" aria-disabled="true">장기·예정</span></div><div class="vtabs"><span class="vtabs-lbl">국면</span><a class="vtab active" data-target="kospi-close" href="#kospi-close">장마감전 분석</a><a class="vtab" data-target="kospi-preopen" href="#kospi-preopen">개장전 분석</a></div></div>
     <div class="view-head">
       <div class="view-title">장마감전 분석 <span class="view-sub">· 코스피 · 2026-08-21</span> <span class="badge badge-ok">마감 확정</span></div>
       <div class="stage-strip"><div class="stage-steps"><span class="stage-step ">① 결정</span><span class="stage-sep">›</span><span class="stage-step stage-on">② 컨펌</span><span class="stage-sep">›</span><span class="stage-step ">③ 재평가</span></div><div class="stage-note">지금 <b>② 컨펌</b> · 확정치로 결과 확인 · 다음 갱신 내일 08:00 KST 재평가</div><div class="stage-note">상태 <b>CLOSE_RECONCILIATION</b> · 허용 데이터: 확정 종가·확정 수급(16:30) · 허용 액션: 잠정→확정 재계산·컨펌 행동(유지/축소/청산예약) · 자동주문 차단</div></div>
@@ -678,7 +689,7 @@
   <div class="card">
     <h2>익일 개장 전 재검토 체크리스트</h2>
     <ul class="check"><li>미 국채 10년물 및 나스닥 반도체 지수 야간 흐름 확인</li><li>원/달러 환율 1384.6 대비 갭 여부 및 변동성 재점검</li><li>코스닥 외국인·기관 수급 및 사이드카 재발 여부</li><li>SK하이닉스·삼성전자 후속 공시(자사주·주주환원) 및 시장 반응</li><li>이란 관련 제재·회견 등 지정학 헤드라인 재확인</li></ul>
-  </div></section><section class="view" data-view="kosdaq-close">
+  </div></section><section class="view" data-view="kosdaq-close"><div class="view-nav"><div class="vtabs"><span class="vtabs-lbl">지평</span><span class="vtab active">단기</span><span class="vtab vtab-off" aria-disabled="true">중기·예정</span><span class="vtab vtab-off" aria-disabled="true">장기·예정</span></div><div class="vtabs"><span class="vtabs-lbl">국면</span><a class="vtab active" data-target="kosdaq-close" href="#kosdaq-close">장마감전 분석</a><a class="vtab" data-target="kosdaq-preopen" href="#kosdaq-preopen">개장전 분석</a></div></div>
     <div class="view-head">
       <div class="view-title">장마감전 분석 <span class="view-sub">· 코스닥 · 2026-08-21</span> <span class="badge badge-ok">마감 확정</span></div>
       <div class="stage-strip"><div class="stage-steps"><span class="stage-step ">① 결정</span><span class="stage-sep">›</span><span class="stage-step stage-on">② 컨펌</span><span class="stage-sep">›</span><span class="stage-step ">③ 재평가</span></div><div class="stage-note">지금 <b>② 컨펌</b> · 확정치로 결과 확인 · 다음 갱신 내일 08:00 KST 재평가</div><div class="stage-note">상태 <b>CLOSE_RECONCILIATION</b> · 허용 데이터: 확정 종가·확정 수급(16:30) · 허용 액션: 잠정→확정 재계산·컨펌 행동(유지/축소/청산예약) · 자동주문 차단</div></div>
@@ -992,7 +1003,7 @@
   <div class="card">
     <h2>익일 개장 전 재검토 체크리스트</h2>
     <ul class="check"><li>익일 개장 전 미 국채금리·뉴욕증시 마감 지표 재확인</li><li>외국인·기관 수급 전환 여부(전일 -2836억/-3464억 대비)</li><li>원/달러 환율 1384.6원 기준 추가 변동 여부</li><li>등급게이트(신규진입 차단) 해제 여부 및 총점 32.3 개선 여부</li><li>ATR 타점(802.94 진입가 기준 손절 782.65·목표 821.23) 유효성 재점검</li></ul>
-  </div></section><section class="view" data-view="kospi-preopen">
+  </div></section><section class="view" data-view="kospi-preopen"><div class="view-nav"><div class="vtabs"><span class="vtabs-lbl">지평</span><span class="vtab active">단기</span><span class="vtab vtab-off" aria-disabled="true">중기·예정</span><span class="vtab vtab-off" aria-disabled="true">장기·예정</span></div><div class="vtabs"><span class="vtabs-lbl">국면</span><a class="vtab" data-target="kospi-close" href="#kospi-close">장마감전 분석</a><a class="vtab active" data-target="kospi-preopen" href="#kospi-preopen">개장전 분석</a></div></div>
     <div class="view-head">
       <div class="view-title">개장전 분석 <span class="view-sub">· 코스피 · 2026-08-21</span> <span class="badge badge-info" title="전일 마감 수치를 앵커로 재검토">개장 전 재검토</span></div>
       <div class="stage-strip"><div class="stage-steps"><span class="stage-step ">① 결정</span><span class="stage-sep">›</span><span class="stage-step ">② 컨펌</span><span class="stage-sep">›</span><span class="stage-step stage-on">③ 재평가</span></div><div class="stage-note">지금 <b>③ 재평가</b> · 간밤 반영·방향 결정 · 다음 갱신 장중 15:00 KST 결정</div><div class="stage-note">상태 <b>PREOPEN</b> · 허용 데이터: 전일 확정치·미국장·금리·유가·환율 · 허용 액션: 관심 시나리오·개장 대응(유지/축소/청산) 결정만 · 자동주문 차단</div></div>
@@ -1149,7 +1160,7 @@
   <div class="card">
     <h2>장중 확인 체크리스트</h2>
     <ul class="check"><li>개장 직후 코스피200 선물 및 실시간 원달러 환율 재확인</li><li>삼성전자·SK하이닉스 등 반도체 대형주 갭 방향 및 폭 확인</li><li>외국인·기관·개인 수급 동향 초반 흐름 점검</li><li>08:50 장전 재평가 시점까지 지수 변동성 및 거래대금 추이 확인</li><li>등급게이트(NO_TRADE) 유지 여부 재점검</li></ul>
-  </div></section><section class="view" data-view="kosdaq-preopen">
+  </div></section><section class="view" data-view="kosdaq-preopen"><div class="view-nav"><div class="vtabs"><span class="vtabs-lbl">지평</span><span class="vtab active">단기</span><span class="vtab vtab-off" aria-disabled="true">중기·예정</span><span class="vtab vtab-off" aria-disabled="true">장기·예정</span></div><div class="vtabs"><span class="vtabs-lbl">국면</span><a class="vtab" data-target="kosdaq-close" href="#kosdaq-close">장마감전 분석</a><a class="vtab active" data-target="kosdaq-preopen" href="#kosdaq-preopen">개장전 분석</a></div></div>
     <div class="view-head">
       <div class="view-title">개장전 분석 <span class="view-sub">· 코스닥 · 2026-08-21</span> <span class="badge badge-info" title="전일 마감 수치를 앵커로 재검토">개장 전 재검토</span></div>
       <div class="stage-strip"><div class="stage-steps"><span class="stage-step ">① 결정</span><span class="stage-sep">›</span><span class="stage-step ">② 컨펌</span><span class="stage-sep">›</span><span class="stage-step stage-on">③ 재평가</span></div><div class="stage-note">지금 <b>③ 재평가</b> · 간밤 반영·방향 결정 · 다음 갱신 장중 15:00 KST 결정</div><div class="stage-note">상태 <b>PREOPEN</b> · 허용 데이터: 전일 확정치·미국장·금리·유가·환율 · 허용 액션: 관심 시나리오·개장 대응(유지/축소/청산) 결정만 · 자동주문 차단</div></div>
@@ -1301,7 +1312,7 @@
   <div class="card">
     <h2>장중 확인 체크리스트</h2>
     <ul class="check"><li>09:00 개장 직후 코스닥 지수의 갭 방향과 크기 확인</li><li>반도체·소부장 대형주의 상대강세 여부 점검</li><li>외국인·기관 수급 동향(순매수/순매도 전환 여부) 확인</li><li>원달러 환율 장중 추가 변동 확인</li><li>08:50 장전 재평가 시점까지 ATR타점 조건(watch) 변화 여부 재확인</li></ul>
-  </div></section><section class="view" data-view="btc-perp">
+  </div></section><section class="view" data-view="btc-perp"><div class="view-nav"><div class="vtabs"><span class="vtabs-lbl">지평</span><span class="vtab active">단기</span><span class="vtab vtab-off" aria-disabled="true">중기·예정</span><span class="vtab vtab-off" aria-disabled="true">장기·예정</span></div></div>
     <div class="view-head">
       <div class="view-title">BTCUSDT <span class="view-sub">· 비트코인 선물 · 2026-08-23 0930</span> <span class="badge badge-info">세션 스냅샷</span></div>
       <div class="slot-pick"><label class="slot-lab">날짜 <select class="slot-sel" onchange="if(this.value) location=this.value"><option value="/archive/btc/2026-08-30-2200.html#btc-perp">2026-08-30</option><option value="/archive/btc/2026-08-29-2200.html#btc-perp">2026-08-29</option><option value="/archive/btc/2026-08-28-2200.html#btc-perp">2026-08-28</option><option value="/archive/btc/2026-08-27-2200.html#btc-perp">2026-08-27</option><option value="/archive/btc/2026-08-26-2200.html#btc-perp">2026-08-26</option><option value="/archive/btc/2026-08-25-2200.html#btc-perp">2026-08-25</option><option value="/archive/btc/2026-08-24-2200.html#btc-perp">2026-08-24</option><option value="/archive/btc/2026-08-23-2200.html#btc-perp" selected>2026-08-23</option><option value="/archive/btc/2026-08-22-2200.html#btc-perp">2026-08-22</option><option value="/archive/btc/2026-08-21-2200.html#btc-perp">2026-08-21</option></select></label><div class="slot-regs"><a class="slot-chip active" href="/#btc-perp">09:30</a><a class="slot-chip" href="/archive/btc/2026-08-23-2200.html#btc-perp">22:00</a></div><span class="slot-hint">정규 하루 2회(09:30·22:00 KST) · 수동은 목록</span></div>
@@ -1641,7 +1652,9 @@ NO_TRADE — 신규진입 차단, 관망
 
   function activate(id){
     document.querySelectorAll('.view').forEach(function(s){ s.classList.toggle('active', s.getAttribute('data-view')===id); });
-    document.querySelectorAll('.nav-item').forEach(function(a){ var on=a.getAttribute('data-target')===id;
+    document.querySelectorAll('.nav-item').forEach(function(a){
+      var v=a.getAttribute('data-views');   // 한 시장 아이템이 그 시장의 모든 국면 뷰를 포섭
+      var on = v ? ((' '+v+' ').indexOf(' '+id+' ')>=0) : (a.getAttribute('data-target')===id);
       a.classList.toggle('active', on); if(on){ a.setAttribute('aria-current','page'); } else { a.removeAttribute('aria-current'); } });
     buildView(id);
     window.scrollTo(0,0);
