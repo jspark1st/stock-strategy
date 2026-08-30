@@ -1179,6 +1179,8 @@ def build_report_text(r: dict) -> str:
     (실거래 지평 병기, n<40 성적은 '측정중'). 결측 키에 강건(.get·None 가드).
     """
     btc = r.get("id") == "btc-perp" or r.get("report_type") == "btc_perp"
+    preopen = r.get("report_type") == "preopen"
+    blocked = (r.get("entry") or {}).get("allow") is False  # 진입 차단이면 타점/주문은 참고 환산만
     L: list[str] = []
     # 헤더
     if btc:
@@ -1212,9 +1214,18 @@ def build_report_text(r: dict) -> str:
         # 여기서만 '익일 상승확률'로 남으면 기저율 상수가 예측인 것처럼 그대로 전파된다.
         cal = r.get("calibration") or {}
         degen = bool(cal.get("slope_at_floor"))
-        lbl = "상승 기저율(예측 아님)" if degen else "익일 시가 상승확률"
-        L.append(f"\n## 총점 {fmt(r.get('total'))} · 등급 {r.get('grade','')} "
+        if degen:
+            lbl = "상승 기저율(예측 아님)"
+        elif preopen:
+            lbl = "오늘 시가 대비 상승확률"
+        else:
+            lbl = "익일 시가 상승확률"
+        anchor = "(전일 마감 앵커) " if preopen else ""
+        L.append(f"\n## 총점 {fmt(r.get('total'))} {anchor}· 등급 {r.get('grade','')} "
                  f"· {lbl} {pct(r.get('p_up'))} / 하락 {pct(r.get('p_down'))}")
+        if preopen:
+            L.append("- ⚠ 총점·등급은 **전일 마감 앵커**(오늘 새로 산출한 값이 아님). "
+                     "방향확률만 간밤 미국장으로 유계 보정한다.")
         if degen:
             span = cal.get("prob_span_pp")
             L.append(f"- ⚠ 캘리브 기울기 하한 고착 — 총점이 확률을 거의 못 움직인다"
@@ -1337,15 +1348,20 @@ def build_report_text(r: dict) -> str:
     pr = atr.get("primary") or {}
     if pr:
         L.append("\n## 오버나이트 타점")
+        if blocked:
+            L.append("- ⚠ 진입 게이트 차단 — 관망/현금, 권장비중 0%. "
+                     "아래 가격은 참고 환산값이며 실행 지시가 아니다.")
         L.append(f"- {pr.get('label','타점')}: 진입 {fmt(pr.get('entry'))} / 손절 {fmt(pr.get('stop'))} "
                  f"/ 목표 {fmt(pr.get('target'))} · 손익비 {fmt(pr.get('rr'))}")
         for v in (atr.get("variants") or []):
             L.append(f"  · {v.get('label')}: 진입 {fmt(v.get('entry'))} / 손절 {fmt(v.get('stop'))} "
                      f"/ 목표 {fmt(v.get('target'))} · 손익비 {fmt(v.get('rr'))}"
-                     + (" · 자격" if v.get("qualified") else ""))
+                     + (" · 자격" if (v.get("qualified") and not blocked) else ""))
     oc = r.get("order_card") or {}
     if oc:
         el = oc.get("etf_levels") or {}
+        if blocked:
+            L.append("- ⚠ 진입 차단 — HTS 자동매도 설정 금지. 아래는 지수↔ETF 참고 환산(실행 아님).")
         L.append(f"- 상품 주문({oc.get('instrument')}·{oc.get('shcode')}): "
                  f"진입 {fmt(el.get('entry'))} / 손절 {fmt(el.get('stop'))} / 목표 {fmt(el.get('target'))}")
         if oc.get("disparity_pct") is not None or oc.get("tracking_error_pct") is not None:
@@ -1989,6 +2005,30 @@ def _attach_preopen_order_cards(reports: list[dict]) -> None:
             r["order_card"] = closes[mk]
 
 
+def _attach_preopen_calibration(reports: list[dict]) -> None:
+    """개장전 뷰에 같은 시장 마감의 calibration 메타를 붙인다(값 변경 없음, 라벨 정합용).
+
+    개장전 p_up 은 그 마감 리포트의 (기울기 하한 고착일 수 있는) 캘리브레이터를 통과한 값에
+    간밤 틸트만 더한 것이다. 그런데 build_preopen 은 calibration 키를 안 담아, 히어로·복사텍스트의
+    '상승 기저율(예측 아님)' 격하와 레짐 편향 고지가 개장전에서만 유실됐다(마감 뷰는 정직). →
+    같은 시장 마감의 calibration 을 backfill 해 두 뷰가 같은 정직성 라벨을 쓰게 한다.
+    """
+    calibs: dict[str, dict] = {}
+    for r in reports:
+        rid = r.get("id") or ""
+        if (rid.endswith("-close") or (r.get("label") in ("장 마감", LABEL_CLOSE)
+                                       and not _is_preopen_report(r))):
+            if r.get("calibration"):
+                mk = "kosdaq" if "kosdaq" in rid.lower() else "kospi"
+                calibs[mk] = r["calibration"]
+    for r in reports:
+        if not _is_preopen_report(r) or r.get("calibration"):
+            continue
+        mk = "kosdaq" if "kosdaq" in (r.get("id") or "").lower() else "kospi"
+        if calibs.get(mk):
+            r["calibration"] = calibs[mk]
+
+
 def normalize_bundle(data: dict) -> dict:
     if "reports" in data:
         b = dict(data)
@@ -2010,6 +2050,7 @@ def normalize_bundle(data: dict) -> dict:
     for p in b["placeholders"]:
         _remap_nav(p)
     _attach_preopen_order_cards(b["reports"])
+    _attach_preopen_calibration(b["reports"])
     # 이미 실제 리포트가 있는 그룹/라벨의 placeholder 는 제거(중복 방지)
     present = {(r.get("group"), r.get("label")) for r in b["reports"]}
     present_ids = {r.get("id") for r in b["reports"]}
@@ -2177,6 +2218,16 @@ TEMPLATE = r"""<!doctype html>
   a{color:var(--accent)}
   .app{display:flex;min-height:100vh;min-height:100dvh}
   .num{font-variant-numeric:tabular-nums}
+  /* 접근성: 키보드 사용자가 본문으로 바로 점프 */
+  .skip-link{position:fixed;left:8px;top:-52px;z-index:100;background:var(--accent);color:#fff;
+    padding:8px 14px;border-radius:8px;font-weight:700;text-decoration:none;transition:top .15s ease}
+  .skip-link:focus{top:8px}
+  /* 긴 뷰용 맨 위로(스크롤 시 노출) */
+  .to-top{position:fixed;right:16px;bottom:16px;z-index:16;width:44px;height:44px;border-radius:50%;
+    border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:1.15rem;
+    cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.3);line-height:1}
+  .to-top:hover{border-color:var(--accent);color:var(--accent)}
+  .to-top:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
   /* 사이드바 */
   .sidebar{width:252px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);
@@ -2454,7 +2505,7 @@ TEMPLATE = r"""<!doctype html>
     .concl-text{font-size:.96rem}
   }
   @media print{
-    .sidebar,.topnav,.scrim,.tf-bar,.slot-pick{display:none!important}
+    .sidebar,.topnav,.scrim,.tf-bar,.slot-pick,.to-top,.skip-link{display:none!important}
     .view{display:block!important;break-after:page}
     .card{break-inside:avoid;border-color:#ccc}
     body{background:#fff;color:#000}
@@ -2466,30 +2517,35 @@ TEMPLATE = r"""<!doctype html>
 </style>
 </head>
 <body>
+<a class="skip-link" href="#main">본문으로 건너뛰기</a>
 <div class="app">
-  <aside class="sidebar" id="sidebar">
+  <aside class="sidebar" id="sidebar" aria-label="사이드바">
     <div class="brand">📊 easystock</div>
     <div class="brand-sub">by junaitech</div>
     <div class="date-nav cal-wrap"><label class="slot-lab">📅 날짜
-      <select class="stock-datesel" onchange="if(this.value) location=this.value">
+      <select class="stock-datesel" aria-label="날짜 선택" onchange="if(this.value) location=this.value">
         <option value="/" selected>{{DATE}}</option>
       </select></label></div>
-    {{SIDEBAR}}
+    <nav class="nav" aria-label="리포트 목록">{{SIDEBAR}}</nav>
     <div class="side-foot">
-      <button class="toggle" onclick="window.__toggleTheme()">🌓 라이트 / 다크</button>
+      <button class="toggle" type="button" aria-pressed="false" aria-label="라이트/다크 테마 전환"
+        onclick="window.__toggleTheme()">🌓 라이트 / 다크</button>
     </div>
   </aside>
-  <div class="scrim" onclick="window.__toggleSidebar()"></div>
+  <div class="scrim" aria-hidden="true" onclick="window.__toggleSidebar()"></div>
 
-  <main class="main">
+  <main class="main" id="main" tabindex="-1">
     <div class="topnav">
-      <button class="hamb" onclick="window.__toggleSidebar()">☰</button>
+      <button class="hamb" type="button" aria-label="메뉴 열기" aria-expanded="false"
+        aria-controls="sidebar" onclick="window.__toggleSidebar()">☰</button>
       <strong>easystock</strong>
     </div>
     {{VIEWS}}
     <p class="disc">투자 판단의 참고 자료이며 투자 권유가 아님.</p>
   </main>
 </div>
+<button class="to-top" type="button" aria-label="맨 위로"
+  onclick="window.scrollTo({top:0,behavior:'smooth'})" hidden>↑</button>
 
 {{LWC_SCRIPT}}
 <script>window.__REPORT__ = {{CHART_DATA_JSON}};</script>
@@ -2584,10 +2640,12 @@ TEMPLATE = r"""<!doctype html>
 
   function activate(id){
     document.querySelectorAll('.view').forEach(function(s){ s.classList.toggle('active', s.getAttribute('data-view')===id); });
-    document.querySelectorAll('.nav-item').forEach(function(a){ a.classList.toggle('active', a.getAttribute('data-target')===id); });
+    document.querySelectorAll('.nav-item').forEach(function(a){ var on=a.getAttribute('data-target')===id;
+      a.classList.toggle('active', on); if(on){ a.setAttribute('aria-current','page'); } else { a.removeAttribute('aria-current'); } });
     buildView(id);
     window.scrollTo(0,0);
-    document.getElementById('sidebar').classList.remove('open');
+    var sb=document.getElementById('sidebar'); sb.classList.remove('open');
+    var h=document.querySelector('.hamb'); if(h){ h.setAttribute('aria-expanded','false'); h.setAttribute('aria-label','메뉴 열기'); }
   }
   function valid(id){ return id && document.querySelector('.view[data-view="'+id+'"]'); }
   function startId(){ var h=(location.hash||'').replace('#',''); if(valid(h)) return h;
@@ -2595,17 +2653,27 @@ TEMPLATE = r"""<!doctype html>
 
   document.querySelectorAll('.nav-item').forEach(function(a){
     a.addEventListener('click', function(e){ e.preventDefault(); var id=a.getAttribute('data-target');
-      if(!valid(id)) return; try{ history.replaceState(null,'','#'+id); }catch(x){ location.hash=id; } activate(id); });
+      if(!valid(id)) return; try{ history.replaceState(null,'','#'+id); }catch(x){ location.hash=id; } activate(id);
+      var mn=document.getElementById('main'); if(mn){ try{ mn.focus({preventScroll:true}); }catch(_){ } } });
   });
   window.addEventListener('hashchange', function(){ var id=(location.hash||'').replace('#',''); if(valid(id)) activate(id); });
 
+  function syncThemeMeta(){ var r=document.documentElement, light=r.dataset.theme==='light';
+    var mt=document.querySelector('meta[name="theme-color"]'); if(mt) mt.setAttribute('content', light?'#f7f6f2':'#141311');
+    var tg=document.querySelector('.toggle'); if(tg) tg.setAttribute('aria-pressed', light?'true':'false'); }
   window.__toggleTheme=function(){ var r=document.documentElement; r.dataset.theme=r.dataset.theme==='light'?'dark':'light';
     try{ localStorage.setItem('theme', r.dataset.theme); }catch(e){}
+    syncThemeMeta();
     var a=document.querySelector('.view.active'); if(a) buildView(a.getAttribute('data-view')); };
-  window.__toggleSidebar=function(){ document.getElementById('sidebar').classList.toggle('open'); };
+  window.__toggleSidebar=function(){ var sb=document.getElementById('sidebar'); var open=sb.classList.toggle('open');
+    var h=document.querySelector('.hamb'); if(h){ h.setAttribute('aria-expanded', open?'true':'false'); h.setAttribute('aria-label', open?'메뉴 닫기':'메뉴 열기'); } };
   window.addEventListener('resize', function(){ var a=document.querySelector('.view.active'); if(!a) return;
     (built[a.getAttribute('data-view')]||[]).forEach(function(i){ try{ i.chart.applyOptions({width:i.el.clientWidth}); }catch(e){} }); });
 
+  var toTop=document.querySelector('.to-top');
+  if(toTop){ window.addEventListener('scroll', function(){ toTop.hidden = window.scrollY < 400; }, {passive:true}); }
+
+  syncThemeMeta();
   var s=startId(); if(s) activate(s);
 })();
 </script>

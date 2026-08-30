@@ -199,6 +199,44 @@ def test_report_text_btc_specific_sections():
         assert must in t, must
 
 
+def test_report_text_blocked_gate_annotation():
+    # 진입 차단(entry.allow=False)이면 복사 텍스트의 타점·주문 섹션도 '실행 아님'을 명시하고
+    # variants '· 자격' 태그를 숨긴다 (HTML 카드와 같은 게이트 규율 — 새 출력 경로 재발 방지).
+    r = dict(_full_report(),
+             entry={"allow": False, "direction": "long", "blocked_reasons": ["방향 확률 임계"]},
+             atr={"primary": {"label": "오버나이트", "entry": 100, "stop": 98, "target": 102, "rr": 1.0},
+                  "variants": [{"label": "단기", "entry": 100, "stop": 95, "target": 110,
+                                "rr": 2.0, "qualified": True}]},
+             order_card={"instrument": "KODEX 200", "shcode": "069500",
+                         "etf_levels": {"entry": 100, "stop": 98, "target": 102}})
+    t = rr.build_report_text(r)
+    assert "진입 게이트 차단" in t
+    assert "HTS 자동매도 설정 금지" in t
+    assert "· 자격" not in t                       # 차단 상태에선 자격 태그 숨김
+
+
+def test_report_text_preopen_anchor_and_calibration_downgrade():
+    # 개장전 총점은 전일 앵커이고, 캘리브 기울기 하한이면 p_up 라벨을 '기저율(예측 아님)'로.
+    r = dict(_full_report(), id="kospi-preopen", report_type="preopen",
+             calibration={"source": "bootstrap:open", "n": 149, "a": 0.005,
+                          "slope_at_floor": True, "prob_span_pp": 8.8})
+    t = rr.build_report_text(r)
+    assert "전일 마감 앵커" in t
+    assert "상승 기저율(예측 아님)" in t
+    assert "익일 시가 상승확률" not in t.split("## 총점")[1].split("\n")[0]
+
+
+def test_normalize_backfills_preopen_calibration():
+    close = dict(_full_report(), id="kospi-close", report_type=None,
+                 calibration={"source": "bootstrap:open", "n": 149, "a": 0.005,
+                              "slope_at_floor": True})
+    pre = {"id": "kospi-preopen", "report_type": "preopen", "group": "코스피",
+           "label": "개장 전", "p_up": 0.61, "total": 53.7}
+    nb = rr.normalize_bundle({"trade_date": "2026-08-27", "reports": [close, pre]})
+    got = next(x for x in nb["reports"] if x.get("id") == "kospi-preopen")
+    assert (got.get("calibration") or {}).get("slope_at_floor") is True
+
+
 def test_report_text_performance_hidden_under_40():
     # 판별 성과(AUC)도 표본 40 미만이면 숨긴다 — 소표본 AUC 를 실력으로 오독 금지.
     lo = dict(_full_report(),
@@ -218,6 +256,16 @@ def test_copy_widget_and_script_in_render():
     assert html.count('class="copy-btn"') >= 2      # 코스피·코스닥 뷰 각각
     assert html.count('class="copy-src"') >= 2
     assert "window.__copyReport" in html
+
+
+def test_render_shell_accessibility():
+    # 2026-08-30 UX: 키보드/스크린리더 접근성 셸이 렌더에 박혀 있어야 한다(퇴행 방지).
+    html = rr.render({"trade_date": "2026-08-27", "reports": [_full_report()]})
+    for must in ('class="skip-link"', '<nav class="nav" aria-label="리포트 목록"',
+                 'id="main" tabindex="-1"', 'aria-controls="sidebar"',
+                 "setAttribute('aria-current','page')", 'class="to-top"',
+                 'meta[name="theme-color"]'):
+        assert must in html, must
 
 
 def test_accuracy_hidden_under_40():
