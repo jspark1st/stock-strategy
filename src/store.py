@@ -874,14 +874,25 @@ def review_digest(conn: sqlite3.Connection, since: str | None = None,
         args.append(since)
     total = conn.execute(f"SELECT COUNT(*) FROM report_review {where}", args).fetchone()[0]
     # 해결률(헬스 지표) — 같은 항목이 안 닫히고 쌓이면 노이즈, 새 항목이 나고 닫히면 루프 작동.
-    res_where = "WHERE trade_date>=?" if since else ""
+    # accepted(수용/데이터대기)는 설계상 영구 미해결이라 분모에 넣으면 해결률이 구조적으로 0쪽
+    # 으로 왜곡된다 → actionable 만으로 산출(루프가 실제로 도는지를 본다).
+    acc = set(accepted or ())
+    _acc_clause = ""
+    _acc_params: list = []
+    if acc:
+        _acc_clause = " AND (code IS NULL OR code NOT IN (%s))" % ",".join("?" * len(acc))
+        _acc_params = list(acc)
+    res_base = "WHERE trade_date>=?" if since else "WHERE 1=1"
     res_args = [since] if since else []
-    resolved_n = conn.execute(
-        f"SELECT COUNT(*) FROM report_review {res_where}{' AND' if since else 'WHERE'} resolved=1",
-        res_args).fetchone()[0]
-    _tot = total + resolved_n
-    resolution = {"open": total, "resolved": resolved_n,
-                  "rate": round(resolved_n / _tot, 3) if _tot else None}
+    open_act = conn.execute(
+        f"SELECT COUNT(*) FROM report_review {res_base} AND resolved=0{_acc_clause}",
+        res_args + _acc_params).fetchone()[0]
+    resolved_act = conn.execute(
+        f"SELECT COUNT(*) FROM report_review {res_base} AND resolved=1{_acc_clause}",
+        res_args + _acc_params).fetchone()[0]
+    _tot = open_act + resolved_act
+    resolution = {"open": open_act, "resolved": resolved_act,
+                  "rate": round(resolved_act / _tot, 3) if _tot else None}
     # code 별 반복 집계(빈도가 곧 '구조적 결함'의 증거).
     # 2026-08-28: source='rule' 한정을 풀었다 — LLM 비평도 고정 code 를 갖게 되면서
     # 규칙이 못 잡는 발견(예: 완전성 100%인데 program_net 결측)이 여기 안 잡히던 문제 해소.
@@ -896,7 +907,6 @@ def review_digest(conn: sqlite3.Connection, since: str | None = None,
         rec.append(dict(r))
     rec.sort(key=lambda d: (-d["n"], -_SEV_RANK.get(d.get("severity"), 0)))
     # 이원화: 수용된 한계(데이터 대기·설계)는 실행가능 백로그에서 뺀다.
-    acc = set(accepted or ())
     actionable = [d for d in rec if d.get("code") not in acc]
     accepted_rec = [d for d in rec if d.get("code") in acc]
     # LLM: 최근 미해결 발견(중복 title 은 최신만). 수용 code 는 제외.

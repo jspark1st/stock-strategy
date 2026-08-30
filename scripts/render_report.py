@@ -2301,6 +2301,12 @@ def render(data: dict, lwc_src: str | None = None) -> str:
     market_views: dict[str, dict] = {}
     for r in bundle["reports"]:
         market_views.setdefault(r.get("group", "코스피"), {})[r.get("label", r["id"])] = r["id"]
+    # placeholder(예: 실제 개장전 리포트가 아직 없을 때 주입되는 '준비 중' 국면)도 국면 탭에
+    # 넣어야 클릭으로 도달 가능하다. 안 넣으면 형제 리포트의 국면 탭이 그 뷰를 링크 못 해 orphan.
+    for p in bundle.get("placeholders", []):
+        g, lab, pid = p.get("group", "기타"), p.get("label", ""), p.get("id")
+        if pid and g in market_views:  # 실제 리포트가 있는 시장의 형제 국면만(고아 그룹 방지)
+            market_views[g].setdefault(lab, pid)
     items, views, chart_views = [], [], {}
     for r in bundle["reports"]:
         vid = r["id"]
@@ -2315,10 +2321,13 @@ def render(data: dict, lwc_src: str | None = None) -> str:
             chart_views[vid] = _chart_payload(r)
     for i, p in enumerate(bundle.get("placeholders", [])):
         vid = p.get("id", f"ph-{i}")
+        g = p.get("group", "기타")
         items.append({"id": vid, "label": p.get("label", ""),
-                      "group": p.get("group", "기타"), "ph": True,
+                      "group": g, "ph": True,
                       "note": p.get("note", "준비 중")})
-        views.append((vid, render_placeholder_view(p)))
+        # 형제 국면이 있는 시장의 placeholder 면 국면 탭을 함께(뷰에서 형제로 되돌아가게).
+        tabs = _view_tabs(g, vid, market_views) if len(market_views.get(g, {})) > 1 else ""
+        views.append((vid, tabs + render_placeholder_view(p)))
 
     # 리포트 비평 뷰 — 메뉴 하나. 전 시장 비평 + 교차 점검 + 누적 개선 백로그.
     n_rev = sum(len(_all_findings(r)) for r in bundle["reports"]) + \

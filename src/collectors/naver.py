@@ -126,7 +126,17 @@ def investor_history(market: str, date: str | None = None, limit: int = 10,
             except ValueError:
                 break
         acc.sort(key=lambda t: t[0], reverse=True)
-        return [_flows_from(market, ymd, vals) for ymd, vals in acc[:limit]]
+        out: list[InvestorFlows] = []
+        for ymd, vals in acc[:limit]:
+            f = _flows_from(market, ymd, vals)
+            # market_flows(라이브)와 동일 규율: 항등식(개인+외국인+기관계+기타법인≈0)이 깨지면
+            # 컬럼 밀림/오매핑이므로 그 행을 버린다. 없으면(정상) 아무 것도 안 버린다.
+            # 여기 없으면 backtest/캘리브레이션이 오매핑 수급을 조용히 팩터로 삼킨다.
+            if _identity_ok(f):
+                out.append(f)
+            else:
+                _flow_integrity_warn(f)
+        return out
     finally:
         if own:
             c.close()

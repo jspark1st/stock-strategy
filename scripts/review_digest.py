@@ -83,7 +83,8 @@ def build(db: str = DB, since: str | None = None) -> tuple[str, str]:
         md.append("| 빈도 | code | 요지 | 왜 코딩 아님 |")
         md.append("|---|---|---|---|")
         _why = {"btc_gate_block": "BTC 게이트 엄격=설계", "no_discrimination": "AUC≈0.5=데이터 한계",
-                "calib_slope_floor": "정직한 무신호=데이터", "sample_short": "n<40 표본 대기",
+                "btc_core_unaligned": "BTC 코어 정렬 상시 관측=설계", "sample_short": "n<40 표본 대기",
+                "calib_slope_floor": "정직한 무신호=데이터",
                 "mixed_signals": "코어 소수 팩터 상시 관측", "news_dead": "재료 상시 제외=설계"}
         for d in acc:
             md.append(f"| {d['n']} | `{d.get('code')}` | {d.get('title')} "

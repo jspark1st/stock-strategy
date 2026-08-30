@@ -235,6 +235,44 @@ def test_sidebar_groups_by_asset_then_market():
     assert 'ETH 선물' in html and '예정' in html
 
 
+def test_view_tabs_phase_links_and_horizon():
+    # A안 뷰 상단 탭: 지평(단기 활성·중기/장기 예정) + 국면(형제 뷰 링크).
+    mv = {"코스피": {"장마감전 분석": "kospi-close", "개장전 분석": "kospi-preopen"}}
+    html = rr._view_tabs("코스피", "kospi-close", mv)
+    # 지평 행: 단기만 활성, 나머지 예정
+    assert 'vtab active">단기' in html
+    assert "중기·예정" in html and "장기·예정" in html
+    # 국면 탭이 같은 시장의 형제 뷰(개장전)를 링크 → hashchange 로 뷰 전환
+    assert 'data-target="kospi-preopen"' in html and 'href="#kospi-preopen"' in html
+    # 현재 국면(장마감)은 active 로 서버렌더(각 뷰가 제 탭을 들고 있어 JS 불필요)
+    assert 'vtab active" data-target="kospi-close"' in html
+    # 국면 라벨 순서: 장마감전 먼저(NAV_ITEM_ORDER)
+    assert html.index("장마감전 분석") < html.index("개장전 분석")
+
+
+def test_preopen_placeholder_reachable_via_phase_tab():
+    """실제 개장전 리포트가 없어 '준비 중' placeholder 가 주입될 때, 형제(장마감) 리포트의
+    국면 탭이 그 placeholder 뷰를 링크해야 한다(안 그러면 클릭으로 도달 못 하는 orphan)."""
+    bundle = {"trade_date": "2026-08-30", "reports": [
+        {"id": "kospi-close", "group": "코스피", "label": rr.LABEL_CLOSE, "total": 50,
+         "grade": "중립", "p_up": 0.5}],
+        "placeholders": [
+        {"id": "kospi-preopen", "group": "코스피", "label": rr.LABEL_PREOPEN, "note": "준비 중"}]}
+    html = rr.render(bundle)
+    # 장마감 뷰의 국면 탭이 placeholder(개장전) 뷰를 data-target 으로 링크 → hashchange 도달
+    assert 'data-target="kospi-preopen"' in html
+    # placeholder 뷰 자체도 국면 탭을 들고 있어 형제(장마감)로 되돌아갈 수 있다
+    assert 'data-target="kospi-close"' in html
+
+
+def test_view_tabs_btc_omits_phase_row():
+    # BTC 는 슬롯 칩(09:30·22:00)이 국면 역할 → 국면 행 생략, 지평 행만.
+    mv = {"비트코인 선물": {"BTCUSDT": "btc-perp"}}
+    html = rr._view_tabs("비트코인 선물", "btc-perp", mv)
+    assert "지평" in html          # 지평 행은 유지
+    assert "국면" not in html      # 국면 행은 생략
+
+
 def test_normalize_remaps_legacy_nav():
     b = rr.normalize_bundle({
         "reports": [

@@ -18,6 +18,11 @@ import json
 from . import store
 from .collectors import llm
 
+# 비평 백로그 DB 영속화(store.record_reviews)가 조용히 실패했는지 노출 — llm._LAST_ERROR 와 같은
+# 패턴. evaluate 가 매 실행 리셋하고 실패 시 채운다. 호출부(run_close·run_btc)가 _alert 로 승격한다.
+# (이게 비면 규칙·LLM 비평이 나와도 백로그가 안 쌓이고 /triage 개선 루프가 조용히 끊긴다.)
+_LAST_PERSIST_ERR: str | None = None
+
 # 판별 미확보 밴드(±8%p) — build_hero/headline 과 동일.
 _BAND = 0.08
 # 캘리브 기울기 하한 근처(총점이 확률에 영향 못 줌).
@@ -251,7 +256,7 @@ LLM_CODES = {
 #   mixed_signals     신호 혼재 = 코어 소수 팩터의 상시 관측
 #   news_dead         재료 상시 제외 = 설계(검증 불가 팩터에 가중 안 줌)
 ACCEPTED_CODES = frozenset({
-    "btc_gate_block", "no_discrimination", "calib_slope_floor",
+    "btc_gate_block", "btc_core_unaligned", "no_discrimination", "calib_slope_floor",
     "sample_short", "mixed_signals", "news_dead",
 })
 
@@ -356,6 +361,8 @@ def evaluate(conn, trade_date: str, reports: list[dict], env: dict | None = None
 
     반환 {cross:[...], digest:{...}}. dry_run 이면 DB 미기록(첨부는 함).
     """
+    global _LAST_PERSIST_ERR
+    _LAST_PERSIST_ERR = None
     env = env or {}
     per, cross = rule_findings(reports)
     for r in reports:
@@ -366,13 +373,13 @@ def evaluate(conn, trade_date: str, reports: list[dict], env: dict | None = None
         if conn is not None and not dry_run:
             try:
                 store.record_reviews(conn, trade_date, mk, rt, slot, rules + lls)
-            except Exception:  # noqa — 비평 기록 실패가 파이프라인을 막지 않게
-                pass
+            except Exception as e:  # noqa — 파이프라인은 안 막되(raise X) 무성사망은 아니게(승격O)
+                _LAST_PERSIST_ERR = f"{mk} {type(e).__name__}: {e}"
     if conn is not None and not dry_run and cross:
         try:
             store.record_reviews(conn, trade_date, "ALL", "close", "", cross)
-        except Exception:  # noqa
-            pass
+        except Exception as e:  # noqa
+            _LAST_PERSIST_ERR = f"cross {type(e).__name__}: {e}"
     digest = {}
     if conn is not None:
         try:

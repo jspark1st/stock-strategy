@@ -844,6 +844,11 @@ def main() -> int:
             crit_err = llm._LAST_ERROR.get("critic")
             if not dry_run and env.get("google_gemini_api") and crit_err and crit_err != "no key":
                 _alert(f"자가비평 critic(Gemini) 실패({crit_err}) — 비평 LLM 발견 0건, 무성사망 가능")
+            # 비평 DB 영속화 무성 실패 승격 — critic 은 정상인데 record_reviews 가 터지면
+            # 백로그가 안 쌓여 /triage 개선 루프가 조용히 끊긴다(critic 승격이 못 잡는 클래스).
+            if not dry_run and report_review._LAST_PERSIST_ERR:
+                _alert(f"자가비평 백로그 저장 실패({report_review._LAST_PERSIST_ERR}) — "
+                       f"비평 누적 중단 가능(개선 루프 결손)")
         except Exception as e:  # noqa
             print(f"⚠ 리포트 비평 실패({type(e).__name__}: {e}) — 스킵")
 

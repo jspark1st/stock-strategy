@@ -250,13 +250,73 @@ def test_review_digest_dualizes_accepted_and_tracks_resolution():
         assert {"gate_sizing", "narrative_mismatch"} <= act        # 실행가능
         assert {"btc_gate_block", "no_discrimination"} <= acc      # 수용
         assert not (act & acc) and "btc_gate_block" not in act     # 안 겹침·수용은 실행가능 제외
-        assert dg["resolution"]["open"] == 8 and dg["resolution"]["resolved"] == 0
+        # 해결률은 actionable 만 분모로(accepted 4행 제외) → open=4(gate_sizing2·narrative2)
+        assert dg["resolution"]["open"] == 4 and dg["resolution"]["resolved"] == 0
         # 닫으면 실행가능에서 빠지고 해결률에 반영
         store.resolve_review(conn, code="gate_sizing")
         conn.commit()
         dg2 = store.review_digest(conn, accepted=acc_codes)
         assert "gate_sizing" not in {d["code"] for d in dg2["actionable"]}
         assert dg2["resolution"]["resolved"] == 2
+        # 해결률(rate)=resolved/(open+resolved), actionable 기준. 닫기 전 0/4·후 2열림/2해결.
+        assert dg["resolution"]["rate"] == 0.0                      # 0/4
+        assert dg2["resolution"]["rate"] == round(2 / 4, 3)         # 2/(2+2)=0.5
+        conn.close()
+    finally:
+        os.unlink(path)
+
+
+def test_review_digest_rate_none_on_empty_db():
+    """빈 백로그(open·resolved 모두 0) → 0나누기 없이 rate=None."""
+    fd, path = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+    try:
+        conn = store.connect(path)
+        dg = store.review_digest(conn)
+        assert dg["resolution"]["open"] == 0 and dg["resolution"]["resolved"] == 0
+        assert dg["resolution"]["rate"] is None                    # 분모 0 가드
+        conn.close()
+    finally:
+        os.unlink(path)
+
+
+def test_resolve_review_by_title():
+    """code 없는 LLM 발견은 title 로 닫는다(/triage --resolve title 경로)."""
+    fd, path = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+    try:
+        conn = store.connect(path)
+        store.record_reviews(conn, "2026-08-28", "KOSPI", "close", "", [
+            {"source": "llm", "category": "부족", "code": None, "severity": "med",
+             "title": "수급 program_net 결측", "detail": "", "evidence": ""}])
+        n = store.resolve_review(conn, title="수급 program_net 결측")
+        assert n == 1
+        # 이미 닫힌 것 재호출은 0(멱등).
+        assert store.resolve_review(conn, title="수급 program_net 결측") == 0
+        # 인자 없으면 아무 것도 안 닫는다(0).
+        assert store.resolve_review(conn) == 0
+        conn.close()
+    finally:
+        os.unlink(path)
+
+
+def test_review_persist_failure_is_surfaced(monkeypatch):
+    """record_reviews DB 저장이 터지면 파이프라인은 안 막되(raise X) _LAST_PERSIST_ERR 로 승격돼
+    호출부가 _alert 할 수 있어야 한다(Gemini 무성사망과 같은 클래스의 재발 방지)."""
+    fd, path = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+    try:
+        conn = store.connect(path)
+
+        def boom(*a, **k):
+            raise RuntimeError("db locked")
+
+        monkeypatch.setattr(store, "record_reviews", boom)
+        reports = [_report()]
+        # 예외를 삼키되(파이프라인 계속) 무성이 아니게 — 에러 노출.
+        report_review.evaluate(conn, "2026-08-27", reports, {}, dry_run=False, use_llm=False)
+        assert report_review._LAST_PERSIST_ERR is not None
+        assert "RuntimeError" in report_review._LAST_PERSIST_ERR
         conn.close()
     finally:
         os.unlink(path)

@@ -39,10 +39,6 @@ class CandleSeries:
         return len(self.candles)
 
     @property
-    def closes(self) -> list[float]:
-        return [c.close for c in self.candles]
-
-    @property
     def last(self) -> Candle | None:
         return self.candles[-1] if self.candles else None
 

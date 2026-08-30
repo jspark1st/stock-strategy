@@ -47,6 +47,18 @@ def resolve_slot(now: datetime, manual: bool) -> str:
     return "2200"
 
 
+def _btc_alert(msg: str, now: datetime) -> None:
+    """운영 경보 — exit 0 크론이 못 울리는 무성 실패를 alerts.log 에 남긴다(주식 _alert 와 동형)."""
+    print("⚠ " + msg)
+    try:
+        alog = ROOT / "out" / "alerts.log"
+        alog.parent.mkdir(exist_ok=True)
+        with open(alog, "a", encoding="utf-8") as f:
+            f.write(f"[{now.strftime('%Y-%m-%d %H:%M:%S')}] ALERT: {msg}\n")
+    except Exception:  # noqa
+        pass
+
+
 def _iso_day(c) -> str:
     return f"{c.date[:4]}-{c.date[4:6]}-{c.date[6:8]}"
 
@@ -499,13 +511,11 @@ def main() -> int:
             crit_err = llm._LAST_ERROR.get("critic")
             if not dry_run and env.get("google_gemini_api") and crit_err and crit_err != "no key":
                 msg = f"[BTC] 자가비평 critic(Gemini) 실패({crit_err}) — 비평 LLM 0건, 무성사망 가능"
-                try:
-                    alog = ROOT / "out" / "alerts.log"
-                    alog.parent.mkdir(exist_ok=True)
-                    with open(alog, "a", encoding="utf-8") as f:
-                        f.write(f"[{now.strftime('%Y-%m-%d %H:%M:%S')}] ALERT: {msg}\n")
-                except Exception:  # noqa
-                    pass
+                _btc_alert(msg, now)
+            # 비평 DB 영속화 무성 실패 승격 — 주식 run_close 와 동일(critic 승격이 못 잡는 클래스).
+            if not dry_run and report_review._LAST_PERSIST_ERR:
+                _btc_alert(f"[BTC] 자가비평 백로그 저장 실패({report_review._LAST_PERSIST_ERR}) — "
+                           f"비평 누적 중단 가능", now)
         except Exception as e:  # noqa
             print(f"⚠ BTC 비평 실패({type(e).__name__}: {e}) — 스킵")
 
