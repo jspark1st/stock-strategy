@@ -277,7 +277,10 @@
   ul{padding-left:18px} li{margin-bottom:5px}
   .risk-ul .risk-live{list-style:none;margin-left:-18px;padding-left:12px;border-left:3px solid var(--caution);color:var(--text)}
   .mat-ul{list-style:none;margin-left:-18px}
-  .mat-ul li{display:flex;gap:8px;align-items:flex-start}
+  /* flex-wrap: 좁으면 '제외' 배지를 다음 줄로 내린다. overflow-wrap:break-word: .card 의
+     overflow-wrap:anywhere 가 flex 항목(제목)의 min-content 를 1글자로 만들어 nowrap 배지가
+     너비를 다 먹을 때 제목이 세로 1글자씩 깨지던 모바일 버그 방지(min-content=최장 단어). */
+  .mat-ul li{display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap;overflow-wrap:break-word}
   .mtag{color:#fff;font-size:.7rem;font-weight:800;padding:1px 8px;border-radius:6px;white-space:nowrap;margin-top:3px}
   .mtag-off{background:transparent;color:var(--muted);border:1px solid var(--border);font-weight:700}
   .mtime{color:var(--muted);font-size:.78rem;font-variant-numeric:tabular-nums;white-space:nowrap;margin-top:3px}
@@ -1700,7 +1703,9 @@ NO_TRADE — 관망
         for(var s=0;s<want.length&&!pick;s++)
           for(var j=0;j<day.length;j++){ if(isReg(day[j])&&day[j].slot===want[s]){pick=day[j];break;} }
         if(!pick) pick=day.slice().sort(function(a,b){return (a.slot||'')<(b.slot||'')?1:-1;})[0];
-        return (pick&&pick.href)||'/#btc-perp';
+        var hr=(pick&&pick.href)||'/#btc-perp';
+        if(hr.indexOf('#')<0) hr+='#btc-perp';   // 앵커 없으면 붙인다 — 없으면 그 페이지 기본(코스피) 뷰로 열림
+        return hr;
       }
       if(!curDate||dates.indexOf(curDate)<0) curDate=dates[0];
       sel.innerHTML=dates.map(function(d){
