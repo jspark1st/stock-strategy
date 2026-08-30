@@ -2925,6 +2925,24 @@ BTC_DATESEL_SYNC = """<script>
         return '<option value="'+landing(byDate[d])+'"'+(d===curDate?' selected':'')+'>'+d+'</option>';
       }).join('');
       if(!sel.getAttribute('onchange')) sel.setAttribute('onchange','if(this.value) location=this.value');
+      // 슬롯 칩도 라이브 매니페스트로 다시 그린다 — 아카이브 페이지는 렌더 시점 슬롯만 구워져(09:30
+      // 페이지엔 22:00 칩이 없어 '눌렀더니 22:00 이 사라지는' 것처럼 보였다). 그날 정규 슬롯 전부 표시.
+      var regsEl=document.querySelector('.slot-regs');
+      if(regsEl){
+        var dayItems=(byDate[curDate]||[]).filter(isReg).sort(function(a,b){return (a.slot||'')<(b.slot||'')?-1:1;});
+        var ac=regsEl.querySelector('a.slot-chip.active'), curSlot='';
+        if(ac){ var m2=(ac.textContent||'').match(/(\\d\\d):(\\d\\d)/); if(m2) curSlot=m2[1]+m2[2]; }
+        var onLanding=location.pathname==='/'||location.pathname==='/index.html';
+        if(dayItems.length){
+          regsEl.innerHTML=dayItems.map(function(x){
+            var hh=(x.slot||'').slice(0,2)+':'+(x.slot||'').slice(2);
+            var active=x.slot===curSlot;
+            var href=(active&&onLanding)?'/#btc-perp':(x.href||'/#btc-perp');
+            if(href.indexOf('#')<0) href+='#btc-perp';
+            return '<a class="slot-chip'+(active?' active':'')+'" href="'+href+'">'+hh+'</a>';
+          }).join('');
+        }
+      }
     }).catch(function(){});
   }catch(e){}
 })();
