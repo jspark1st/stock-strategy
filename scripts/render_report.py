@@ -2853,17 +2853,29 @@ window.__mountCal=function(o){
     var sel=document.querySelector('select.stock-datesel'); if(!sel) return;
     var cur='', co=sel.options[sel.selectedIndex];
     if(co){ var mm=(co.textContent||'').match(/\d{4}-\d{2}-\d{2}/); if(mm) cur=mm[0]; }
-    fetch('/archive/stock/manifest.json',{cache:'no-store'}).then(function(r){return r.json();})
-    .then(function(items){
-      if(!Array.isArray(items)||!items.length) return;
-      var dates=items.map(function(x){return x&&x.date;}).filter(Boolean).sort().reverse();
+    // 주식(거래일)만이 아니라 BTC(매일·주말 포함) 날짜까지 합친다 — 주말에 BTC 리포트가 있으면
+    // 달력에서 그 날짜를 고를 수 있어야 최신 가상화폐로 갈 수 있다. 라우팅: 최신→'/', 거래일→주식
+    // 아카이브, 주말(BTC만)→그 날 BTC 아카이브(주식 최근 영업일이 함께 병합돼 있음).
+    function grab(u){ return fetch(u,{cache:'no-store'}).then(function(r){return r.json();}).catch(function(){return [];}); }
+    Promise.all([grab('/archive/stock/manifest.json'), grab('/archive/manifest.json')]).then(function(res){
+      var stockItems=Array.isArray(res[0])?res[0]:[], btcItems=Array.isArray(res[1])?res[1]:[];
+      var stockSet={}, btcBy={};
+      stockItems.forEach(function(x){ if(x&&x.date) stockSet[x.date]=1; });
+      btcItems.forEach(function(x){ if(x&&x.date){ var c=btcBy[x.date]; if(!c||(x.slot||'')>(c.slot||'')) btcBy[x.date]=x; } });
+      var all={}; Object.keys(stockSet).forEach(function(d){all[d]=1;}); Object.keys(btcBy).forEach(function(d){all[d]=1;});
+      var dates=Object.keys(all).filter(Boolean).sort().reverse();
       if(!dates.length) return;
       var newest=dates[0];
       if(!cur||dates.indexOf(cur)<0) cur=newest;
       window.__mountCal({
         anchor: sel.parentElement.parentElement, hide: sel.parentElement,
         dates: dates, cur: cur,
-        hrefOf: function(d){ return (d===newest)?'/':('/archive/stock/'+d+'.html'); }
+        hrefOf: function(d){
+          if(d===newest) return '/';
+          if(stockSet[d]) return '/archive/stock/'+d+'.html';
+          if(btcBy[d]&&btcBy[d].href) return btcBy[d].href;
+          return '/';
+        }
       });
     }).catch(function(){});
   }catch(e){}
