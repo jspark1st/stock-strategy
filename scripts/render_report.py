@@ -1236,6 +1236,25 @@ def build_report_text(r: dict) -> str:
     gate = r.get("gate") or {}
     if gate.get("reasons"):
         L.append(f"- 게이트: {', '.join(gate['reasons'])}")
+    # 신뢰도 상세
+    cd = r.get("confidence_detail") or {}
+    if cd:
+        L.append(f"- 신뢰도: 완전성 {pct(cd.get('completeness'))} × 표본보정 {fmt(cd.get('sample_factor'),2)}"
+                 f" (표본 {cd.get('n')}/{cd.get('min_sample')})")
+        if cd.get("agreement_note"):
+            L.append(f"  · {cd['agreement_note']}")
+    # 컨펌 변화(15:00 잠정 → 16:30 확정)
+    cf = r.get("confirm_diff") or {}
+    if cf.get("items"):
+        L.append("\n## 컨펌 변화(15:00→16:30)")
+        for it in cf["items"]:
+            u = it.get("unit") or ""
+            L.append(f"- {it.get('label')}: {fmt(it.get('before'))}{u} → {fmt(it.get('after'))}{u}"
+                     f" ({signed(it.get('delta'),2)}{u})")
+        act = cf.get("action") or {}
+        if act.get("action"):
+            L.append(f"- 판단: {act['action']}"
+                     + (f" — {act.get('reason')}" if act.get("reason") else ""))
     # 항목별 점수
     subs = r.get("subscores") or []
     if subs:
@@ -1246,6 +1265,60 @@ def build_report_text(r: dict) -> str:
             wtxt = f" (가중 {w*100:.0f}%)" if isinstance(w, (int, float)) else ""
             det = " · ".join(x for x in (s.get("observed"), s.get("comment")) if x)
             L.append(f"- {lab} {fmt(s.get('score'))}{wtxt}" + (f" · {det}" if det else ""))
+    # 팩터 기여도
+    contribs = r.get("contributions") or []
+    if contribs:
+        L.append("\n## 팩터 기여도(총점 · 확률)")
+        for c in contribs:
+            L.append(f"- {c.get('label')}: 총점 {signed(c.get('total_contrib'),1)}"
+                     f" · 확률 {signed(c.get('p_up_contrib_pp'),1)}%p (유효가중 {pct(c.get('weight_eff'))})")
+    # BTC 전용: 관점 정렬 · 코어 · 포지셔닝 · MTF · 심리
+    if btc:
+        cv = r.get("convergence") or {}
+        if cv:
+            L.append("\n## 관점 정렬")
+            if cv.get("sentence"):
+                L.append(f"- {cv['sentence']}")
+            if cv.get("majority"):
+                L.append(f"- 다수결 {cv.get('majority')} {cv.get('majority_n')}/{cv.get('directional')}"
+                         f" · 롱 {cv.get('longs')} 숏 {cv.get('shorts')} · 일치도 {pct(cv.get('agreement'))}"
+                         f" · 확신 {cv.get('conviction')} · {cv.get('kind')}")
+            for it in cv.get("items") or []:
+                L.append(f"  · {it.get('label')} {it.get('side')} ({fmt(it.get('score'))})")
+        core = [x for x in (
+            (f"코어 정렬 {r.get('core_aligned')}/{r.get('core_needed')} ({r.get('core_side')})"
+             if r.get("core_needed") is not None else None),
+            f"분면 {r.get('quadrant')}" if r.get("quadrant") else None,
+            f"판정 {r.get('verdict')}" if r.get("verdict") else None,
+            f"다음 세션 {r.get('next_session')}" if r.get("next_session") else None,
+        ) if x]
+        if core:
+            L.append("- " + " · ".join(core))
+        pos = [x for x in (
+            f"글로벌 L/S {fmt(r.get('ls_global'),2)}" if r.get("ls_global") is not None else None,
+            f"상위계정 L/S {fmt(r.get('ls_top'),2)}" if r.get("ls_top") is not None else None,
+            f"공포탐욕 {r.get('fng')}" if r.get("fng") is not None else None,
+        ) if x]
+        if pos:
+            L.append("- 포지셔닝: " + " · ".join(pos))
+        mtf = r.get("mtf") or {}
+        if mtf:
+            L.append("\n## 멀티 타임프레임")
+            for tf in ("1H", "4H", "1D"):
+                d = mtf.get(tf) or {}
+                if not d:
+                    continue
+                st = "↑" if (d.get("st_dir") or 0) > 0 else ("↓" if (d.get("st_dir") or 0) < 0 else "·")
+                L.append(f"- {tf}: 종가 {fmt(d.get('close'))} · RSI {fmt(d.get('rsi'),0)}"
+                         f" · MACD {signed(d.get('macd_hist'),0)} · EMA21 {fmt(d.get('ema21'))}"
+                         f" · ST{st} · ATR {fmt(d.get('atr_pct'),2)}%")
+        sns = r.get("sns") or {}
+        if sns.get("n"):
+            L.append(f"\n## SNS 심리\n- 표본 {sns.get('n')} · 호재 {sns.get('pos')} 악재 {sns.get('neg')}"
+                     + (f" · 편향 {sns.get('bias')}" if sns.get("bias") else ""))
+            for t in (sns.get("topics") or [])[:5]:
+                if isinstance(t, dict) and t.get("title"):
+                    L.append(f"  · [{t.get('tag','')}] {t['title']}")
     # 수급
     fl = r.get("flows") or {}
     if fl and not btc:
@@ -1266,11 +1339,24 @@ def build_report_text(r: dict) -> str:
         L.append("\n## 오버나이트 타점")
         L.append(f"- {pr.get('label','타점')}: 진입 {fmt(pr.get('entry'))} / 손절 {fmt(pr.get('stop'))} "
                  f"/ 목표 {fmt(pr.get('target'))} · 손익비 {fmt(pr.get('rr'))}")
+        for v in (atr.get("variants") or []):
+            L.append(f"  · {v.get('label')}: 진입 {fmt(v.get('entry'))} / 손절 {fmt(v.get('stop'))} "
+                     f"/ 목표 {fmt(v.get('target'))} · 손익비 {fmt(v.get('rr'))}"
+                     + (" · 자격" if v.get("qualified") else ""))
     oc = r.get("order_card") or {}
     if oc:
         el = oc.get("etf_levels") or {}
         L.append(f"- 상품 주문({oc.get('instrument')}·{oc.get('shcode')}): "
                  f"진입 {fmt(el.get('entry'))} / 손절 {fmt(el.get('stop'))} / 목표 {fmt(el.get('target'))}")
+        if oc.get("disparity_pct") is not None or oc.get("tracking_error_pct") is not None:
+            L.append(f"  · 괴리율 {signed(oc.get('disparity_pct'),2)}% · 추적오차 {fmt(oc.get('tracking_error_pct'),2)}%")
+        for w in (oc.get("warnings") or [])[:3]:
+            L.append(f"  · ⚠ {w}")
+    # 마감 1시간봉 분석(주식)
+    itr = r.get("intraday") or {}
+    if not btc and itr.get("label"):
+        L.append(f"\n## 마감 {itr.get('timeframe','60m')} 분석\n- {itr['label']}"
+                 + (f" · 세션 {signed(itr.get('sess_ret'),2)}%" if itr.get("sess_ret") is not None else ""))
     # 서술
     if nar.get("conclusion"):
         L.append(f"\n## 매매 결론\n{nar['conclusion']}")
@@ -1295,6 +1381,20 @@ def build_report_text(r: dict) -> str:
     if nar.get("risks"):
         rk = nar["risks"]
         L.append("\n## 리스크\n" + ("\n".join(f"- {x}" for x in rk) if isinstance(rk, list) else str(rk)))
+    hyp = nar.get("hypotheses")
+    if isinstance(hyp, list) and hyp:
+        L.append("\n## 검증 가설")
+        for h in hyp[:5]:
+            if isinstance(h, dict) and h.get("claim"):
+                L.append(f"- 주장: {h['claim']}")
+                if h.get("basis"):
+                    L.append(f"  · 근거: {h['basis']}")
+                if h.get("counter"):
+                    L.append(f"  · 반증: {h['counter']}")
+    rev = nar.get("reopen_review")
+    if isinstance(rev, list) and rev:
+        L.append("\n## 재개장 체크리스트")
+        L.extend(f"- {x}" for x in rev[:8])
     # 재료
     fc = r.get("materials_fc") or {}
     heads = fc.get("headlines") or nar.get("materials")
@@ -1311,6 +1411,9 @@ def build_report_text(r: dict) -> str:
                 lines.append(f"- {h}")
         if lines:
             L.append("\n## 주요 재료")
+            _fc = (r.get("materials_fc") or r.get("materials_factcheck") or {}).get("fact_check")
+            if _fc:
+                L.append(f"- (팩트체크) {_fc}")
             L.extend(lines)
     # 경고
     warns = r.get("warnings") or []
@@ -1330,6 +1433,16 @@ def build_report_text(r: dict) -> str:
                          f" (n={acc.get('overnight_n')})")
             L.append(f"- 라벨 적중률(종가→종가, 실행 아님) {pct(acc.get('hit_rate'))}"
                      f" · Brier {fmt(acc.get('mean_brier'),3)}")
+    # 페이퍼 손익(체결 있을 때만)
+    pp = r.get("paper") or {}
+    if pp.get("n"):
+        L.append(f"\n## 페이퍼(가상 체결 {pp['n']}회)\n- 승률 {pct(pp.get('win_rate'))}"
+                 f" · 평균 순손익 {signed(pp.get('avg_net_pct'),2)}% · 누적 {signed(pp.get('cum_net_pct'),2)}%")
+    # 판별 성과(표본 40 이상만 — 소표본 AUC 는 실력 아님)
+    perf = r.get("performance") or {}
+    if isinstance(perf.get("n_total"), int) and perf["n_total"] >= 40:
+        L.append(f"\n## 판별 성과(표본 {perf['n_total']})\n- ROC-AUC {fmt(perf.get('roc_auc'),3)}"
+                 f" · MFE {signed(perf.get('avg_mfe_pct'),2)}% · MAE {signed(perf.get('avg_mae_pct'),2)}%")
     # 출처
     srcs = r.get("sources") or []
     if srcs:
@@ -1340,6 +1453,15 @@ def build_report_text(r: dict) -> str:
                 us.append(u)
         if us:
             L.append("\n## 출처\n" + "\n".join(f"- {u}" for u in us))
+    lin = r.get("lineage") or {}
+    if isinstance(lin, dict) and lin:
+        parts = []
+        for k, v in lin.items():
+            if isinstance(v, dict) and v.get("source"):
+                st = v.get("status")
+                parts.append(f"{k}={v['source']}" + (f"({st})" if st else ""))
+        if parts:
+            L.append("\n## 데이터 계보\n- " + " · ".join(parts))
     L.append("\n※ 개인용 리스크 브리핑 · 투자자문 아님. 확정 수치는 API 원천, 확률은 방향 참고값.")
     return "\n".join(L)
 

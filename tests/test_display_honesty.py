@@ -153,6 +153,65 @@ def test_report_text_regime_anchor_disclosed():
     assert "단일 상승레짐" in t          # 복사본에도 레짐 편향 고지
 
 
+def test_report_text_widened_sections():
+    # 2026-08-30: '전체 복사'가 화면 주요 섹션을 담는다(요약본 → 전체에 준함).
+    r = dict(_full_report(),
+             atr={"primary": {"label": "오버나이트", "entry": 100, "stop": 98,
+                              "target": 102, "rr": 1.0},
+                  "variants": [{"label": "단기(1~3일)", "entry": 100, "stop": 95,
+                                "target": 110, "rr": 2.0, "qualified": True}]},
+             confirm_diff={"items": [{"label": "총점", "before": 40.6, "after": 36.2,
+                                      "delta": -4.4, "unit": ""}],
+                           "action": {"action": "HOLD", "reason": "약화 < 임계"}},
+             contributions=[{"label": "투자주체 수급", "total_contrib": -12.6,
+                             "p_up_contrib_pp": 1.6, "weight_eff": 0.263}],
+             intraday={"label": "전강후약", "timeframe": "60m", "sess_ret": -0.8},
+             lineage={"지수": {"source": "네이버 지수 일봉(확정)", "status": "마감 확정"}})
+    r["narrative"] = dict(r["narrative"],
+                          hypotheses=[{"claim": "수급 완충 부족", "basis": "수급 2.0",
+                                       "counter": "개인 순매수 역전"}],
+                          reopen_review=["야간선물 방향 확인"])
+    t = rr.build_report_text(r)
+    for must in ("컨펌 변화", "팩터 기여도", "단기(1~3일)", "마감 60m 분석",
+                 "검증 가설", "재개장 체크리스트", "데이터 계보"):
+        assert must in t, must
+
+
+def test_report_text_btc_specific_sections():
+    btc = {"id": "btc-perp", "report_type": "btc_perp", "trade_date": "2026-08-30",
+           "slot": "0930", "total": 47.9, "grade": "약세",
+           "p_long": 0.452, "p_short": 0.548,
+           "subscores": [{"key": "deriv", "label": "파생 포지셔닝", "score": 52.4,
+                          "weight": 0.28, "observed": "펀딩 0.0079% · OI +0.7%"}],
+           "convergence": {"sentence": "괴리. 확신도 Medium.", "majority": "Short",
+                           "majority_n": 3, "directional": 4, "longs": 1, "shorts": 3,
+                           "agreement": 0.75, "conviction": "Medium", "kind": "괴리",
+                           "items": [{"label": "기술·추세", "side": "Short", "score": 44.0}]},
+           "core_side": "Short", "core_aligned": 1, "core_needed": 2, "quadrant": "Q1",
+           "verdict": "NO_TRADE", "ls_global": 1.19, "ls_top": 2.08, "fng": 69,
+           "mtf": {"1H": {"close": 78186.4, "rsi": 55.3, "macd_hist": 90.1,
+                          "ema21": 78016.1, "st_dir": -1, "atr_pct": 0.33}},
+           "sns": {"n": 1, "pos": 0, "neg": 0,
+                   "topics": [{"tag": "중립", "title": "BTC 뉴스"}]}}
+    t = rr.build_report_text(btc)
+    for must in ("관점 정렬", "다수결 Short", "코어 정렬 1/2", "판정 NO_TRADE",
+                 "포지셔닝", "멀티 타임프레임", "1H:", "SNS 심리"):
+        assert must in t, must
+
+
+def test_report_text_performance_hidden_under_40():
+    # 판별 성과(AUC)도 표본 40 미만이면 숨긴다 — 소표본 AUC 를 실력으로 오독 금지.
+    lo = dict(_full_report(),
+              performance={"n_total": 8, "roc_auc": 0.867, "avg_mfe_pct": 2.5,
+                           "avg_mae_pct": -0.7})
+    assert "판별 성과" not in rr.build_report_text(lo)
+    hi = dict(_full_report(),
+              performance={"n_total": 60, "roc_auc": 0.58, "avg_mfe_pct": 2.5,
+                           "avg_mae_pct": -0.7})
+    t = rr.build_report_text(hi)
+    assert "판별 성과" in t and "ROC-AUC" in t
+
+
 def test_copy_widget_and_script_in_render():
     r2 = dict(_full_report(), id="kosdaq-close", label="장마감전 분석", group="코스닥")
     html = rr.render({"trade_date": "2026-08-27", "reports": [_full_report(), r2]})
