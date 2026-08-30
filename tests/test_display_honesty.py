@@ -349,6 +349,25 @@ def test_headline_downgrades_on_slope_floor():
     assert "익일 상승확률" in ScoreResult.headline(normal)
 
 
+def test_fmt_handles_non_numeric():
+    # 재렌더가 노출한 잠재 크래시: confirm_diff 등 문자열 값에 fmt/signed 가 죽던 것 방지.
+    assert rr.fmt("종가") == "종가"
+    assert rr.fmt(None) == "—"
+    assert rr.fmt(1234.5) == "1,234.5"
+    assert rr.signed("n/a") == "n/a"
+    assert rr.signed(3.2, 1) == "+3.2"
+
+
+def test_basis_and_headline_state_kst():
+    # 시각대(KST) 명시 — 사용자가 KST/UTC 를 헷갈리지 않게.
+    b = rr.build_basis({"as_of": "2026-08-30 08:00", "report_type": "preopen",
+                        "anchor_date": "2026-08-29"})
+    assert "08:00 KST" in b and "모든 시각 KST" in b
+    # 이미 KST 표기가 있으면 중복하지 않는다
+    b2 = rr.build_basis({"as_of": "2026-08-30 19:06 KST"})
+    assert "19:06 KST KST" not in b2 and "모든 시각 KST" in b2
+
+
 def test_gemini_generate_records_last_error():
     # critic 무성사망 관측: 키 없으면 _LAST_ERROR['critic'] 기록(소비처가 경보로 승격 가능).
     from src.collectors import llm

@@ -33,9 +33,9 @@ LABEL_CLOSE = "장마감전 분석"
 LABEL_PREOPEN = "개장전 분석"
 NAV_ITEM_ORDER = (LABEL_CLOSE, LABEL_PREOPEN)
 DEFAULT_PLACEHOLDERS = [
-    {"id": "kospi-preopen", "group": "코스피", "label": LABEL_PREOPEN, "note": "08:00 갱신"},
-    {"id": "kosdaq-preopen", "group": "코스닥", "label": LABEL_PREOPEN, "note": "08:00 갱신"},
-    {"id": "btc-perp", "group": "비트코인 선물", "label": "BTCUSDT", "note": "09:30 · 22:00"},
+    {"id": "kospi-preopen", "group": "코스피", "label": LABEL_PREOPEN, "note": "08:00 KST 갱신"},
+    {"id": "kosdaq-preopen", "group": "코스닥", "label": LABEL_PREOPEN, "note": "08:00 KST 갱신"},
+    {"id": "btc-perp", "group": "비트코인 선물", "label": "BTCUSDT", "note": "09:30 · 22:00 KST"},
 ]
 
 
@@ -51,12 +51,16 @@ def grade_color(g: str) -> str:
 def fmt(n, digits=1) -> str:
     if n is None:
         return "—"
+    if not isinstance(n, (int, float)):   # 숫자 아닌 값(문자 라벨 등)은 그대로 — 크래시 방지
+        return str(n)
     return f"{n:,.{digits}f}"
 
 
 def signed(n, digits=2) -> str:
     if n is None:
         return "—"
+    if not isinstance(n, (int, float)):
+        return str(n)
     return f"{'+' if n >= 0 else ''}{n:,.{digits}f}"
 
 
@@ -105,7 +109,10 @@ def build_basis(r: dict) -> str:
     bits = []
     as_of = r.get("as_of")
     if as_of:
-        bits.append(f'<span class="basis-k">기준시각</span> {esc(as_of)}')
+        # 시각이 KST(한국 표준시)임을 못박는다 — as_of 문자열에 이미 있으면 중복 표기하지 않는다.
+        _ao = str(as_of)
+        _tz = "" if ("KST" in _ao or "UTC" in _ao) else " KST"
+        bits.append(f'<span class="basis-k">기준시각</span> {esc(_ao)}{_tz}')
     if r.get("report_type") == "preopen":
         if r.get("anchor_date"):
             bits.append(f'<span class="basis-k">수치 앵커</span> {esc(r["anchor_date"])} 마감')
@@ -126,6 +133,7 @@ def build_basis(r: dict) -> str:
                     f'<span class="basis-note">({won})</span>')
     if not bits:
         return ""
+    bits.append('<span class="basis-note">모든 시각 KST(한국 표준시)</span>')
     return f'<div class="basis">{" · ".join(bits)}</div>'
 
 
@@ -1113,9 +1121,9 @@ def _stage_of(r: dict) -> int:
     return 2
 
 
-_STAGES = [(1, "결정", "종가베팅 주문 판단", "16:30 확정"),
-           (2, "컨펌", "확정치로 결과 확인", "내일 08:00 재평가"),
-           (3, "재평가", "간밤 반영·방향 결정", "장중 15:00 결정")]
+_STAGES = [(1, "결정", "종가베팅 주문 판단", "16:30 KST 확정"),
+           (2, "컨펌", "확정치로 결과 확인", "내일 08:00 KST 재평가"),
+           (3, "재평가", "간밤 반영·방향 결정", "장중 15:00 KST 결정")]
 
 
 def build_stage_strip(r: dict) -> str:
@@ -1169,7 +1177,7 @@ def build_confirm_diff(r: dict) -> str:
                     f'<span class="pill" style="background:{acol}">{esc(act["action"])}</span> '
                     f'<span class="muted">{esc(act.get("reason",""))}</span></div>')
     return (f'<div class="card confirm-diff"><h2>확정 대조 '
-            f'<span class="pill pill-ghost">{esc(cd.get("prov_as_of","15:00 잠정"))} → 마감 확정</span></h2>'
+            f'<span class="pill pill-ghost">{esc(cd.get("prov_as_of","15:00 KST 잠정"))} → 마감 확정</span></h2>'
             f'<div class="note muted">주문 시점(장중 잠정) 판단이 확정치로 어떻게 바뀌었는지</div>'
             f'<table class="cd-table"><thead><tr><th>항목</th><th>잠정</th><th></th>'
             f'<th>확정</th><th>변화</th></tr></thead><tbody>{rows}</tbody></table>{act_html}</div>')
@@ -1270,7 +1278,9 @@ def build_report_text(r: dict) -> str:
         L.append(f"# {r.get('label','')} · {r.get('group','')} · {r.get('trade_date','')}".strip(" ·"))
     defin = ("장중 잠정(마감 전 스냅샷)" if r.get("intraday_snapshot")
              else ("개장전 재검토" if r.get("report_type") == "preopen" else "마감 확정"))
-    L.append(f"- 상태: {defin}" + (f" · 기준시각 {r['as_of']}" if r.get("as_of") else ""))
+    _ao = str(r.get("as_of") or "")
+    _tz = "" if not _ao or "KST" in _ao or "UTC" in _ao else " KST"
+    L.append(f"- 상태: {defin}" + (f" · 기준시각 {_ao}{_tz}(모든 시각 KST)" if _ao else ""))
     nar = r.get("narrative") or {}
     head = nar.get("character") or r.get("headline")
     if head:
@@ -1723,7 +1733,8 @@ def render_btc_view(r: dict, date: str) -> str:
       <div class="view-title">BTCUSDT <span class="view-sub">· 비트코인 선물 · {esc(r.get("trade_date", date))} {slot}</span> {_status_badge(r)}</div>
       {picker}
       <div class="basis"><span class="basis-k">기준</span> {as_of} · 마크 {fmt(mark,1)} ({chg_html})
-        · {esc(r.get("nasdaq_txt") or "")} · 실시간 아님</div>
+        · {esc(r.get("nasdaq_txt") or "")} · 실시간 아님
+        <span class="basis-note">· 모든 시각 KST(한국 표준시)</span></div>
       {_copy_widget(r)}
     </div>
     {headline_html}
@@ -1927,7 +1938,7 @@ def _btc_slot_picker(r: dict, date: str, items: list | None = None) -> str:
             f'{date_html}'
             f'<div class="slot-regs">{"".join(chips)}</div>'
             f'{man_html}'
-            f'<span class="slot-hint">정규 하루 2회 · 수동은 목록</span>'
+            f'<span class="slot-hint">정규 하루 2회(09:30·22:00 KST) · 수동은 목록</span>'
             f'</div>')
 
 
