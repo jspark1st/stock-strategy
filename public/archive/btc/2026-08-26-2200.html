@@ -1688,8 +1688,10 @@ NO_TRADE — 신규진입 차단, 관망
     if(window.__btcDateSynced) return; window.__btcDateSynced=true;
     var labels=document.querySelectorAll('label.slot-lab'), sel=null;
     for(var i=0;i<labels.length;i++){
-      if((labels[i].textContent||'').trim().indexOf('\ub0a0\uc9dc')===0){
-        sel=labels[i].querySelector('select'); break; }
+      // BTC 자기 셀렉트(select.slot-sel)만 잡는다 — 주식은 select.stock-datesel 이라 절대 안 걸린다
+      // (예전엔 라벨 텍스트 '날짜'로 찾아, 주식 라벨의 📅 이모지가 빠지면 주식을 BTC로 오라우팅할 위험).
+      var s=labels[i].querySelector('select.slot-sel');
+      if(s&&(labels[i].textContent||'').trim().indexOf('\ub0a0\uc9dc')===0){ sel=s; break; }
     }
     if(!sel) return;
     var curDate='', cop=sel.options[sel.selectedIndex];
