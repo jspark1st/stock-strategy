@@ -1863,7 +1863,11 @@ def _btc_is_manual(x: dict) -> bool:
 def _btc_slot_href(x: dict, viewing: dict) -> str:
     sl = x.get("slot") or ""
     href = x.get("href") or "/#btc-perp"
+    # 지금 보고 있는 **바로 그 슬롯**만 깔끔한 랜딩 URL(/#btc-perp)로. 나머지 슬롯은 아카이브로.
+    # 예전엔 같은 날짜의 정규 슬롯을 전부 랜딩으로 보내, 22:00 을 볼 때 09:30 칩도 같은 페이지(22:00)
+    # 를 가리켜 회색·안 눌리는 것처럼 보였다(→ 09:30 아카이브로 이동해야 정상).
     if (sl in ("0930", "2200") and x.get("date") == viewing.get("trade_date")
+            and sl == (viewing.get("slot") or "")
             and viewing.get("kind") != "manual"):
         href = "/#btc-perp"
     if "#" not in href:

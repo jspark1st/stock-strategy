@@ -635,3 +635,21 @@ def test_deriv_quadrant_extreme_signs_q1_q4():
     # 극단+OI증가는 과열군중 게이트 발동
     _, _, g = btc_scoring.score_deriv(+EXT, +EXT, None, None, oi_chg_session=0.05)
     assert any("과열 군중" in x for x in g)
+
+
+def test_btc_slot_chip_href_points_to_archive_for_other_slot():
+    # 22:00 을 볼 때 09:30 칩은 랜딩(현재 페이지)이 아니라 09:30 아카이브로 가야 한다.
+    # (예전엔 같은 날짜 정규 슬롯을 전부 랜딩으로 보내 09:30 칩이 안 눌리는 것처럼 보였다.)
+    import re
+    import scripts.render_report as rr
+    items = [{"date": "2026-08-30", "slot": "2200", "kind": "scheduled",
+              "href": "/archive/btc/2026-08-30-2200.html"},
+             {"date": "2026-08-30", "slot": "0930", "kind": "scheduled",
+              "href": "/archive/btc/2026-08-30-0930.html"}]
+    r = {"id": "btc-perp", "report_type": "btc_perp", "trade_date": "2026-08-30",
+         "slot": "2200", "kind": "scheduled"}
+    picker = rr._btc_slot_picker(r, "2026-08-30", items=items)
+    chips = dict((lab, href) for href, lab in
+                 re.findall(r'<a class="slot-chip[^"]*" href="([^"]+)">(\d\d:\d\d)</a>', picker))
+    assert "/archive/btc/2026-08-30-0930.html" in chips.get("09:30", "")   # 다른 슬롯 → 아카이브
+    assert chips.get("22:00", "").startswith("/#btc-perp")                 # 현재 슬롯 → 랜딩
