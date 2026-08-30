@@ -83,7 +83,7 @@ train/test 분할로 과최적화 노출.)
 PYTHONUTF8=1 python scripts/run_backtest.py --count 250 --tune   # 방향예측 성적·튜닝(개발 중심)
 PYTHONUTF8=1 python scripts/run_close.py                          # 마감 파이프라인
 PYTHONUTF8=1 python scripts/run_preopen.py                        # 개장전 재평가
-PYTHONUTF8=1 .venv/bin/python -m pytest tests/ -q                  # 328 collected (2026-08-30)
+PYTHONUTF8=1 .venv/bin/python -m pytest tests/ -q                  # 330 collected (2026-08-30)
 ```
 
 ## 문서 지도 (이 순서로 파고든다)

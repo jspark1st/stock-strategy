@@ -73,9 +73,11 @@ def gemini_generate(sys_prompt: str, user_prompt: str, env: dict,
     """
     key = env.get("google_gemini_api")
     if not key:
+        _LAST_ERROR["critic"] = "no key"
         return None
     base = {"contents": [{"role": "user", "parts": [{"text": user_prompt}]}],
             "systemInstruction": {"parts": [{"text": sys_prompt}]}}
+    last = "unknown"
     for model in (models or resolve_models(env)["critic"]):
         # gemini_call 과 동일한 사고예산 완화: 사고 토큰이 maxOutputTokens 를 먹어 본문 0자로
         # 조용히 죽는 것(G6 클래스)을 막는다. 사고예산 0 우선 → 미지원이면 사고 허용 재시도.
@@ -86,18 +88,23 @@ def gemini_generate(sys_prompt: str, user_prompt: str, env: dict,
                 r = httpx.post(GEMINI_URL.format(model=model), params={"key": key},
                                json={**base, "generationConfig": cfg}, timeout=TIMEOUT)
                 if r.status_code == 404:
+                    last = "404 model"
                     break                      # 이 모델 없음 → 다음 모델
                 if r.status_code == 400 and "thinking" in r.text.lower():
+                    last = "400 thinkingConfig"
                     continue                   # 사고예산 미지원 → 사고 허용으로 재시도
                 r.raise_for_status()
                 cand = (r.json().get("candidates") or [{}])[0]
                 text = "".join(p.get("text", "")
                                for p in (cand.get("content") or {}).get("parts", []))
                 if text.strip():
+                    # 성공 사유 기록 제거 → 소비처가 '키 있는데 실패'를 경보로 승격 가능(gemini_call 과 동일).
+                    _LAST_ERROR.pop("critic", None)
                     return text
-                # 본문 0자 = 실패(사고에 예산 소진) → 다음 설정/모델
-            except Exception:  # noqa — 다음 설정/모델
-                continue
+                last = f"empty({cand.get('finishReason')})"   # 본문 0자 = 실패
+            except Exception as e:  # noqa — 다음 설정/모델
+                last = type(e).__name__
+    _LAST_ERROR["critic"] = last
     return None
 # Opus 5 는 적응형 사고(adaptive thinking)가 기본 ON 이라 사고 토큰도 max_tokens 를 먹는다.
 # 4000 이면 JSON 이 중간에 잘릴 수 있어 넉넉히 잡는다(비용은 실제 출력분만 청구).

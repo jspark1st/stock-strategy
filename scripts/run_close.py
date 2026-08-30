@@ -839,6 +839,11 @@ def main() -> int:
                        len(r.get("reviews", {}).get("llm", [])) for r in reports)
             print(f"[자가비평] 발견 {nrev}건 · 교차 {len(review_meta.get('cross') or [])}건 "
                   f"· 누적 백로그 {(review_meta.get('digest') or {}).get('n_total', 0)}건")
+            # critic(자가비평 Gemini)이 키 있는데 무성사망했는지 승격 — 2026-08-28 ④(Gemini
+            # 무성사망) 와 같은 클래스가 자가비평 경로에 남아 있던 것. 안 잡으면 '매일 비평 0건'만 찍힘.
+            crit_err = llm._LAST_ERROR.get("critic")
+            if not dry_run and env.get("google_gemini_api") and crit_err and crit_err != "no key":
+                _alert(f"자가비평 critic(Gemini) 실패({crit_err}) — 비평 LLM 발견 0건, 무성사망 가능")
         except Exception as e:  # noqa
             print(f"⚠ 리포트 비평 실패({type(e).__name__}: {e}) — 스킵")
 

@@ -287,6 +287,34 @@ def test_exit_open_suppresses_buy_all_paths():
     assert "권장비중 0%" in facts
     fb = llm.fallback_narrative(r)
     assert "신규 진입 차단(개장 즉시 청산)" in fb["conclusion"]
+    # 복사 텍스트 '진입 판정' 라인도 stale allow=True 를 노출하면 안 된다(같은 텍스트 내 허용/차단 공존 금지).
+    assert "진입 판정: 허용" not in copy
+    assert "진입 판정: 차단" in copy
+
+
+def test_exit_open_entry_gate_badge_downgraded():
+    # build_entry_gate 녹색 '진입 허용' 배지가 EXIT_OPEN preopen 에서 격하돼야 한다(전일 checks
+    # 전부 ✓·allow=True 를 그대로 받는 경로 — 청산 지시 옆 녹색 허용 배지 방지).
+    r = dict(_exit_open_report(),
+             entry={"allow": True, "direction": "long",
+                    "checks": [{"name": "등급", "ok": True, "detail": ""},
+                               {"name": "확률", "ok": True, "detail": ""}]})
+    g = rr.build_entry_gate(r)
+    assert "badge-ok" not in g and "진입 허용" not in g
+    assert "개장 즉시 청산" in g and "전일 종가 진입 게이트" in g
+    # 정상 허용(마감)은 녹색 '진입 허용' 유지
+    ok = {"id": "kospi-close",
+          "entry": {"allow": True, "checks": [{"name": "등급", "ok": True, "detail": ""}]}}
+    assert "진입 허용" in rr.build_entry_gate(ok)
+
+
+def test_gemini_generate_records_last_error():
+    # critic 무성사망 관측: 키 없으면 _LAST_ERROR['critic'] 기록(소비처가 경보로 승격 가능).
+    from src.collectors import llm
+    llm._LAST_ERROR.pop("critic", None)
+    out = llm.gemini_generate("sys", "user", {})   # 키 없음
+    assert out is None
+    assert llm._LAST_ERROR.get("critic") == "no key"
 
 
 def test_atr_badge_downgraded_on_all_block_paths():

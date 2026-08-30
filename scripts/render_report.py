@@ -313,14 +313,28 @@ def build_entry_gate(r: dict) -> str:
     if not checks:
         return ""
     allow = e.get("allow")
+    # 개장전 EXIT_OPEN/NO_TRADE 는 전일 close 의 checks(전부 ✓·allow=True)를 그대로 받으므로,
+    # preopen_state 를 보지 않으면 청산 지시 옆에 녹색 '진입 허용' 배지가 뜬다(권위=청산과 모순).
+    preopen = r.get("report_type") == "preopen"
+    pstate = (r.get("preopen_state") or {}).get("state")
+    exit_open = pstate in ("NO_TRADE", "EXIT_OPEN")
     rows = "".join(
         f'<li><span class="chk-{"ok" if c["ok"] else "no"}">{"✓" if c["ok"] else "✕"}</span> '
         f'{esc(c["name"])} <span class="muted">· {esc(str(c.get("detail","")))}</span></li>'
         for c in checks)
-    verdict = ('<span class="badge badge-ok">진입 허용</span>' if allow
-               else '<span class="badge badge-warn">진입 차단</span>')
-    return (f'<div class="card"><h2>종가 진입 게이트 {verdict}</h2>'
-            f'<div class="note muted">전부 충족일 때만 진입(총점이 아니라 조건 조합)</div>'
+    if exit_open:
+        verdict = ('<span class="badge badge-warn">'
+                   + ("개장 즉시 청산" if pstate == "EXIT_OPEN" else "관망") + '</span>')
+    elif allow:
+        verdict = '<span class="badge badge-ok">진입 허용</span>'
+    else:
+        verdict = '<span class="badge badge-warn">진입 차단</span>'
+    # 개장전이면 이 게이트는 '전일 종가 시점' 판정 — 오늘 새 판정으로 오독되지 않게 시점 라벨을 박는다.
+    title = "전일 종가 진입 게이트" if preopen else "종가 진입 게이트"
+    note = ("개장 08:50 상태가 권위 — 아래 체크리스트는 전일 종가 시점 기록이다."
+            if preopen else "전부 충족일 때만 진입(총점이 아니라 조건 조합)")
+    return (f'<div class="card"><h2>{title} {verdict}</h2>'
+            f'<div class="note muted">{note}</div>'
             f'<ul class="gate-ul">{rows}</ul></div>')
 
 
@@ -1271,14 +1285,20 @@ def build_report_text(r: dict) -> str:
             if cal.get("source") and cal["source"] != "sot":
                 note += f" · {cal['source']} n={cal.get('n')} · 단일 상승레짐 기저율 앵커, 하락장 미검증"
             L.append("-" + note + ")")
-    # 진입 판정
+    # 진입 판정 — 상단 blocked(entry.allow=False OR preopen_state in NO_TRADE/EXIT_OPEN)를 따른다.
+    # 개장전 EXIT_OPEN 은 entry.allow 가 전일값이라 True 로 남으므로 원시 allow 를 쓰면 같은 복사
+    # 텍스트 안에 '허용'과 '차단'이 공존한다(붙여넣기 LLM 오독). blocked 기준으로 통일한다.
     ent = r.get("entry") or {}
-    if ent:
-        allow = ent.get("allow")
-        L.append(f"- 진입 판정: {'허용' if allow else '차단'}"
-                 + (f" (방향 {ent.get('direction')})" if ent.get("direction") else "")
-                 + (f" · 사유: {', '.join(ent.get('blocked_reasons') or [])}"
-                    if not allow and ent.get("blocked_reasons") else ""))
+    if ent or blocked:
+        _ps = (r.get("preopen_state") or {}).get("state")
+        _dir = f" (방향 {ent.get('direction')})" if ent.get("direction") else ""
+        if blocked:
+            reason = ("개장 즉시 청산" if _ps == "EXIT_OPEN"
+                      else "관망(NO_TRADE)" if _ps == "NO_TRADE"
+                      else ", ".join(ent.get("blocked_reasons") or []) or "조건 미충족")
+            L.append(f"- 진입 판정: 차단{_dir} · 사유: {reason}")
+        else:
+            L.append(f"- 진입 판정: 허용{_dir}")
     gate = r.get("gate") or {}
     if gate.get("reasons"):
         L.append(f"- 게이트: {', '.join(gate['reasons'])}")
