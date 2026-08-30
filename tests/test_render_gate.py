@@ -205,7 +205,9 @@ def test_facts_block_allows_when_entry_allow_true():
     assert "실행수단 KODEX 코스닥150" in txt
 
 
-def test_sidebar_groups_by_market_then_stage():
+def test_sidebar_groups_by_asset_then_market():
+    # A안(2026-08-30): 사이드바 = 자산군(주식/가상화폐) → 시장(코스피/코스닥/BTC) 2단.
+    # 한 시장의 국면(장마감/개장전)은 사이드바에서 한 아이템으로 합치고 data-views 로 포섭.
     html = rr.build_sidebar([
         {"id": "kosdaq-close", "group": "코스닥", "label": "장마감전 분석",
          "ph": False, "total": 32.3, "grade": "위험"},
@@ -218,10 +220,19 @@ def test_sidebar_groups_by_market_then_stage():
         {"id": "kosdaq-preopen", "group": "코스닥", "label": "개장전 분석",
          "ph": False, "total": 56.6, "grade": "중립"},
     ])
-    assert html.index("nav-title\">코스피") < html.index("nav-title\">코스닥")
-    assert html.index("nav-title\">코스닥") < html.index("비트코인 선물")
-    k = html[html.index("코스피"):html.index("코스닥")]
-    assert k.index("장마감전 분석") < k.index("개장전 분석")
+    # 자산군 헤더 순서: 주식 → 가상화폐
+    assert html.index('nav-title">주식') < html.index('nav-title">가상화폐')
+    # 주식 섹션에 코스피·코스닥 시장 아이템(국면 중복 없이 각 1개)
+    stock = html[html.index('nav-title">주식'):html.index('nav-title">가상화폐')]
+    assert '>코스피</span>' in stock and '>코스닥</span>' in stock
+    assert stock.index('코스피') < stock.index('코스닥')
+    assert stock.count('data-target=') == 2                    # 두 시장 = 두 아이템(4국면 아님)
+    # 시장 아이템이 그 시장의 모든 국면 뷰를 포섭 → 어느 국면 뷰에서도 활성
+    assert 'data-views="kospi-close kospi-preopen"' in html    # 장마감 먼저
+    assert 'data-target="kospi-close"' in html                 # 대표=장마감
+    # BTC 는 가상화폐 섹션에 'BTC 선물'로 · 미래 자리 '예정'
+    assert '>BTC 선물</span>' in html
+    assert 'ETH 선물' in html and '예정' in html
 
 
 def test_normalize_remaps_legacy_nav():

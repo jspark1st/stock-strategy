@@ -32,6 +32,17 @@ NAV_GROUP_ORDER = ("코스피", "코스닥", "비트코인 선물")
 LABEL_CLOSE = "장마감전 분석"
 LABEL_PREOPEN = "개장전 분석"
 NAV_ITEM_ORDER = (LABEL_CLOSE, LABEL_PREOPEN)
+
+# ── 메뉴 IA(2026-08-30 사용자 결정 · A안): 사이드바 = 자산군 → 시장(2단). 지평(단기/중기/장기)·
+#    국면(장마감/개장전)은 뷰 상단 탭. 미래 트랙은 '예정'으로 자리만 확보(있는 척 X). → AGENTS.md 「장기 비전」.
+ASSET_ORDER = ("주식", "가상화폐", "종합 리포트", "진단")
+ASSET_OF = {"코스피": "주식", "코스닥": "주식", "비트코인 선물": "가상화폐", "진단": "진단"}
+MARKET_LABEL = {"비트코인 선물": "BTC 선물", "진단": "리포트 비평"}   # 사이드바 시장 표기
+FUTURE_MARKETS = (                                   # (자산, 시장 라벨, 배지) — 예정 자리
+    ("가상화폐", "ETH 선물", "예정"),
+    ("종합 리포트", "종합 리포트", "예정"),
+)
+HORIZONS = (("단기", True), ("중기", False), ("장기", False))   # 지평 탭 — 단기만 활성(L5+ 예정)
 DEFAULT_PLACEHOLDERS = [
     {"id": "kospi-preopen", "group": "코스피", "label": LABEL_PREOPEN, "note": "08:00 KST 갱신"},
     {"id": "kosdaq-preopen", "group": "코스닥", "label": LABEL_PREOPEN, "note": "08:00 KST 갱신"},
@@ -2182,41 +2193,74 @@ def normalize_bundle(data: dict) -> dict:
     return b
 
 
+def _nav_badge(it: dict) -> str:
+    if it.get("ph"):
+        return f'<span class="nav-badge">{esc(it.get("note", "준비 중"))}</span>'
+    if it.get("badge"):
+        return f'<span class="nav-badge">{esc(it["badge"])}</span>'
+    if it.get("total") is not None:
+        return (f'<span class="nav-score" style="color:{grade_color(it.get("grade",""))}">'
+                f'{fmt(it["total"])}</span>')
+    if it.get("grade"):
+        return f'<span class="nav-badge">{esc(it["grade"])}</span>'
+    return ""
+
+
 def build_sidebar(items: list[dict]) -> str:
-    order, gmap = [], {}
+    """A안: 자산군(주식/가상화폐/종합/진단) 섹션 → 시장 아이템(2단). 한 시장의 여러 국면(장마감·개장전)은
+    사이드바에서 **한 아이템**으로 합치고(대표=장마감), 국면 전환은 뷰 상단 탭이 한다. data-views 로
+    그 시장의 모든 뷰 id 를 담아, 어느 국면 뷰에 있어도 사이드바 시장 아이템이 활성 표시된다."""
+    bym: dict[str, list] = {}
     for it in items:
-        g = it["group"]
-        if g not in gmap:
-            gmap[g] = []
-            order.append(g)
-        gmap[g].append(it)
-    known = [g for g in NAV_GROUP_ORDER if g in gmap]
-    rest = [g for g in order if g not in NAV_GROUP_ORDER]
-    order = known + rest
+        bym.setdefault(it["group"], []).append(it)
+    market_order = list(NAV_GROUP_ORDER) + ["진단"] + [g for g in bym if g not in NAV_GROUP_ORDER and g != "진단"]
     out = []
-    for g in order:
-        gmap[g].sort(key=lambda x: (NAV_ITEM_ORDER.index(x["label"])
-                                    if x.get("label") in NAV_ITEM_ORDER else 99))
-        out.append(f'<div class="nav-group"><div class="nav-title">{esc(g)}</div>')
-        for it in gmap[g]:
-            cls = "nav-item" + (" ph" if it["ph"] else "")
-            if it["ph"]:
-                badge = f'<span class="nav-badge">{esc(it.get("note", "준비 중"))}</span>'
-            elif it.get("badge"):
-                badge = f'<span class="nav-badge">{esc(it["badge"])}</span>'
-            elif it.get("total") is not None:
-                badge = (f'<span class="nav-score" style="color:{grade_color(it.get("grade",""))}">'
-                         f'{fmt(it["total"])}</span>')
-            elif it.get("grade"):
-                badge = f'<span class="nav-badge">{esc(it["grade"])}</span>'
-            else:
-                badge = ""
+    for asset in ASSET_ORDER:
+        markets = [m for m in market_order if m in bym and ASSET_OF.get(m, m) == asset]
+        futures = [f for f in FUTURE_MARKETS if f[0] == asset]
+        if not markets and not futures:
+            continue
+        out.append(f'<div class="nav-group"><div class="nav-title">{esc(asset)}</div>')
+        for m in markets:
+            group_items = bym[m]
+            group_items.sort(key=lambda x: (NAV_ITEM_ORDER.index(x["label"])
+                                            if x.get("label") in NAV_ITEM_ORDER else 99))
+            reals = [x for x in group_items if not x.get("ph")]
+            pool = reals or group_items
+            primary = next((x for x in pool if x.get("label") == LABEL_CLOSE), pool[0])
+            member_ids = " ".join(x["id"] for x in group_items)
+            mlabel = MARKET_LABEL.get(m, m)
+            cls = "nav-item" + (" ph" if primary.get("ph") else "")
             out.append(
-                f'<a class="{cls}" data-target="{esc(it["id"])}" href="#{esc(it["id"])}" '
-                f'aria-label="{esc(it["label"])} {esc(g)}">'
-                f'<span>{esc(it["label"])}</span>{badge}</a>')
+                f'<a class="{cls}" data-target="{esc(primary["id"])}" data-views="{esc(member_ids)}" '
+                f'href="#{esc(primary["id"])}" aria-label="{esc(mlabel)} {esc(asset)}">'
+                f'<span>{esc(mlabel)}</span>{_nav_badge(primary)}</a>')
+        for (_, flabel, note) in futures:               # 예정 자리(비활성)
+            out.append(f'<span class="nav-item ph" aria-disabled="true">'
+                       f'<span>{esc(flabel)}</span><span class="nav-badge">{esc(note)}</span></span>')
         out.append("</div>")
     return "".join(out)
+
+
+def _view_tabs(market: str, cur_vid: str, market_views: dict) -> str:
+    """뷰 상단 탭 — 지평(단기 활성·중기/장기 예정) + 국면(그 시장의 장마감/개장전 뷰 링크).
+    BTC 는 슬롯 칩(09:30·22:00)이 국면 역할이라 국면 행을 생략한다. 탭 링크는 href=#vid →
+    hashchange 로 뷰 전환(기존 핸들러 재사용). 활성 표시는 뷰마다 서버렌더돼 있어 JS 불필요."""
+    hz = "".join(
+        (f'<span class="vtab active">{esc(name)}</span>' if act
+         else f'<span class="vtab vtab-off" aria-disabled="true">{esc(name)}·예정</span>')
+        for (name, act) in HORIZONS)
+    rows = f'<div class="vtabs"><span class="vtabs-lbl">지평</span>{hz}</div>'
+    phases = market_views.get(market) or {}
+    if market != "비트코인 선물" and phases:
+        labels = ([l for l in NAV_ITEM_ORDER if l in phases]
+                  + [l for l in phases if l not in NAV_ITEM_ORDER])
+        gm = "".join(
+            f'<a class="vtab{" active" if phases[l] == cur_vid else ""}" '
+            f'data-target="{esc(phases[l])}" href="#{esc(phases[l])}">{esc(l)}</a>'
+            for l in labels)
+        rows += f'<div class="vtabs"><span class="vtabs-lbl">국면</span>{gm}</div>'
+    return f'<div class="view-nav">{rows}</div>'
 
 
 def ensure_lwc_vendor() -> Path:
@@ -2253,6 +2297,10 @@ def render(data: dict, lwc_src: str | None = None) -> str:
     date = str(bundle.get("trade_date", ""))
 
     bundle_as_of = bundle.get("as_of")
+    # 시장별 국면(장마감/개장전) 뷰 id — 뷰 상단 국면 탭이 형제 뷰를 링크하는 데 쓴다.
+    market_views: dict[str, dict] = {}
+    for r in bundle["reports"]:
+        market_views.setdefault(r.get("group", "코스피"), {})[r.get("label", r["id"])] = r["id"]
     items, views, chart_views = [], [], {}
     for r in bundle["reports"]:
         vid = r["id"]
@@ -2261,7 +2309,8 @@ def render(data: dict, lwc_src: str | None = None) -> str:
         items.append({"id": vid, "label": r.get("label", vid),
                       "group": r.get("group", "코스피"), "ph": False,
                       "total": r.get("total"), "grade": r.get("grade")})
-        views.append((vid, render_report_view(r, date)))
+        views.append((vid, _view_tabs(r.get("group", "코스피"), vid, market_views)
+                      + render_report_view(r, date)))
         if r.get("charts"):
             chart_views[vid] = _chart_payload(r)
     for i, p in enumerate(bundle.get("placeholders", [])):
@@ -2442,6 +2491,17 @@ TEMPLATE = r"""<!doctype html>
   .stage-sep{color:var(--muted);font-weight:800}
   .stage-note{color:var(--muted);font-size:.82rem;margin-top:5px}
   .stage-note b{color:var(--text)}
+  /* 뷰 상단 탭 — 지평(단기/중기/장기) + 국면(장마감/개장전). A안 IA. */
+  .view-nav{display:flex;flex-direction:column;gap:6px;margin:2px 0 14px}
+  .vtabs{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+  .vtabs-lbl{font-size:.72rem;color:var(--muted);font-weight:700;min-width:2.4em}
+  .vtab{border:1px solid var(--border);background:var(--surface2);color:var(--muted);
+    border-radius:8px;padding:5px 12px;font:inherit;font-size:.82rem;font-weight:600;
+    text-decoration:none;min-height:32px;display:inline-flex;align-items:center}
+  .vtab.active{background:color-mix(in srgb,var(--accent) 20%,transparent);color:var(--accent);border-color:var(--accent)}
+  .vtab-off{opacity:.5;border-style:dashed;cursor:default}
+  a.vtab:hover{border-color:var(--accent)}
+  a.vtab:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   /* 확정 대조 테이블 */
   .cd-table{width:100%;border-collapse:collapse;margin-top:8px;font-variant-numeric:tabular-nums}
   .cd-table th{text-align:left;font-size:.78rem;color:var(--muted);font-weight:700;padding:4px 8px;border-bottom:1px solid var(--border)}
@@ -2760,7 +2820,9 @@ TEMPLATE = r"""<!doctype html>
 
   function activate(id){
     document.querySelectorAll('.view').forEach(function(s){ s.classList.toggle('active', s.getAttribute('data-view')===id); });
-    document.querySelectorAll('.nav-item').forEach(function(a){ var on=a.getAttribute('data-target')===id;
+    document.querySelectorAll('.nav-item').forEach(function(a){
+      var v=a.getAttribute('data-views');   // 한 시장 아이템이 그 시장의 모든 국면 뷰를 포섭
+      var on = v ? ((' '+v+' ').indexOf(' '+id+' ')>=0) : (a.getAttribute('data-target')===id);
       a.classList.toggle('active', on); if(on){ a.setAttribute('aria-current','page'); } else { a.removeAttribute('aria-current'); } });
     buildView(id);
     window.scrollTo(0,0);
