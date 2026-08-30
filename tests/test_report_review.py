@@ -16,7 +16,7 @@ def _report(**over):
             "excluded_keys": ["news"], "signal_agreement": 0.0,
             "atr": {"primary": {"kelly_pct": 5}},
             "accuracy": {"n": 45, "hit_rate": 0.857, "overnight_hit_rate": 0.25,
-                         "overnight_n": 4}}
+                         "overnight_n": 12}}   # R5: 실거래 표본 ≥ _MIN_HORIZON_N 이라야 점화
     base.update(over)
     return base
 
@@ -260,3 +260,25 @@ def test_review_digest_dualizes_accepted_and_tracks_resolution():
         conn.close()
     finally:
         os.unlink(path)
+
+
+# ── R5 정제: 소표본·favorable 괴리는 노이즈라 점화 안 함 ──────────────────
+def test_horizon_divergence_suppressed_on_small_sample():
+    per, _ = report_review.rule_findings([_report(
+        accuracy={"n": 45, "hit_rate": 0.857, "overnight_hit_rate": 0.25, "overnight_n": 4})])
+    codes = _codes(sum(per.values(), []))
+    assert "horizon_divergence" not in codes          # n<10 → 소표본, 점화 안 함
+
+
+def test_horizon_divergence_suppressed_when_real_beats_label():
+    # 실거래(0.80)가 라벨(0.55)보다 나으면 '전략 전제 위협'이 아니라 favorable → 점화 안 함
+    per, _ = report_review.rule_findings([_report(
+        accuracy={"n": 45, "hit_rate": 0.55, "overnight_hit_rate": 0.80, "overnight_n": 20})])
+    assert "horizon_divergence" not in _codes(sum(per.values(), []))
+
+
+def test_horizon_divergence_fires_on_real_threat():
+    # 라벨이 실거래보다 유의하게 낫고(위협 방향) 표본 충분하면 점화
+    per, _ = report_review.rule_findings([_report(
+        accuracy={"n": 45, "hit_rate": 0.85, "overnight_hit_rate": 0.30, "overnight_n": 20})])
+    assert "horizon_divergence" in _codes(sum(per.values(), []))

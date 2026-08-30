@@ -24,6 +24,8 @@ _BAND = 0.08
 _SLOPE_FLOOR = 0.006
 # 실거래(종가→시가) vs 라벨(종가→종가) 적중률 괴리 경보(%p).
 _HORIZON_GAP = 0.20
+# 괴리 경보에 필요한 최소 실거래 표본 — n 작으면 괴리가 노이즈라 매 회차 재점화한다(소표본 방어).
+_MIN_HORIZON_N = 10
 
 
 def _is_btc(r: dict) -> bool:
@@ -114,14 +116,18 @@ def _per_report_rules(r: dict) -> list[dict]:
                       "익일 상승확률이 40~60% 판별 미확보 구간이라 방향 베팅 근거가 약하다.",
                       f"p_up={p_up:.3f}"))
 
-    # R5 실거래(종가→시가) vs 라벨(종가→종가) 괴리 — 전략 전제 위협(모순)
+    # R5 실거래(종가→시가) vs 라벨(종가→종가) 괴리 — 전략 전제 위협(모순).
+    # 정상상태 재점화(노이즈) 방지: ①실거래 표본이 의미있고(n≥_MIN_HORIZON_N) ②**라벨이 실거래보다
+    # 유의하게 나은** 위협 방향(hr-ohr≥gap)일 때만 고심각. 소표본·favorable(실거래>라벨) 괴리는
+    # 위협이 아니라 점화 안 한다(주 라벨은 이미 open 으로 전환됨 — 이 규칙은 '악화 감시'만 남긴다).
     hr, ohr = acc.get("hit_rate"), acc.get("overnight_hit_rate")
-    if hr is not None and ohr is not None and (acc.get("overnight_n") or 0) > 0:
-        if abs(hr - ohr) >= _HORIZON_GAP:
-            out.append(_f("rule", "모순", "horizon_divergence", "high",
-                          "라벨 적중률과 실거래(시가청산) 적중률 괴리",
-                          "라벨(종가→종가)은 맞는데 실제 거래 지평(종가→익일 시가)은 다른 결과 — '라벨은 맞고 실거래는 지는' 위험.",
-                          f"라벨 {hr*100:.0f}% vs 실거래 {ohr*100:.0f}% (n={acc.get('overnight_n')})"))
+    on = acc.get("overnight_n") or 0
+    if hr is not None and ohr is not None and on >= _MIN_HORIZON_N and (hr - ohr) >= _HORIZON_GAP:
+        out.append(_f("rule", "모순", "horizon_divergence", "high",
+                      "라벨 적중률과 실거래(시가청산) 적중률 괴리",
+                      "라벨(종가→종가)은 맞는데 실제 거래 지평(종가→익일 시가)은 유의하게 나쁨 — "
+                      "'라벨은 맞고 실거래는 지는' 위험이 표본으로 확인됨.",
+                      f"라벨 {hr*100:.0f}% vs 실거래 {ohr*100:.0f}% (n={on}, 격차 {(hr-ohr)*100:.0f}%p)"))
 
     # R6 데이터 완전성 미달(부족)
     dc = r.get("data_completeness")
