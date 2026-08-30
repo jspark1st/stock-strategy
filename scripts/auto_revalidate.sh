@@ -33,3 +33,11 @@ if [ $RC -ne 0 ]; then
   exit $RC
 fi
 echo "[$(date '+%F %T')] ✓ 재검증 완료(텔레그램 전송)" >> "$LOG"
+
+# 문서 드리프트 가드 — 문서가 현실(테스트 수·링크·크론)과 어긋나면 경보(비치명적)
+"$PY" scripts/check_docs.py >> "$LOG" 2>&1
+DRC=$?
+if [ $DRC -ne 0 ]; then
+  echo "[$(date '+%F %T')] ALERT: 문서 드리프트 감지(check_docs exit $DRC)" >> out/alerts.log
+  "$PY" scripts/notify.py "🟡 문서 드리프트 — check_docs 불일치. out/auto_revalidate.log 확인 후 문서를 현실에 맞춰라." >> "$LOG" 2>&1 || true
+fi

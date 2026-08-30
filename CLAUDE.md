@@ -1,8 +1,9 @@
 # CLAUDE.md
 
 > **Claude Code는 아래「인수인계 2026-08-22」를 먼저 읽고**, 그다음 `AGENTS.md`(북극성).
-> 문서 체계: **AGENTS.md**(전략·규칙·로드맵) → **이 파일**(운영·코드맵·진행 로그) →
-> **guide_docs/index.md** → 폴더. BTC는 **HANDOFF_BTC.md**.
+> 문서 체계: **AGENTS.md**(전략·규칙) → **이 파일**(진행 로그=감사 추적 + 정본 포인터) →
+> **guide_docs/index.md**(`ops` · `code` · `defects` · `roadmap` · `lessons`) → 폴더. BTC는 **HANDOFF_BTC.md**.
+> 운영·코드맵·측정은 이 파일에 더 없다 — 폴더가 정본이다(위 표).
 >
 > **이 프로젝트는 딱 하나다:** 오버나이트 롱(**장마감 매수 → 익일 장전 재평가 후 매도**) 방향예측 시스템.
 > 최종 목표는 이 단일 전략의 **매매 자동화**. 성공의 척도는 **총점·상승/하락 확률의 방향예측 정확도**뿐.
@@ -11,8 +12,44 @@
 > **BTCUSDT 무기한 선물 리포트는 별도 트랙이다.** 같은 서버·`.env`·`history.db`·텔레그램 봇·
 > `public/index.html` 셸을 쓰지만 스코어링(`src/btc_scoring.py`)·크론(`auto_btc.sh`)·팩터·DB 슬롯이
 > 전부 분리돼 있다. 이 파일의 어떤 내용도 BTC 트랙에 자동 적용되지 않는다 → **HANDOFF_BTC.md**
+>
+> **이 파일의 진행 로그는 감사 추적이다.** 운영 절차·다음 할 일·재발 결함·측정 교훈의
+> 현재 정본은 `guide_docs/{ops,code,defects,roadmap,lessons}/`. open items → `guide_docs/roadmap/README.md`.
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## 목적별 문서 (현재 상태의 정본)
+
+| 폴더 | 문서 | 쓸 때 |
+|---|---|---|
+| ops | [`guide_docs/ops/README.md`](guide_docs/ops/README.md) | 크론·백업·헬스·배포·장애 |
+| code | [`guide_docs/code/README.md`](guide_docs/code/README.md) | 코드맵·테스트·커밋. 측정은 [`code/measure.md`](guide_docs/code/measure.md) · API/계약은 [`code/reference.md`](guide_docs/code/reference.md) |
+| defects | [`guide_docs/defects/README.md`](guide_docs/defects/README.md) | 재발 버그·8축 감사 |
+| roadmap | [`guide_docs/roadmap/README.md`](guide_docs/roadmap/README.md) | **open items · L0→L4 승격** |
+| lessons | [`guide_docs/lessons/README.md`](guide_docs/lessons/README.md) | 음성 결과·평가 연보·교훈 |
+| 입구 | [`guide_docs/index.md`](guide_docs/index.md) | 분류 카탈로그 · 갱신 규칙 |
+
+아래 진행 로그는 **감사 추적**(무엇이 언제 바뀌었나). 다음 할 일은 `guide_docs/roadmap/` 이 이 파일 하단 목록보다 우선한다.
+
+## 2026-08-30 — 문서 분류 (`ops` · `code` · `defects` · `roadmap` · `lessons`)
+
+코드 변경 없음. `guide_docs/index.md` 를 분류 카탈로그로 재작성하고 목적별 폴더를 채움.
+한글 폴더명(유지/개발/보수/발전/진화)은 영어 역할명으로 교체.
+open items 정본은 `guide_docs/roadmap/README.md`. 이 파일 진행 로그는 이력으로 유지.
+
+## 2026-08-30 (2차) — 정본 이관(중복 제거) + 문서 드리프트 자동 가드 (코드 변경 없음·테스트 318)
+
+문서 평가 후 사용자 권고 실행. **CLAUDE.md 가 정본을 이중으로 들던 부채 청산.**
+- ✅ **현재정본 섹션을 폴더로 이관·포인터화** — Where you are running·Commands·Data sources·LS TR 스펙·
+  Directory·15:00 제약·렌더러/스코어링 계약·서버운영·`.claude` 설정을 제거하고 「현재 정본은 guide_docs
+  폴더에」 포인터 표로 축약. 829→~600줄. 진행 로그(감사 추적)만 남음.
+- ✅ **`guide_docs/code/reference.md` 신설** — 갈 곳 없던 유일 정본(LS TR 스펙·데이터 소스·렌더러/
+  스코어링 계약·15:00 설계제약) 이관.
+- ✅ **크론·L0→L4 상태 정본 1곳화** — AGENTS.md 는 링크만(상태는 `roadmap/`, 크론은 `ops/`).
+- ✅ **`scripts/check_docs.py` (문서 드리프트 가드)** — 테스트 수(정본 명령 `pytest tests/`)·상대 링크
+  실존·크론(crontab vs ops 문서) 검사. `auto_revalidate.sh`(월간)에 배선, 불일치 시 텔레그램 경보.
+  실행 시 실제로 옛 표기(AGENTS 318 vs 320 오검출)를 잡아 정본 명령으로 교정. 라이브: 318 일치·링크 0.
+- ✅ **문서가 다음 걸음을 제안** — `index.md` 「지금 무엇을 할까」 상황별 표 + 각 폴더 README `다음 걸음` 꼬리말.
 
 ## 2026-08-22 (오후) — 전면 감사 후 우선순위 개선 (Claude Code, 소스 미커밋)
 
@@ -221,7 +258,7 @@ BTC 상세는 **HANDOFF_BTC.md** (이 파일의 주식 로그보다 그쪽이 So
 
 ### 지금 서버·repo
 - **KS6F-JNT-3-VM-1** `~/overnight_report` (구 KS5F `~/stock_strategy` 는 폐기).
-- Python은 **`.venv/bin/python`** (시스템 python3 에 pytest/httpx 없음). 테스트 **311 passed** (2026-08-28, `.venv`).
+- Python은 **`.venv/bin/python`** (시스템 python3 에 pytest/httpx 없음). 테스트 **318 collected** (2026-08-30, `.venv`).
 - 라이브: https://easystock-junaitech.vercel.app — `public/index.html` push → Vercel.
 - 마지막 사이트 배포: `2ee469a` (2026-08-22 11:11, HTML만).
 
@@ -278,196 +315,24 @@ untracked BTC(당시): `src/btc_*.py` `scripts/run_btc.py` `auto_btc.sh` `btc_tu
 - `public/index.html` 없이 소스만 푸시하거나, 소스 푸시를 사용자 지시 없이 하기.
 - 오버나이트 롱에 숏 전략·스윙 타점을 본거래로 승격.
 
-## Where you are running (read this first)
+## 현재 정본은 guide_docs 폴더에 있다
 
-Claude Code runs **on the production server KS6F** (`KS6F-JNT-3-VM-1`), repo **`~/overnight_report`**.
-구 서버 KS5F `~/stock_strategy` 는 폐기. Windows `E:\Projects\...` 경로는 레거다.
+이 파일의 **진행 로그(아래)는 감사 추적**이다 — 무엇이 언제 바뀌었나. **지금 무엇이 참인가**는 폴더가 정본이다.
+아래 항목은 예전에 이 파일에 있었으나 폴더로 이관했다. 링크를 따라간다.
 
-- Ubuntu · **KST** · 한국 IP(네이버/KRX 정상). `python3` 3.12, **deps는 venv**: `~/overnight_report/.venv`.
-- 실행: `.venv/bin/python scripts/...` 또는 `PYTHONUTF8=1 .venv/bin/python -m pytest tests/ -q`.
-- 이 박스에서 편집하면 프로덕션이다. `public/index.html` 푸시 = Vercel 재배포. 신중히.
-
-## Project overview
-
-`stock_strategy` is the **runnable implementation** of the market-scoring logic that was designed as Perplexity skills in the sibling repo `E:\Projects\perpelexity-finance-skills`. It takes Korean equities (KOSPI/KOSDAQ) end-of-day data, scores the market, and renders a **single self-contained HTML report**. All user-facing output is Korean. It is a personal tool — **not investment advice**.
-
-The design difference from the skills: instead of Perplexity's `finance` connector, this project pulls raw data from **LS증권 Open API** and news from **Tavily**. Per the skills' core rule, precise numbers come from the broker API — never from an LLM.
-
-Full intent, scope, data sources, and the phased build plan live in `docs/PLAN.md`. Read it first.
-
-## Source of truth for formulas (sibling repo)
-
-The scoring formulas, weights, gates, and output format are **defined** in the skills repo, not here. A read-only copy of those reference files is now checked out **locally under `guide_docs/sample/`** (untracked) — use these paths on the server; the old `E:\Projects\perpelexity-finance-skills\...` paths are the original source and won't exist here. Treat these as canonical and mirror them exactly:
-
-- `guide_docs/sample/market-close-review/references/scoring-close.md` — 6 sub-scores, weights (0.20/0.20/0.25/0.15/0.10/0.10), `p_up = 1/(1+exp(-(total-55)/10))` clip 0.20~0.80, grades, gates, missing-data handling, `phase` enum.
-- `guide_docs/sample/market-close-review/references/review-playbook.md` — next-day candidate filter + entry types.
-- `guide_docs/sample/market-close-review/references/atr-risk-sizing.md` — ATR stop/target + edge/Kelly sizing.
-- `guide_docs/sample/market-close-review/SKILL.md` — 9-block output format, timetable, risk notes.
-- `guide_docs/sample/market-open-sentiment/references/broker-api.md` §7 — LS token issuance spec.
-
-If a formula changes, change it in the upstream skills repo too (or note the divergence) — this repo is downstream of that spec. Known easystock divergences from the SoT are listed in "이어서 할 곳" item 3 (ATR normalization, signal agreement, quant extension, gate-first sizing, news 시황 exclusion).
-
-## Commands
-
-On this Linux server, `python3` and plain UTF-8 output both just work — the `PYTHONUTF8=1` prefix below is a harmless Windows holdover, keep it or drop it.
-
-```bash
-python3 scripts/test_connection.py                 # verify LS + Tavily keys
-python3 scripts/run_close.py                        # 마감(종가베팅) pipeline → dashboard bundle + public/index.html
-python3 scripts/run_preopen.py                      # 개장 전 재확인 → out/preopen_<date>.json
-#   run_close flags: --auto (scheduler) --dry-run (no write) --now ISO (force time) --write (persist --now)
-python3 scripts/render_report.py                    # data/sample_dashboard.json -> out/report_<date>.html
-python3 scripts/render_report.py <path-to-bundle-or-scores.json>
-
-# Preview a generated report visually: serve over localhost (file:// is blocked
-# in headless browsers).
-cd out && python3 -m http.server 8931 --bind 127.0.0.1
-#   then open http://127.0.0.1:8931/report_<date>.html
-
-# Tests — 반드시 .venv (시스템 python3 엔 pytest/httpx 없음)
-.venv/bin/python -m pytest tests/ -q                       # 311 passed (2026-08-28)
-.venv/bin/python -m pytest tests/test_scoring.py -q         # scoring engine only
-.venv/bin/python -m pytest tests/test_scoring.py::<name> -q # single test
-```
-
-Environment: Python 3.12.3. **의존성은 venv(`~/overnight_report/.venv`)** — httpx·anthropic·pytest 등. 시스템 python3 엔 없음(구서버 KS5F 시절 "No virtualenv" 서술은 폐기). 실행·테스트는 `.venv/bin/python` 으로.
-
-## Conventions and gotchas
-
-- **UTF-8:** on Linux it's automatic. New scripts that print Korean should still reconfigure stdout to UTF-8 at the top so they survive a cp949 console if ever run on Windows.
-- **Secrets stay in `.env`.** Scripts read them via a dependency-free parser (`load_env`) or `os.environ` — never hardcode, never print raw key/token values (mask to `first4...last4`). `.env` is gitignored; `.env.example` documents key names only. The live `.env` is at **`~/overnight_report/.env`** (구서버 경로 `~/stock_strategy/.env` 는 폐기). 텔레그램 알림 키(`telegram_token`·`telegram_chat_id`) 포함.
-- Reports follow the skills' teal/dark-light design language (from `assets/dashboard-template.html`); keep new UI consistent with `scripts/render_report.py`.
-
-## Data sources and keys
-
-`.env` keys (note the misspelled secret var — keep it as-is to match the file):
-
-| key | meaning |
+| 찾는 것 | 정본 |
 |---|---|
-| `ls_security_key` | LS APP_KEY |
-| `ls_serect_key` | LS APP_SECRET (**must differ from APP_KEY**) |
-| `tavily_api_key` | Tavily search key |
+| 서버·venv·경로·라이브 사이트·DB | [`guide_docs/ops/README.md`](guide_docs/ops/README.md) 「지금 어디서 도나」 |
+| 명령어(수동 실행) · 테스트 | [`ops/`](guide_docs/ops/README.md) 「수동 실행」 · [`code/`](guide_docs/code/README.md) 「테스트」 |
+| 시크릿 키 이름 | [`ops/`](guide_docs/ops/README.md) 「시크릿」 |
+| 코드맵(src) · 커밋 규율 | [`code/README.md`](guide_docs/code/README.md) |
+| LS TR 스펙 · 데이터 소스 · 렌더러/스코어링 계약 · 15:00 설계제약 | [`code/reference.md`](guide_docs/code/reference.md) |
+| 스코어링 공식(SoT) | [`guide_docs/sample/`](guide_docs/sample/) · [`index.md`](guide_docs/index.md) §2 |
+| 측정 하네스 · 실험 | [`code/measure.md`](guide_docs/code/measure.md) |
+| 다음 할 일 · L0→L4 | [`roadmap/README.md`](guide_docs/roadmap/README.md) |
 
-- **LS증권**: `POST https://openapi.ls-sec.co.kr:8080/oauth2/token`, `application/x-www-form-urlencoded`, body `grant_type=client_credentials&appkey=..&appsecretkey=..&scope=oob`. Token expires **next day 07:00 KST** (fixed, not 24h sliding) → cache with TTL to that time.
-- **Tavily**: `POST https://api.tavily.com/search`, `Authorization: Bearer <key>`, JSON body.
-
-### LS API — 확인된 TR 스펙 (`scripts/probe_ls.py` 로 실측, 2026-08-18)
-- 호출: `POST {BASE}{path}`, 헤더 `authorization: Bearer` + `tr_cd` + `tr_cont`; 바디 `{"{tr_cd}InBlock": {...}}`; 응답 `{"{tr_cd}OutBlock..": ..., "rsp_cd":"00000"}`.
-- **레이트 리밋 빡셈**: 연속 호출 시 `HTTP 500 / IGW00201 "호출 거래건수 초과"`. 호출 간 ~1s 스로틀 필수 — `LSClient(min_interval=1.0)` + 백오프 재시도 내장.
-- **t8410** `/stock/chart` 일/주/월봉. InBlock: `shcode·gubun`(2일/3주/4월)·`qrycnt·sdate·edate·sujung`. **다중행은 `sdate/edate` 범위 필수** (빈값이면 1행). OutBlock1 행: `date·open·high·low·close·jdiff_vol`(거래량)·`value`(거래대금, 백만원).
-- **t8412** `/stock/chart` N분봉. InBlock: `shcode·ncnt·qrycnt·nday("1")·edate`. **ncnt 네이티브 지원: 1/3/5/10/15/30/60/120/240 전부** → 4시간봉(240) 리샘플 불필요. OutBlock1 행: 위 + `time`(HHMMSS).
-- **t1102** `/stock/market-data` 현재가. OutBlock: `price`(현재가/종가)·`recprice`(전일종가)·`diff`(등락률%, 부호포함)·`open/high/low·volume·value·uplmtprice/dnlmtprice`.
-- **t1511** `/indtp/market-data` 업종(지수) 시세 — InBlock `{upcode}`. **지수 스냅샷 + 시장 폭을 한 방에.** upcode: **001=코스피 종합 · 301=코스닥 종합** · 101=KOSPI200 · 201=KOSPI100. OutBlock: `pricejisu`(현재지수)·`openjisu/highjisu/lowjisu·jniljisu`(전일)·`diffjisu`(등락률%)·`value`(거래대금)·`volume`. **시장 폭(LS 공식 예제로 확정)**: `highjo`=상승·`lowjo`=하락·`unchgjo`=보합·`upjo`=상한·`downjo`=하한. → `LSClient.index_snapshot(upcode)`.
-- **t8419** `/indtp/chart` 지수 일봉 — **미해결**: `gubun=2`+예제 파라미터로도 0행 반환. (지수 MA5·20일 평균거래대금이 여기 걸림 → 대안/파라미터 추가 조사 필요.)
-- **t1601** `/stock/investor` 투자자별종합 — **매핑 보류**: OutBlock `svolume_NN`(순매수=`ms_NN`-`md_NN`) 이 투자자유형 코드(suffix 00~18)별로 오나, **suffix→투자자(외국인/기관/개인) legend와 금액/수량 단위가 공개 스펙엔 없고 DevCenter `.res` 파일에만 존재.** 추측 금지(대원칙: 정확 수치는 API). 라이브 관찰: `_18`=합계, `{00..17}` 순매수 합=0(시장 항등식), 최대매수/매도는 `_08`/`_17`.
-- **미착수**: 실시간 웹소켓 `wss://openapi.ls-sec.co.kr:9443/websocket`.
-- **선물(야간 KOSPI200) — TR 프로브 완료·미구현 (2026-08-25, LsApiHelper 카탈로그)**: 개장전 유일한
-  '직교 실시간 후보' 조사 결과 — **t2101**(선물 현재가, InBlock `focode` → price·OHLC·basis·IV·그릭스),
-  **t2201**(선물 차트, InBlock `focode·stime·etime·cts_time` → 시계열 OHLC·volume·미결제·야간 필드
-  `jnilclose`). **2025-06 이후 KRX 야간거래**(EUREX연계 종료). 구현하려면 ①근월물 focode 획득
-  ②엔드포인트(index.json /futureoption/…) ③수집기 ④measure-first. **미구현 이유**: 야간선물은 간밤
-  미국장에 반응 → US blend와 **semi-redundant** 가능성 높음(오늘 ES/NQ 드리프트·VIX/DXY·펀딩이 전부
-  중복/음성이었음). 다레짐 데이터 축적 후 재측정 대상(open item, EV 낮음). 스펙 확보됐으니 재개 가능.
-
-## Directory structure
-
-```
-.env / .env.example / .gitignore / README.md / CLAUDE.md
-docs/PLAN.md                     intent, scope, phased plan (read first)
-scripts/test_connection.py       [done] LS + Tavily connectivity check
-scripts/render_report.py         [done] 번들 JSON -> 단일 자체완결 HTML 대시보드 (사이드바+뷰, LWC 인라인)
-scripts/run_close.py             [done] 마감(종가베팅) 파이프라인. 거래일 판정→휴장이면 무산출.
-                                 플래그: --auto(스케줄러) --dry-run(무반영) --now ISO(시각강제) --write(--now 반영)
-scripts/run_preopen.py           [done] 개장 전 재확인(앵커 신선도 검증 포함) → out/preopen_<date>.json 저장
-                                 (오후 마감 회차가 같은 날 대시보드에 4뷰로 합침)
-scripts/auto_close.sh / auto_final.sh / auto_preopen.sh  [done] 서버 cron 러너(파이프라인 → git push → Vercel)
-                                 auto_close=15:00 잠정 · auto_final=16:30 마감확정 재계산 · auto_preopen=08:00 개장전
-scripts/auto_close.bat / auto_preopen.bat / setup_schedule.bat  [done] (대안) 로컬 Windows 스케줄러
-scripts/make_sample_dashboard.py [done] 코스피/코스닥 시장레벨 데모 번들(sample_dashboard.json) 생성
-scripts/make_sample_charts.py    [done] (레거시) 단일 리포트용 OHLC → sample_close.json charts 주입
-scripts/probe_ls.py              [done] LS TR 응답 스펙 실측 프로브 (read-only)
-scripts/diag_factors.py          [done] 4팩터 단독 판별력 진단(표본 캐시 → 팩터별 AUC·분포). 5차
-scripts/diag_features.py         [done] 원천 후보피처(반전·모멘텀·MA이격·변동성·거래량) 단독 AUC 스캔. 5차
-scripts/exp_calibrate.py         [done] 캘리브레이션/판별 후보 walk-forward 비교(무네트워크). 5차
-scripts/exp_features.py          [done] 원천피처 per-market 로지스틱 walk-forward(과최적 노출). 5차
-scripts/exp_guarded.py           [done] 가드된 vol_ratio 틸트 vs 캘리브 단독 walk-forward 검증. 5차
-scripts/fit_calibration.py       [done] 재구성 이력 → 부트스트랩 캘리브 + KOSDAQ vol_tilt(data/calibration.json). 5차
-src/models.py                    [done] input/output + collector dataclasses (pure)
-src/scoring.py                   [done] pure-function scoring engine (+신호 일치도·데이터 완전성)
-src/quant.py                     [done] 기술·퀀트 확장 서브스코어(0.15) + 마감 1시간봉 분석
-src/atr.py                       [done] ATR 매매 타점(정규화 ATR·변동성 국면·구조 손절·Kelly)
-src/store.py                     [done] SQLite 자가학습(예측→익일채점) + fit_calibrator(총점→확률 재적합)
-src/calibration.py               [done] 적응형 확률 캘리브레이션 sigmoid(a·total+b) — 비관편향 제거(5차)
-                                 store 학습치>부트스트랩>SoT 폴백. + vol_tilt(유계 판별 틸트, KOSDAQ).
-                                 scoring.score_close(calib=, direction_tilt=)로 주입.
-src/remote.py                    [done] 원격 서버 DB/리포트 scp 동기화(서버선 자동 degrade)
-src/collectors/ls.py             [🔶] LS client: token cache + throttle + MTF candles + quote
-src/collectors/naver.py          [done] 네이버 우회 수집기: 지수 일/주/월봉 + 투자자 수급(억원)
-src/collectors/news.py           [done] Tavily 실시간 재료 + 당일 팩트체크(발행시각) → news 서브스코어
-src/collectors/llm.py            [done] 멀티 LLM(Perplexity 실시간·Gemini 계산·Claude 종합) 서술/개장전
-assets/vendor/lightweight-charts.standalone.production.js  [done] TradingView LWC v4.2.3 벤더링(인라인용, Apache-2.0)
-tests/test_scoring.py            [done] 43 boundary-value pytest cases
-tests/test_pipeline_logic.py     [done] 23 회귀 테스트 — 2026-08-19 점검에서 고친 논리 결함들
-conftest.py                      [done] pytest root marker (puts repo root on sys.path)
-data/sample_dashboard.json       [done] 코스피+코스닥 시장레벨 데모 번들 (렌더러 기본 입력)
-data/sample_close.json           (레거시) 단일 코스피 리포트 + charts — 여전히 렌더 호환
-data/.ls_token.json              LS token cache (gitignored — secret)
-out/report_<date>.html           generated reports (gitignored) + bundle_<date>.json
-public/index.html                [done] Vercel 배포 대상(최신 대시보드, 파이프라인이 갱신·커밋)
-public/login.html                [done] easystock 비밀번호 로그인 폼
-middleware.js / api/login.js      [done] Vercel 비번 게이트(쿠키 검증·fail-closed) + 로그인 API
-vercel.json / package.json / .vercelignore  [done] Vercel 정적+함수 배포 설정(framework:null)
-data/history.db                  SQLite 자가학습 DB (gitignored; 정본은 서버)
-data/calibration.json            [done] 부트스트랩 캘리브레이션 프라이어(추적됨; fit_calibration.py 재생성)
-guide_docs/sample/…              [untracked] SoT 스킬 참조본 로컬 사본(scoring-close·atr-risk-sizing·
-                                 review-playbook·SKILL·broker-api). "Source of truth" 섹션이 여기를 가리킴.
-guide_docs/source/evaluation.md  [untracked] 2026-08-18 라이브 리포트 사후검증 — 확정치 대조로 드러난
-                                 실제 결함(수급 ~4천억 과소반영, 외국인 연속일수 3→실제5 오류, 원달러
-                                 등락률 방향 오독, 세션수익률 지수/ETF 혼용). **점수 정확도 회귀 시 참고**.
-```
-남은 데이터 갭: 마감 동시호가(call — 15:00 리포트 시점엔 **구조적으로 미발생** → 결측이 아니라
-'제외' 처리), 지수 거래대금(점수는 '거래량' 기준 — LS t1511/네이버 실시간이 당일 `value` 는 주지만
-20일 이력이 없어 비교 불가), 야간/미국선물 % (뉴스 재료로 정성 반영 중). **usdkrw 는 해결**
-(`naver.usdkrw()`).
-
-### 15:00(장중) 실행 전제 — 이 프로젝트의 가장 중요한 설계 제약
-종가베팅 주문은 **종가 단일가(15:20~15:30) 전에** 넣어야 의미가 있다 → 마감 리포트는 15:00 에 돈다.
-따라서 그 시각의 데이터는 전부 '마감 확정치'가 아니다. 파이프라인은 이걸 숨기지 않고 전 구간에 반영한다:
-- **거래일 판정**: 요일/달력 하드코딩 금지(대체공휴일·임시휴장). 독립 소스 3개를 순서대로 교차확인 →
-  ①네이버 일봉에 오늘 봉 ②네이버 실시간 지수 `localTradedAt` 날짜 ③LS t1511 전일지수 == 시계열 마지막 종가.
-  셋 다 아니면 **아무것도 만들지 않고 종료**(휴장). `run_close.resolve_session()`.
-- **수급**: 확정 일별 행이 아직 없으면 `investorDealTrendTime`(시간별 잠정) → `provisional=True`.
-  **거래일 일치 검증 필수** — 전일 수급을 오늘 것으로 쓰면 무결성 사고. `naver.market_flows()`.
-- **거래량**: '15:00까지 누적'을 종일 20일평균과 그냥 비교하면 구조적 과소평가 → 시장별 완성계수로 환산.
-  계수는 DB 자가학습(`store.volume_completion_factor`), 부트스트랩은 KODEX ETF 10분봉 실측
-  (KOSPI 0.93 / KOSDAQ 0.96, 2026-08-11~18).
-- **마감 동시호가**: 아직 일어나지 않은 이벤트 → `call_not_applicable=True` → **excluded**(가중치 재배분).
-  결측으로 두면 상시 '부분 데이터'가 되어 다른 항목 하나만 더 빠져도 총점이 통째로 미산출된다.
-- **채점**: 장중 미완성 등락률로 채점 금지. `store.grade_with_candles()` 가 **확정 일봉이 나온 뒤**에만
-  채점하고, 밀린 날짜는 전부 소급한다.
-- 리포트에는 `as_of`(기준시각)·`intraday_snapshot`·'장중 잠정' 배지가 항상 박힌다. LLM 프롬프트도
-  '종가 아님'을 명시받는다.
-
-### 투자자 수급·지수 일봉 데이터 소스 (확정)
-- **KRX 정보데이터시스템 `getJsonData.cmd` 는 막힘** — 익명/워밍업 세션에 **HTTP 400 `LOGOUT`** 반환(pykrx 포함, 2026-08-18 한국 IP=SK브로드밴드 실측; 지오블록 아님). pykrx의 종목 OHLCV가 되는 건 실은 **네이버로 우회**하기 때문.
-- **해결 = `src/collectors/naver.py`** (httpx만, pandas/numpy 불필요): ①지수 일봉 `fchart.stock.naver.com/sise.nhn`(XML) → `CandleSeries`, ②투자자 수급 `finance.naver.com/sise/investorDealTrendDay.naver`(EUC-KR HTML, **bizdate 필수**) → `InvestorFlows`. 값은 KRX 원천 공식 수치.
-- **라이브 검증(2026-08-18)**: KOSPI 개인 +7,420·외국인 +914·기관계 −7,951·기타법인 −383 / KOSDAQ 개인 +3,905·외국인 +366·기관계 −4,176·기타법인 −95. **단위 억원**, 시장 항등식(합=0) 양시장 통과 → suffix→투자자 매핑 확정. `models.py`에 `InvestorFlows` 추가.
-- **추가 확보(2026-08-19)**: ③장중 잠정 수급 `investorDealTrendTime.naver?sosok=&bizdate=`(일별과 **동일 컬럼 구조**,
-  분 단위 갱신) → 15:00 회차의 수급 공백 해결. ④실시간 지수
-  `polling.finance.naver.com/api/realtime/domestic/index/{KOSPI|KOSDAQ}`(OHLC·누적거래량·거래대금·
-  `marketStatus`·`localTradedAt`) → 거래일 판정 + 장중 지수. ⑤원달러
-  `api.stock.naver.com/marketindex/exchange/FX_USDKRW`(`closePrice`·`fluctuationsRatio`).
-- **pykrx는 불필요**(KRX 막힘) → **제거함, numpy 1.26.4 복원**(numba/tensorflow 호환). 단 전역 파이썬에 `pandas-ta`(numpy≥2.2.6)가 있어 numba/tensorflow와 **상호모순**(내 작업과 무관한 기존 충돌) — 근본 해결은 프로젝트별 venv. 본 프로젝트는 numpy 미사용이라 무관.
-
-### 리포트 렌더러 계약 (대시보드 셸)
-- **입력 = 번들** `{"trade_date","reports":[…],"placeholders":[…]}`. 레거시 단일 점수 dict도 허용(자동으로 코스피 마감 1개 뷰로 감쌈). 기본 입력은 `data/sample_dashboard.json`(없으면 `sample_close.json`).
-- **UI = 좌측 사이드바(테마별 그룹 메뉴) + 우측 뷰.** 한 HTML 안에서 메뉴 클릭으로 뷰 전환(URL 해시 딥링크, 모바일 햄버거). 뷰 차트는 활성화 시 lazy 빌드 + 테마 토글 시 재빌드. `placeholders`는 "준비 중" 빈 상태 뷰 → 미래 유형(개장전·단타/스윙/장기) 자리를 미리 확보.
-- **현재 뷰 = 시장/지수 레벨 특화** (코스피·코스닥 각각). 구성: 헤드라인 → 총점/확률 hero → 항목별 점수 → 투자주체 수급 → 지수 캔들차트(MA5/20 + 크로스헤어 OHLC) → 주의 신호 → 주요 재료. **개별 종목은 포함하지 않음**(종목 단위는 이후 테마별 리포트에서 — JS엔 `data-cand` 종목캔들 빌더가 미래 대비로 남아있음).
-- **리포트 객체 스키마**: `{id,group,label,provisional,headline,market{kospi_close|kosdaq_close,*_chg_pct,usdkrw},total,grade,p_up,p_down,subscores[],flows{foreign_net,inst_net,retail_net,program_net},warnings[],sources[],charts{index{name,timeframe,candles[{time,open,high,low,close}],ma5[],ma20[]}}}`. `time`은 `'YYYY-MM-DD'`.
-- **색 관례(한국 HTS 표준)**: 방향(가격/수급/확률/등락) = **빨강 상승·매수 / 파랑 하락·매도**. 점수 크기 = 브랜드 teal. 등급/상태 = 라벨 동반 상태색. MA5=주황·MA20=보라. dataviz 스킬 규칙(마크 스펙·범례·다크 검증·팔레트 검증기 PASS) 준수.
-- **자체완결**: LWC를 `assets/vendor/…`에서 읽어 인라인(외부 CDN 0). 차트 포함 시 ~213KB, 미포함 시 LWC 미인라인.
-
-- **Scoring engine contract**: `src.scoring.score_close(CloseInputs) -> ScoreResult` is a pure function (no IO). Feed it dataclasses from `src.models`; a missing sub-score = pass `None` for that input group. `ScoreResult.to_report_dict()` yields exactly the dict `scripts/render_report.py` consumes, so `score_close(...).to_report_dict()` → `render()` works directly (verified). `raw_prob(total)` exposes the pre-clip sigmoid.
+프로젝트 한 줄: 오버나이트 롱(장마감 매수 → 익일 시가매도) 방향예측. 정확 수치는 API, LLM 은 서술만.
+전략·금지·척도는 **AGENTS.md**(북극성). BTC 는 **HANDOFF_BTC.md**(별도 트랙).
 
 ## Progress log
 
@@ -500,64 +365,15 @@ Keep this section updated as work advances. Status legend: ✅ done · 🔶 part
   - ✅ **배포** — GitHub Public `jspark1st/stock-strategy` + **Vercel `easystock`**(team junaitech). 커스텀 비번 게이트(fail-closed).
   - ✅ **서버 자동화** — 아래 "서버 운영" 참조.
 
-### 서버 운영 (인수인계 — 2026-08-19 **KS6F 로 이전 완료**. 이제 작업/실행은 KS6F)
-- **서버(현행)**: `KS6F-JNT-3-VM-1` = `ssh -i C:/keys/anyang-private-key-openssh.pem -p 4159 jspark1st@211.37.73.241` (내부망 `192.168.75.170`). Ubuntu·**KST**·한국 IP로 네이버/KRX 정상. python3.12. **deps 는 venv**: `~/overnight_report/.venv`(httpx·anthropic·pytest). passwordless sudo 가능.
-- **코드 위치**: **`~/overnight_report`** (git in-place, remote fetch=https·push=git@github deploy key `~/.ssh/easystock_deploy`, 권한 600). **DB**: `~/overnight_report/data/history.db` → 심볼릭 → `~/overnight_report/db/history.db`(정본, 누적 — 구 서버서 이관). **`.env`는 사용자 관리**(9키). `remote.py`는 REMOTE_KEY(C:/keys…) 리눅스에 없어 자동 local-only degrade → **이 서버가 primary**.
-- **구 서버(KS5F, `1.241.52.6:4159` `~/stock_strategy`) = 폐기.** 크론 삭제됨. 더는 실행/커밋하지 않음.
-- **venv 주의**: 스크립트는 `.venv/bin/python` 을 우선 사용(`auto_*.sh` 자동 감지). 수동 실행도 `~/overnight_report/.venv/bin/python scripts/...` 로. 시스템 python3 엔 deps 없음.
-- **cron**(KS6F): 주식 평일 `0 8 * * 1-5` `auto_preopen.sh` · `0 15 * * 1-5` `auto_close.sh` · `30 16 * * 1-5` `auto_final.sh`.
-  BTC 매일(주말 포함) `30 9 * * *` · `0 22 * * *` `auto_btc.sh`. 각 러너: 파이프라인 → `public/` 변경 시만 git push → Vercel.
-  로그 `out/auto_*.log` · 경보 `out/alerts.log`. `auto_update=false` 면 **크론만** 건너뜀(BTC 수동 TUI는 동작).
-  - **15:00 vs 16:30 회차**: `run_close.py` 는 실행 시각이 16:00(`FINAL_AFTER_HHMM`)을 지나면 `resolve_session` 이 `intraday=False` 를 돌려줘 **확정 일봉·확정 수급·확정 종가**로 재계산하고 같은 날 리포트를 덮어쓴다(잠정 배지 → '마감 확정치'). 같은 스크립트를 두 시각에 도는 구조.
-- **수동 실행**: `cd ~/overnight_report && .venv/bin/python scripts/run_close.py` (또는 run_preopen / run_backtest). **코드 수정 후**: 이 서버서 직접 편집 → commit → push(배포키), 또는 어디서든 push 후 서버서 `git pull`.
-- **이전 검증(2026-08-19)**: clone·venv·deps·106 테스트·LS/Tavily/LLM 키·`auto_close.sh` 실행→커밋→**push `f1ab04d..42b0d0a`→Vercel 배포**까지 end-to-end 성공. 크론 3회차 등록 확인.
-- **Vercel**: 프로젝트 `easystock`(prj_MVEYDzFx7LG0WddGqIQeMfsM1qSO, team_4rQsEoiwakRmCY4Ru0QJ7c1o), URL **easystock-junaitech.vercel.app**. 게이트 env **`view_password`·`auth_token`**(대시보드 설정 — MCP에 env 도구 없음). 네이티브 비번보호는 유료라 커스텀 미들웨어(middleware.js+api/login.js) 사용.
+### 서버 운영 → guide_docs/ops
 
-- **2026-08-19 (2차) — 전면 점검: 자동화·논리정합성·데이터 신뢰도·리포트 품질·UI**
-  사용자 요청("자동 업데이트 확인 / 논리 모순·버그 점검 / 팩트 기반 점수화 검증 / 리포트 약점 보완 / UI 폴리쉬").
-  - ✅ **거래일 판정** — 공휴일에 전일 데이터를 오늘 것처럼 발행하던 위험 제거. 소스 3중 교차확인,
-    휴장이면 무산출·무배포. (요일 기반/달력 하드코딩은 대체공휴일에 반드시 틀리므로 채택 안 함)
-  - ✅ **수급 무결성** — `market_flows()` 가 거래일 일치를 검증. 확정치 없으면 시간별 잠정치
-    (`provisional`), 그것도 없으면 결측. **전일 수급 대체 사용 금지.**
-  - ✅ **동시호가 = 제외(결측 아님)** — 상시 '부분 데이터' 상태 해소, 완전성 100% 정상화.
-  - ✅ **거래량 편향 보정** — 15:00 누적 → 종일 환산(자가학습 계수 + ETF 실측 부트스트랩).
-  - ✅ **뉴스 이중 계상 제거(중요)** — "코스피 1.5% 하락 마감" 류 *국내 시황* 기사를 악재로 세면
-    이미 종가강도·시장폭·수급에 반영된 가격 움직임을 재료(0.10)에서 한 번 더 세는 순환 구조였다
-    (실측 42.6→39.3 이 이 경로). `kind`(시황|재료)·`scope`(시장|종목)로 분류해 **점수엔 재료·시장만**.
-    해외 마감 기사는 익일 선행정보라 재료로 유지.
-  - ✅ **뉴스 태깅 비관 편향 제거** — 제목+본문 통합 판정이라 부정어 하나만 있어도 악재로 뒤집혔다
-    ("반도체 톱2 강세에 코스피 +3%대↑" → 악재). **제목 기준 순(net) 카운트**로 교체.
-  - ✅ **등급 게이트가 사이징을 지배(중요)** — 등급 '위험'(신규진입 차단)인데 p_down 이 높다는 이유로
-    Half-Kelly 가 상한 25%를 찍어 "숏 25%"를 권하던 **정면 모순**. 게이트 차단 시 권장비중 0% 강제,
-    `position_scale` 을 켈리에 곱함. 게이트를 리포트·LLM 프롬프트로도 전달.
-  - ✅ **실행 가능한 지시** — 지수는 직접 팔 수 없으므로 하락 방향은 '현금/인버스 ETF'로 명시.
-  - ✅ **채점 정합성** — 장중 미완성 등락률로 채점하고 못 고치던 문제 → 확정 일봉으로만, 밀린 날짜 소급.
-    숏 방향 목표/손절 도달 판정도 대칭 반영. `p_up_raw`(캘리브레이션 전) 보존 + 스키마 마이그레이션.
-  - ✅ **LLM 내구성** — Claude 529(과부하) 시 서술 섹션이 통째로 비던 문제 → 재시도 + 모델 체인
-    (opus-5→sonnet-5) + **결정론 폴백**(확정 수치만으로 결론·시나리오 생성). `max_tokens` 4000→16000
-    (Opus 5 적응형 사고가 토큰을 먹어 JSON 이 잘릴 수 있음).
-  - ✅ **미수집을 0으로 표시하던 문제** — 프로그램 매매 '+0억'(=순매수 0이라는 거짓) → '미수집'.
-  - ✅ **cron 러너 하드닝** — flock(중복 실행 방지)·파이프라인 실패 시 배포 중단·`git pull --rebase`
-    (원격 선행 시 push 실패 방지)·로그 로테이션. `db/`·`reports/` gitignore/vercelignore 추가.
-  - ✅ **UI** — 데이터 기준 스트립(기준시각·장중여부·출처·환율), 상태 배지 3종(장중 잠정/마감 확정/
-    개장전 재검토), p_up 미산출 시 '하락 100%'로 보이던 버그 수정, ATR 손절·목표 색을 **역할이 아니라
-    진입가 대비 위치**로(숏에서 뒤집히던 문제), 사이드바 점수 칩, 리스크 중복 표시 제거,
-    모바일 hero 2열·인쇄 스타일·포커스 링·prefers-reduced-motion.
-  - ✅ 회귀 테스트 23개 추가(`tests/test_pipeline_logic.py`) — 총 66개 통과.
+서버·크론·배포·백업·시크릿의 정본은 [`guide_docs/ops/README.md`](guide_docs/ops/README.md).
+서버 이전(KS5F→KS6F) 스냅샷은 [`HANDOFF.md`](HANDOFF.md).
 
-### Claude Code 프로젝트 설정 (`.claude/`)
-- **agents/** (overnight 맞춤, 9개. 타 프로젝트 fan-out/HQ/재택 에이전트는 제거함)
-  - `pipeline-fanout-auditor` — **전면 감사 오케스트레이터**. 8축 병렬(배선·스코어링·수집·화면·학습지평·크론·BTC격리·pytest) + 적대검증. 읽기전용·opus
-  - `scoring-auditor` — 스코어링 SoT·과거 함정 감사. 읽기전용·opus
-  - `pipeline-runner` — close/preopen/btc **dry-run** 실행·산출 검사
-  - `data-collector-debug` — LS·네이버·Tavily·(BTC) Binance 수집 디버그
-  - `ui-honesty-auditor` — 화면 vs `entry.allow`/`preopen_state` 정합. 읽기전용
-  - `ui-polisher` — 대시보드 UI 다듬기(레이아웃·토큰·모바일·다크/라이트). 정직성 유지·구현
-  - `fact-checker` — 번들·소스 대조. n<40 성적 과장 탐지
-  - `claude-md-verifier` — 인수인계 문서 vs 서버·venv·크론
-  - `test-runner` — `.venv` pytest 층 선택 실행
-- **skills/** — `/close-report` · `/preopen-report` · `/checkup`
-- **workflows/** — `checkup.js` · `scoring-audit.js`. 명시 opt-in 시에만.
+### 에이전트·스킬 → guide_docs/index.md §5
+
+`.claude/agents` · `skills` · `workflows` 목록과 용도는 [`guide_docs/index.md`](guide_docs/index.md) 「5. 에이전트·스킬」.
+각 에이전트 정의는 `.claude/agents/*.md`.
 
 - **2026-08-19 (3차) — evaluation.md 반영 + 3단계 루프 UI/파이프라인**
   외부 평가(guide_docs/source/evaluation.md)의 지적 + 사용자 요청("LS 우선 소싱·LLM 분업 점검·
@@ -799,48 +615,7 @@ open#0ⓐ('다레짐 재검증')를 **자동화**. 크론은 매일 예측·채�
   - 테스트 +5(`test_revalidate.py`: AUC·metrics·추세화살표·blend 재정규화). 총 **263 통과**.
 
 ### 이어서 할 곳 (open items)
-0-A. **[신설·최우선] 신 게이트 통과분 손익 축적** — 게이트가 7주 만에 열렸다(구 0/18 → 신 3/18).
-   paper L1 이 이제 표본을 쌓는다. **L2 승격 판단은 비용 차감 순손익으로만**, 현재 n=2 로 아무 말도
-   하지 말 것. `store.gate_stats()` · health_check(연속 10회 0이면 경보)로 감시.
-0-B. **[신설] KOSDAQ 캘리브 원시 기울기 음(−0.0106)** — 총점이 실거래 지평에서 **역방향**이며 하한
-   클램프가 가려주는 중. 다음 재적합에서도 유지되면 KOSDAQ 총점 구성 자체를 재검토(클램프는 방어지
-   해결이 아니다). 월간 `auto_revalidate` 가 관측. 상세 `guide_docs/source/evaluation6.md`.
 
-0. **[최우선] 방향예측 — 판별력(AUC) 계속** — 5차 처리분: 캘리브레이션(비관편향, 양시장) + **가드된
-   KOSDAQ 거래량 틸트**(walk-forward AUC 0.488→0.577). 남은 것:
-   ⓐ **다레짐 재검증**(핵심) — 캘리브레이터·vol_tilt·KOSDAQ flow 역전 모두 2026 상반기 **단일 상승레짐**
-      위 결과. 하락/횡보 표본이 쌓이면 `exp_guarded.py`/`exp_calibrate.py` 로 재측정. vol_tilt 는 모멘텀성
-      이라 하락장에서 부호가 약해지거나 역전될 수 있음 — cap(±0.10)이 손상은 제한하나 재적합 필요.
-   ⓑ **KOSPI 판별** — 마감(15:00) 종가피처는 전부 과최적(OOS≈0.50). **개장전은 8차에서 돌파**:
-      간밤 미국장 blend 단독 AUC 0.679, 고정틸트로 개장전 OOS AUC 0.505→0.597(이미 라이브). 마감
-      리포트 판별은 여전히 미해결 — 간밤은 인과상 마감엔 못 씀. 남은 각도: 레짐 조건부·비선형·전일 간밤.
-   ⓒ **store 학습치 축적 후 재적합** — 라이브 채점이 N≥40 쌓이면 `fit_calibrator` 가 부트스트랩을 대체.
-      그때 vol_tilt 도 라이브 총점 기준으로 재적합(현재 부트스트랩 근사).
-   개선은 항상 `run_backtest.py`/`exp_*.py` walk-forward 로 측정. 과최적화는 train/test·다레짐 방어.
-1. **첫 라이브 15:00 회차 확인** — 코드는 장중 경로를 모두 갖췄지만 *실제 장중* 응답으로는 아직 미검증.
-   확인할 것: ①네이버 일봉이 장중 오늘 봉을 주는가(아니면 실시간 지수 경로로 자동 폴백) ②
-   `investorDealTrendTime` 이 장중 행을 주는가 ③`out/auto_close.log` 에 '거래일/장중 스냅샷' 라인이 찍히는가.
-2. **거래량 완성계수 학습** — `intraday_volume` 표본이 8일 쌓이면 기본값(0.93/0.96)에서 학습치로 자동 전환.
-   그때 리포트의 `(기본값·표본 n/8)` 표기가 `(학습치 n=N)` 으로 바뀌는지 확인.
-3. **SoT 분기 기록** — ✅ **완료(2026-08-22): `guide_docs/DIVERGENCES.md` 전수 대조표**(11개 분기 ·
-   SoT vs 코드·근거·검증상태·파일). 미등재 스코어링 차이는 버그로 간주(그 규율로 foreign_streak 1일→
-   3일 SoT 정합 수정). 남은 것: 다레짐 표본 후 2(vol_tilt)·9(quant)·10(간밤틸트) 재검증.
-4. **남은 데이터 갭**: 지수 거래대금 20일 이력(현재 거래량 대용), **야간선물** % 정량치(미국 지수 마감은
-   `naver.world_indices()` 로 개장전 재평가에 반영됨 — 선물은 아직 서술만), 마감 동시호가 확정치.
-7. **t1601 suffix 확정(개장 후)** — 오늘 16:30 `auto_final.sh` 가 `probe_investor_map.py` 를 돌려
-   `.ls_investor_map.json` 을 만든다. `out/auto_final.log` 의 `conf=…`·`map=…` 확인 후, conf≥0.95면
-   수급 소스를 네이버→LS 로 옮길지 결정(현재는 하네스만, 소비는 미연결).
-8. **간밤 보정 계수 검증/캘리브레이션** — ✅ **8차에서 walk-forward 검증**(`exp_overnight.py`):
-   현 고정 K_MARKET·CAP 이 개장전 OOS AUC 를 유의하게 올림(KOSPI 0.505→0.597). 학습 재적합은
-   단일레짐 과최적이라 **보류**(고정 유지가 방어적). 남은 것: ⓐ 다레짐 표본 쌓이면 재측정, ⓑ store
-   채점(개장전 p_up→당일 실측)으로 라이브 계수 사후검증, ⓒ WEIGHTS 가정(코스닥 SOX 더 민감)과 실측
-   (KOSPI blend AUC 0.679 > KOSDAQ 0.592)의 불일치 재검토. 미국 커버 반년 한계.
-9. **첫 16:30 확정 회차 확인** — 컨펌 diff(`provisional_<date>.json` → confirm_diff)가 실제로 15:00 대비
-   변화를 렌더하는지, `auto_final.log` 에서 확인.
-5. **방법론 주의(문서화됨)** — `edge = p_up − 1/(1+b)` 는 '익일 방향확률'을 '손익비 승률'로 간주한다.
-   목표·손절 도달 확률과는 다른 값이므로 켈리는 항상 게이트·상한 안에서만. 리포트에도 명시해 둠.
-6. **사용자 잔여 작업**: Vercel env 2개(`view_password`·`auth_token`) 설정+Redeploy(로그인 활성화).
-10. **(8/22 평가에서 온 주식 화면)** — 라이브 성적 n=3을 BTC처럼 n<40이면 「측정 시작」만.
-    재료 항목이 상시 50점이면 고치거나 가중 0. 코스닥 ETF 카드는 다음 마감(watch도 생성) 후 개장 전에 보임.
-    소스 커밋은 사용자 지시 시에만.
-11. **BTC** — 코딩 접음. 게이트 임계 완화 금지. 관측·표본 축적. → HANDOFF_BTC.md
+**정본은 [`guide_docs/roadmap/README.md`](guide_docs/roadmap/README.md).** 이 절은 포인터만 둔다.
+(2026-08-30 문서 분류. 아래 번호 목록은 `roadmap/` 로 이전·정리했다. 15:00/16:30 첫 회차 확인·n<40 숨김·
+news 가중 0·DIVERGENCES 등재는 완료분으로 접음. vol_tilt 라이브 복원은 금지.)

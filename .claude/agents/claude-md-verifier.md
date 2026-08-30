@@ -15,6 +15,8 @@ model: sonnet
 
 - `AGENTS.md` — 전략 하나(오버나이트 롱), 성공 척도, 섞지 말 것
 - `CLAUDE.md` — 서버·명령·진행 로그. **맨 위 인수인계가 최신인지**
+- `guide_docs/index.md` + `ops/` `code/` `defects/` `roadmap/` `lessons/` — 목적별 현재 상태.
+  open items 정본은 `guide_docs/roadmap/README.md` (CLAUDE.md 하단 목록이 더 길면 문서 분기)
 - `HANDOFF.md` — KS6F 이전. `HANDOFF_BTC.md` — BTC 별도 트랙
 - 이 폴더 에이전트·`/.claude/skills/` 의 명령어
 
@@ -33,6 +35,7 @@ model: sonnet
    - 파이썬 소스 커밋은 사용자 지시 전 금지 (인수인계가 그렇게 잠갔으면 문서가 푸시를 권하면 안 됨)
 6. **디렉터리 지도** — CLAUDE.md에 있는 경로가 실제로 있는가. 고의 부재(t8419 등)를 구멍으로 잡지 마라.
 7. **에이전트 목록** — CLAUDE.md 「`.claude/`」절이 이 폴더의 실제 파일과 같은가.
+8. **분류 폴더** — `guide_docs/{ops,code,defects,roadmap,lessons}/README.md` 가 있고 index.md 가 링크하는가.
 
 `git status`로 문서만 더러워졌는지, 소스가 미커밋인지 구분해 보고하라. `.env` 읽기 금지.
 

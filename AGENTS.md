@@ -1,7 +1,7 @@
 # AGENTS.md — 작업 진입점 (북극성)
 
-> 이 파일이 **최상위 작업 지침**이다. 상세는 순서대로: **CLAUDE.md**(운영·데이터·코드맵) →
-> **guide_docs/index.md**(참조·평가·계획) → 폴더들. 새 작업은 항상 여기서 시작한다.
+> 이 파일이 **최상위 작업 지침**이다. 상세는 순서대로: **CLAUDE.md**(운영·코드맵·진행 로그) →
+> **guide_docs/index.md**(`ops` · `code` · `defects` · `roadmap` · `lessons`) → 폴더. 새 작업은 항상 여기서 시작한다.
 
 ## 이 프로젝트는 딱 하나다
 
@@ -59,12 +59,14 @@ train/test 분할로 과최적화 노출.)
 | 단계 | 내용 | 현재 |
 |---|---|---|
 | **L0** | 리포트만 생성 | ✅ |
-| **L1** | Paper trade 기록(가상 체결·비용차감) | ⚠️ **배선됐으나 표본 0** — 게이트가 7주간 통과 0회(2026-08-28 발견·수정). 이제 통과율이 DB에 기록되고 연속 0회면 경보 |
+| **L1** | Paper trade 기록(가상 체결·비용차감) | ⚠️ 배선됨. 게이트 수정(08-28) 후 표본 축적 중. 승격은 비용 차감 순손익만 — [`guide_docs/roadmap/`](guide_docs/roadmap/README.md) |
 | **L2** | 주문 후보 생성 → 사람 승인 | 다음(L1 순손익 실증 후) |
 | **L3** | 조건부 자동 주문 | 검증 후 |
 | **L4** | 자동 진입·청산 | 충분한 실증 후 |
 
 하드 게이트(모든 상위 단계 무조건 차단 조건): `risk=위험 · data=잠정 · confidence<임계 · event_lock`.
+
+> **이 사다리는 정의(안정)다. 각 단계의 현재 상태·승격 조건 정본은 [`guide_docs/roadmap/README.md`](guide_docs/roadmap/README.md).**
 
 ## 하루 파이프라인 (상태 머신)
 
@@ -74,23 +76,39 @@ train/test 분할로 과최적화 노출.)
 16:30 장마감 확정(CLOSE_RECONCILIATION) → 잠정→확정 재계산·컨펌
 익일 → 예측 채점(NEXT_DAY_REVIEW) → 학습
 ```
-cron(평일): `0 8` preopen · `0 15` close · `30 16` final. 자동 push→Vercel 배포.
+자동 push→Vercel. **cron 시각표(실측)·러너 상세 정본 → [`guide_docs/ops/README.md`](guide_docs/ops/README.md).**
 
 ## 핵심 명령어
 ```bash
 PYTHONUTF8=1 python scripts/run_backtest.py --count 250 --tune   # 방향예측 성적·튜닝(개발 중심)
 PYTHONUTF8=1 python scripts/run_close.py                          # 마감 파이프라인
 PYTHONUTF8=1 python scripts/run_preopen.py                        # 개장전 재평가
-PYTHONUTF8=1 .venv/bin/python -m pytest tests/ -q                  # 311 passed (2026-08-28)
+PYTHONUTF8=1 .venv/bin/python -m pytest tests/ -q                  # 318 collected (2026-08-30)
 ```
 
 ## 문서 지도 (이 순서로 파고든다)
-1. **AGENTS.md** (이 파일) — 북극성·규칙·로드맵
-2. **CLAUDE.md** — 상세 운영·코드맵·진행 로그. **Claude Code는 맨 위「인수인계 2026-08-22」부터.**
-3. **guide_docs/index.md** — 참조 스펙(SoT)·외부 평가·계획서 인덱스
-4. 폴더: `guide_docs/sample/`(SoT 공식 스펙) · `guide_docs/source/`(외부 평가) · `plan/`(로드맵) · `docs/PLAN.md`
+
+```
+AGENTS.md              이 파일 — 왜 · 무엇을 · 하지 말 것
+CLAUDE.md              어디서 · 어떻게 도나 · 코드맵 · 진행 로그(감사 추적)
+guide_docs/index.md    분류 카탈로그
+  ops/  code/  defects/  roadmap/  lessons/
+```
+
+1. **AGENTS.md** (이 파일) — 북극성·규칙·로드맵 L0→L4
+2. **CLAUDE.md** — 운영·코드맵·진행 로그. Claude Code는 맨 위 인수인계부터.
+3. **guide_docs/index.md** — 목적별 입구. **지금 무엇이 참인가**의 정본은 여기 폴더.
+   - [`ops/`](guide_docs/ops/README.md) 크론·백업·장애
+   - [`code/`](guide_docs/code/README.md) 코드맵·측정 루프
+   - [`defects/`](guide_docs/defects/README.md) 재발 결함·감사
+   - [`roadmap/`](guide_docs/roadmap/README.md) **open items · 승격 조건**
+   - [`lessons/`](guide_docs/lessons/README.md) 평가·음성 결과·교훈
+   - [`code/reference.md`](guide_docs/code/reference.md) LS TR 스펙·데이터 소스·렌더러/스코어링 계약·15:00 설계제약
+4. SoT·평가 원문: `guide_docs/sample/` · `guide_docs/source/` · `guide_docs/DIVERGENCES.md`
 5. **HANDOFF_BTC.md** — BTCUSDT 선물 트랙(별도). 이 전략과 섞지 않는다
 6. **HANDOFF.md** — 서버 이전 인수인계(2026-08-19)
+
+새 작업: 전략 규칙이면 이 파일, 운영·그날 로그면 CLAUDE.md, 목적별 지식은 `guide_docs/` 해당 폴더. 상세 규칙 → `guide_docs/index.md` 「문서 갱신 규칙」.
 
 ## 작업할 때 체크
 - [ ] 이 변경이 **방향예측 정확도**를 올리거나, 그걸 측정·검증·자동화하는 데 기여하는가?

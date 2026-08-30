@@ -13,7 +13,7 @@ cd ~/overnight_report
 ## 첫 3줄 (읽는 순서)
 1. **AGENTS.md** — 북극성(전략 하나: 오버나이트 롱, 목표: 매매 자동화, 척도: 방향예측 정확도)
 2. **CLAUDE.md** — 상세 운영·데이터·코드맵·진행 로그. **2026-08-22 Claude Code 인수인계가 맨 위.**
-3. **guide_docs/index.md** — 참조·평가·계획 인덱스. BTC는 **HANDOFF_BTC.md**.
+3. **guide_docs/index.md** — `ops` · `code` · `defects` · `roadmap` · `lessons`. BTC는 **HANDOFF_BTC.md**.
 
 ## 환경 (이전 시 구축한 것)
 | 항목 | 위치/값 |
