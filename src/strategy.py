@@ -176,24 +176,6 @@ def exit_plan(cfg: dict, direction: str = "long") -> dict:
             "time_stop": x.get("time_stop"), "direction": direction}
 
 
-def exit_decision(entry_price: float, direction: str, prices: dict, rule: str) -> dict:
-    """청산 판정 — 다음날 장초반 실측 prices({open, p0905, p0915, high, low})로.
-
-    반환: {exit, price, reason}. 데이터 없으면 exit=False(대기).
-    """
-    if rule == "next_open_0905" and prices.get("p0905"):
-        return {"exit": True, "price": prices["p0905"], "reason": "09:05 정시 청산"}
-    if rule == "opening_range":
-        hi, lo = prices.get("or_high"), prices.get("or_low")
-        last = prices.get("p0915")
-        if hi and lo and last:
-            if direction != "short" and last < lo:
-                return {"exit": True, "price": last, "reason": "오프닝레인지 저가 이탈"}
-            if direction == "short" and last > hi:
-                return {"exit": True, "price": last, "reason": "오프닝레인지 고가 이탈"}
-    return {"exit": False, "price": None, "reason": "청산 조건 미충족(보유)"}
-
-
 # ── 6) 순기대값(비용 포함) — path 확률 아님, 방향확률 기준 근사 ────────────────
 def net_expected_value(p_win: float, avg_win_pct: float, avg_loss_pct: float,
                        cfg: dict) -> dict:

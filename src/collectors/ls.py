@@ -270,17 +270,6 @@ class LSClient:
         cds = [self._to_candle(r, minute=True) for r in rows]
         return CandleSeries(shcode, f"{ncnt}m", [c for c in cds if self._valid_candle(c)])
 
-    def multi_timeframe(self, shcode: str, edate: str = "",
-                        minute_tfs: tuple[int, ...] = (5, 15, 60, 240),
-                        daily_count: int = 250,
-                        minute_count: int = 500) -> dict[str, CandleSeries]:
-        """단타 MTF 번들 — 분봉 여러 주기 + 일봉을 한 번에. 키: 타임프레임 라벨."""
-        out: dict[str, CandleSeries] = {}
-        for ncnt in minute_tfs:
-            out[f"{ncnt}m"] = self.minute_candles(shcode, ncnt, edate, count=minute_count)
-        out["D"] = self.daily_candles(shcode, edate=edate, count=daily_count)
-        return out
-
     def index_snapshot(self, upcode: str = "001") -> IndexSnapshot:
         """지수 스냅샷 + 시장 폭 (t1511). upcode '001'=코스피, '101'=KOSPI200."""
         d = self.call_tr("/indtp/market-data", "t1511", {"upcode": upcode}).get("t1511OutBlock", {})

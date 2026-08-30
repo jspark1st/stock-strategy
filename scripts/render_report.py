@@ -48,11 +48,17 @@ def grade_color(g: str) -> str:
     return "var(--caution)"
 
 
+def _finite(n) -> bool:
+    return isinstance(n, (int, float)) and not isinstance(n, bool) and n == n and n not in (float("inf"), float("-inf"))
+
+
 def fmt(n, digits=1) -> str:
     if n is None:
         return "—"
     if not isinstance(n, (int, float)):   # 숫자 아닌 값(문자 라벨 등)은 그대로 — 크래시 방지
         return str(n)
+    if not _finite(n):                    # nan/inf → '—'
+        return "—"
     return f"{n:,.{digits}f}"
 
 
@@ -61,17 +67,19 @@ def signed(n, digits=2) -> str:
         return "—"
     if not isinstance(n, (int, float)):
         return str(n)
+    if not _finite(n):
+        return "—"
     return f"{'+' if n >= 0 else ''}{n:,.{digits}f}"
 
 
 def won(eok) -> str:
-    if eok is None:
+    if not _finite(eok):                  # None·문자·nan/inf 방어
         return "—"
     return f"{'+' if eok >= 0 else ''}{eok:,}억"
 
 
 def pct(v, digits=1) -> str:
-    if v is None:
+    if not _finite(v):
         return "—"
     return f"{v * 100:.{digits}f}%"
 
@@ -1089,13 +1097,6 @@ def build_reopen(r: dict) -> str:
     <h2>{esc(title)}</h2>
     <ul class="check">{items}</ul>
   </div>"""
-
-
-def build_engine_trace(r: dict) -> str:
-    tr = (r.get("narrative", {}) or {}).get("engine_trace") or []
-    if not tr:
-        return ""
-    return f'<div class="engine muted">서술 엔진: {esc(" · ".join(tr))}</div>'
 
 
 def _status_badge(r: dict) -> str:
@@ -2919,8 +2920,10 @@ BTC_DATESEL_SYNC = """<script>
     if(window.__btcDateSynced) return; window.__btcDateSynced=true;
     var labels=document.querySelectorAll('label.slot-lab'), sel=null;
     for(var i=0;i<labels.length;i++){
-      if((labels[i].textContent||'').trim().indexOf('\\ub0a0\\uc9dc')===0){
-        sel=labels[i].querySelector('select'); break; }
+      // BTC 자기 셀렉트(select.slot-sel)만 잡는다 — 주식은 select.stock-datesel 이라 절대 안 걸린다
+      // (예전엔 라벨 텍스트 '날짜'로 찾아, 주식 라벨의 📅 이모지가 빠지면 주식을 BTC로 오라우팅할 위험).
+      var s=labels[i].querySelector('select.slot-sel');
+      if(s&&(labels[i].textContent||'').trim().indexOf('\\ub0a0\\uc9dc')===0){ sel=s; break; }
     }
     if(!sel) return;
     var curDate='', cop=sel.options[sel.selectedIndex];

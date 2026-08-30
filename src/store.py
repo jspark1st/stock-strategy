@@ -273,25 +273,6 @@ def record_prediction(conn: sqlite3.Connection, rep: dict, created_at: str,
     conn.commit()
 
 
-def grade_pending(conn: sqlite3.Connection, market: str, report_type: str,
-                  outcome_date: str, outcome_chg_pct: float,
-                  day_high: float, day_low: float, graded_at: str) -> dict | None:
-    """(레거시) 단건 채점 — 호출부가 직접 실측을 넘길 때만 사용.
-
-    ⚠ 장중(15:00)에 실행되는 파이프라인은 이 함수를 쓰면 **미완성 등락률로 채점**하고
-    graded_at 이 박혀 다시는 교정되지 않는다. 파이프라인은 `grade_with_candles()` 를 쓴다.
-    """
-    cur = conn.execute(
-        "SELECT * FROM daily WHERE market=? AND report_type=? "
-        "AND trade_date<? AND graded_at IS NULL "
-        "ORDER BY trade_date DESC LIMIT 1",
-        (market, report_type, outcome_date))
-    prev = cur.fetchone()
-    if prev is None:
-        return None
-    return _apply_grade(conn, prev, outcome_date, outcome_chg_pct, day_high, day_low, graded_at)
-
-
 def grade_with_candles(conn: sqlite3.Connection, market: str, report_type: str,
                        candles: list, graded_at: str, exclude_dates: set | None = None
                        ) -> list[dict]:

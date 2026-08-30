@@ -495,6 +495,17 @@ def main() -> int:
                 len(rep.get("reviews", {}).get("llm", []))
             print(f"[BTC 자가비평] 발견 {nrev}건 · 누적 "
                   f"{(review_meta.get('digest') or {}).get('n_total', 0)}건")
+            # critic(Gemini) 무성사망 관측 — 주식 run_close 와 동일. 키 있는데 실패면 alerts.log.
+            crit_err = llm._LAST_ERROR.get("critic")
+            if not dry_run and env.get("google_gemini_api") and crit_err and crit_err != "no key":
+                msg = f"[BTC] 자가비평 critic(Gemini) 실패({crit_err}) — 비평 LLM 0건, 무성사망 가능"
+                try:
+                    alog = ROOT / "out" / "alerts.log"
+                    alog.parent.mkdir(exist_ok=True)
+                    with open(alog, "a", encoding="utf-8") as f:
+                        f.write(f"[{now.strftime('%Y-%m-%d %H:%M:%S')}] ALERT: {msg}\n")
+                except Exception:  # noqa
+                    pass
         except Exception as e:  # noqa
             print(f"⚠ BTC 비평 실패({type(e).__name__}: {e}) — 스킵")
 
