@@ -91,7 +91,7 @@ easystock 분기 전수표: **[`DIVERGENCES.md`](DIVERGENCES.md)** (캘리브레
 
 | 문서 | 역할 |
 |---|---|
-| [`../docs/PLAN.md`](../docs/PLAN.md) | 최초 기획. 스윙·단타 확장은 **폐기된 방향** — 북극성은 AGENTS.md |
+| [`../docs/PLAN.md`](../docs/PLAN.md) | 최초 기획. 스윙·단타를 **한 트랙에 섞는 방식**은 폐기 — 장기 비전(L5+)은 독립 트랙으로 재개. 북극성 AGENTS.md |
 | [`../plan/evaluation2-roadmap.md`](../plan/evaluation2-roadmap.md) | 플랫폼 신뢰도. 코드 가능분 완료 |
 | [`../plan/overnight-strategy-completion.md`](../plan/overnight-strategy-completion.md) | 단일 전략 시간축·행동룰. 현황은 [`roadmap/`](roadmap/README.md)가 더 최신 |
 | [`../docs/CROSS_BTC_CARRY.md`](../docs/CROSS_BTC_CARRY.md) | BTC 펀딩 캐리(별도 트랙, 관측 L0/L1) |
