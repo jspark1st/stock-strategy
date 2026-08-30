@@ -289,6 +289,30 @@ def test_exit_open_suppresses_buy_all_paths():
     assert "신규 진입 차단(개장 즉시 청산)" in fb["conclusion"]
 
 
+def test_atr_badge_downgraded_on_all_block_paths():
+    # ATR 카드 제목 옆 1차 배지(색배경 pill)가 등급차단·진입게이트차단·청산 어느 경로에서도
+    # 초록 '매수 우위'로 남으면 안 된다 — build_conclusion 배지와 대칭이어야 한다(재감사 발견).
+    import re
+    def badge(h):
+        m = re.search(r'ATR 매매 플랜 <span class="pill" style="background:([^"]+)">([^<]+)</span>', h)
+        return (m.group(1), m.group(2)) if m else (None, None)
+
+    atr = {"direction": "long", "instrument": "KODEX 200",
+           "primary": {"entry": 100, "stop": 98, "target": 104, "rr": 2.0,
+                       "qualified": True, "kelly_pct": 18, "edge": 0.1}}
+    grade = {"atr": {**atr, "gate_blocked": True}, "gate": {"new_entry_blocked": True},
+             "entry": {"allow": True}}
+    entry_b = {"atr": atr, "gate": {"new_entry_blocked": False},
+               "entry": {"allow": False, "blocked_reasons": ["방향 확률 임계"]}}
+    allowed = {"atr": atr, "gate": {"new_entry_blocked": False}, "entry": {"allow": True}}
+    for r in (grade, entry_b):
+        col, txt = badge(rr.build_atr_plan(r))
+        assert col == "var(--caution)" and "매수" not in txt, (col, txt)
+    # 정상 허용은 매수 배지 유지(오억제 금지)
+    col, txt = badge(rr.build_atr_plan(allowed))
+    assert col == "var(--up)" and txt == "매수 우위"
+
+
 def test_build_overnight_respects_slope_floor():
     base = {"report_type": "preopen",
             "overnight": {"drivers": [{"name": "나스닥", "chg_pct": 0.5, "weight": 0.4}],

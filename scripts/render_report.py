@@ -594,8 +594,14 @@ def build_atr_plan(r: dict) -> str:
     pstate = (r.get("preopen_state") or {}).get("state")
     exit_open = pstate in ("NO_TRADE", "EXIT_OPEN")   # 개장 즉시 청산/관망 = 신규진입 없음
     no_position = blocked or entry_blocked or exit_open
-    # 차단/청산이면 방향 배지도 '차단'으로 낮춘다(매수 배지 옆 0% 모순 방지).
-    if no_position and not blocked and not entry_blocked:
+    # 방향 배지(제목 옆 색배경 pill)도 차단/청산이면 '차단'으로 낮춘다 — build_conclusion 과 대칭.
+    # 등급차단·진입게이트차단·청산 어느 경로든 초록 '매수 우위' 배지가 남으면 결론카드('차단')와
+    # 정면 모순(2차 pill-ghost 회색 사유만으론 부족 — 가장 눈에 띄는 1차 배지가 매수색이면 오독).
+    if blocked:
+        dlabel, dcol = "신규 진입 차단", "var(--caution)"
+    elif entry_blocked:
+        dlabel, dcol = "진입 게이트 차단", "var(--caution)"
+    elif exit_open:
         dlabel, dcol = ("개장 즉시 청산" if pstate == "EXIT_OPEN" else "관망"), "var(--caution)"
     # 차단/청산/NO_TRADE 면 인버스 등 체결수단을 명시하지 않는다(관망/현금이므로)
     instr_txt = ("" if no_position
