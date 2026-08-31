@@ -2544,7 +2544,7 @@ TEMPLATE = r"""<!doctype html>
   .view{display:none}
   .view.active{display:block;animation:fade .18s ease}
   @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1}}
-  .view-head{margin-bottom:16px}
+  .view-head{margin-bottom:20px}
   .view-title{font-size:1.5rem;font-weight:800}
   .view-sub{font-size:.9rem;font-weight:500;color:var(--muted)}
   /* 날짜·기준시각 칩 — '언제 것인지' 크게 보이게 */
@@ -2576,7 +2576,7 @@ TEMPLATE = r"""<!doctype html>
   .stage-note{color:var(--muted);font-size:.82rem;margin-top:5px}
   .stage-note b{color:var(--text)}
   /* 뷰 상단 탭 — 지평(단기/중기/장기) + 국면(장마감/개장전). A안 IA. */
-  .view-nav{display:flex;flex-direction:column;gap:6px;margin:2px 0 14px}
+  .view-nav{display:flex;flex-direction:column;gap:8px;margin:6px 0 20px}
   .vtabs{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
   .vtabs-lbl{font-size:.72rem;color:var(--muted);font-weight:700;min-width:2.4em}
   .vtab{border:1px solid var(--border);background:var(--surface2);color:var(--muted);
@@ -2596,7 +2596,7 @@ TEMPLATE = r"""<!doctype html>
   .hyp-ul{list-style:none;margin-left:-24px} .hyp-ul li{padding:6px 0;border-bottom:1px solid var(--border)}
   .hyp-claim{font-weight:700}
   .chk-ok{color:var(--good);font-weight:800;margin-right:4px} .chk-no{color:var(--down);font-weight:800;margin-right:4px}
-  .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:14px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:16px}
   .headline{font-size:1.06rem;font-weight:600;line-height:1.7}
   .hero{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:16px}
   .stat{text-align:center}
@@ -2773,7 +2773,9 @@ TEMPLATE = r"""<!doctype html>
     .sidebar.open{transform:none}
     .sidebar.open ~ .scrim{display:block}
     .topnav{display:flex}
-    .main{padding:16px}
+    .main{padding:8px 16px 32px}
+    .topnav{padding:14px 16px;margin:0 -16px 4px;gap:12px}
+    .view-nav{margin-top:16px}          /* 스티키 헤더와 지평 탭 사이 숨통 */
     .hero{grid-template-columns:1fr 1fr;gap:12px}
     .hero .stat:first-child{grid-column:1/-1}
     .donut{width:104px;height:104px}
