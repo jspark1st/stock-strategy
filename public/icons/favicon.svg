@@ -8,22 +8,22 @@
       <stop offset="0" stop-color="#3da8b0" stop-opacity="0.28"/>
       <stop offset="1" stop-color="#3da8b0" stop-opacity="0"/>
     </radialGradient>
-    <mask id="moon">
-      <circle cx="389" cy="120" r="59" fill="#fff"/>
-      <circle cx="410" cy="105" r="55" fill="#000"/>
-    </mask>
   </defs>
   <rect width="512" height="512" rx="120" fill="url(#bg)"/>
   <rect width="512" height="512" rx="120" fill="url(#glow)"/>
+  <!-- 예측 트렌드라인 (캔들 아래) -->
+  <polyline points="77,338 205,266 333,187 438,120" fill="none" stroke="#ffd77a"
+            stroke-width="17" stroke-linecap="round" stroke-linejoin="round"/>
   <!-- 상승 캔들 3 (한국 상승=빨강) -->
   <g stroke-linecap="butt">
-    <line x1="138" y1="256" x2="138" y2="404" stroke="#ffd9a8" stroke-width="11"/>
-    <rect x="104" y="287" width="69" height="87" rx="5" fill="#f15553"/>
-    <line x1="256" y1="169" x2="256" y2="348" stroke="#ffd9a8" stroke-width="11"/>
-    <rect x="221" y="205" width="69" height="107" rx="5" fill="#ff7a70"/>
-    <line x1="374" y1="95" x2="374" y2="277" stroke="#ffd9a8" stroke-width="11"/>
-    <rect x="339" y="128" width="69" height="113" rx="5" fill="#fbb219"/>
+    <line x1="131" y1="279" x2="131" y2="428" stroke="#ffd9a8" stroke-width="12"/>
+    <rect x="92" y="307" width="77" height="92" rx="6" fill="#f15553"/>
+    <line x1="256" y1="202" x2="256" y2="369" stroke="#ffd9a8" stroke-width="12"/>
+    <rect x="217" y="233" width="77" height="105" rx="6" fill="#ff7a70"/>
+    <line x1="381" y1="123" x2="381" y2="300" stroke="#ffd9a8" stroke-width="12"/>
+    <rect x="343" y="154" width="77" height="117" rx="6" fill="#fbb219"/>
   </g>
-  <!-- 초승달 (오버나이트) -->
-  <circle cx="389" cy="120" r="59" fill="#f4eacf" mask="url(#moon)"/>
+  <!-- 예측 노드 -->
+  <circle cx="438" cy="120" r="30" fill="#ffd77a"/>
+  <circle cx="438" cy="120" r="15" fill="#ffe6b0"/>
 </svg>
