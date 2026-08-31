@@ -138,6 +138,25 @@ CREATE TABLE IF NOT EXISTS report_review (
   resolved_at  TEXT,
   UNIQUE(trade_date, market, report_type, slot, source, title)
 );
+
+-- BTC 옵션 신호 관측(2026-08-31 measure-first 씨앗) — **관측 전용**, 스코어링/게이트 무영향.
+-- 스냅샷 신호(스큐/GEX)는 이력이 없어 세션마다 쌓는다. 매일 auto_backup 으로 백업됨.
+CREATE TABLE IF NOT EXISTS btc_options (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  trade_date   TEXT NOT NULL,
+  slot         TEXT NOT NULL DEFAULT '',
+  kst          TEXT,
+  as_of        TEXT,
+  underlying   REAL,
+  skew_25d     REAL,      -- IV(25Δput)-IV(25Δcall)/ATM (%)
+  gex          REAL,      -- Σ(call γ·OI - put γ·OI)·S
+  atm_iv       REAL,
+  putcall_oi   REAL,
+  near_days    INTEGER,
+  dvol         REAL,
+  n_options    INTEGER,
+  UNIQUE(trade_date, slot)
+);
 """
 
 # 15:00 시점 '누적/종일' 비율 부트스트랩 — KODEX 200 / 코스닥150 10분봉 5거래일
@@ -934,3 +953,30 @@ def resolve_review(conn: sqlite3.Connection, code: str | None = None,
         return 0
     conn.commit()
     return cur.rowcount
+
+
+# ── BTC 옵션 관측(measure-first 씨앗) — 관측 전용, 스코어링/게이트 무영향 ──────────────
+def record_btc_options(conn: sqlite3.Connection, rec: dict) -> None:
+    """세션 옵션 신호 1행 upsert(멱등 — 같은 trade_date·slot 재실행 안전)."""
+    conn.execute(
+        "INSERT INTO btc_options(trade_date,slot,kst,as_of,underlying,skew_25d,gex,atm_iv,"
+        "putcall_oi,near_days,dvol,n_options) VALUES(?,?,?,?,?,?,?,?,?,?,?,?) "
+        "ON CONFLICT(trade_date,slot) DO UPDATE SET kst=excluded.kst,as_of=excluded.as_of,"
+        "underlying=excluded.underlying,skew_25d=excluded.skew_25d,gex=excluded.gex,"
+        "atm_iv=excluded.atm_iv,putcall_oi=excluded.putcall_oi,near_days=excluded.near_days,"
+        "dvol=excluded.dvol,n_options=excluded.n_options",
+        (rec.get("trade_date"), rec.get("slot"), rec.get("kst"), rec.get("as_of"),
+         rec.get("underlying"), rec.get("skew_25d"), rec.get("gex"), rec.get("atm_iv"),
+         rec.get("putcall_oi"), rec.get("near_days"), rec.get("dvol"), rec.get("n_options")))
+    conn.commit()
+
+
+def btc_options_rows(conn: sqlite3.Connection) -> list[dict]:
+    """축적된 옵션 관측 전부(시간순). 훗날 exp_options 가 다음 세션 방향과 정렬해 측정."""
+    cur = conn.execute("SELECT * FROM btc_options ORDER BY trade_date, slot")
+    cols = [c[0] for c in cur.description]
+    return [dict(zip(cols, r)) for r in cur.fetchall()]
+
+
+def btc_options_count(conn: sqlite3.Connection) -> int:
+    return conn.execute("SELECT COUNT(*) FROM btc_options").fetchone()[0]

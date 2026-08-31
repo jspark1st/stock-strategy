@@ -1,4 +1,10 @@
-# HANDOFF_BTC — BTCUSDT 무기한 선물 리포트 트랙 (2026-08-21, 갱신 2026-08-25)
+# HANDOFF_BTC — BTCUSDT 무기한 선물 리포트 트랙 (2026-08-21, 갱신 2026-08-31)
+
+> **2026-08-31 추가(관측 씨앗):** BTC 옵션 신호(Deribit 무료 API) 축적 시작 —
+> `src/collectors/deribit.py` 가 세션마다 25Δ스큐·GEX·ATM IV·DVOL 계산, `run_btc` 가
+> `store.btc_options`(관측 전용 테이블)에 기록. **스코어링·게이트 무영향(잠금 준수).** 스냅샷이라
+> 이력 0 → n≥60 까지 축적 대기 후 `exp_options` 로 사전선언 조건(단독 AUC CI>0.5·walk-forward 증분)
+> 측정. 실패면 접음. 상세 `guide_docs/roadmap/README.md` 「실험: BTC 옵션 신호」.
 
 > **2026-08-25 추가:** 이 방향예측(perp) 트랙과 **별개로**, BTC 트랙에 **시장중립 펀딩 캐리**
 > 모듈이 추가됨(`src/btc_carry.py`·`scripts/run_btc_carry.py`·`src/collectors/binance.py` 의

@@ -24,7 +24,7 @@ except Exception:
 from src import (btc_quant, btc_scoring, btc_size, btc_bundle, calibration, notify,
                  remote, report_review, store)
 from src.collectors import binance as bn
-from src.collectors import llm, naver, news
+from src.collectors import deribit, llm, naver, news
 from src.collectors.ls import load_env
 from render_report import render, ensure_lwc_vendor
 
@@ -554,6 +554,18 @@ def main() -> int:
                     f.write(f"[{now.strftime('%Y-%m-%d %H:%M:%S')}] ALERT: {msg}\n")
             except Exception:  # noqa
                 pass
+        # 옵션 신호 관측(measure-first 씨앗 2026-08-31) — 스코어링/게이트 무관·별도 테이블·실패 무해.
+        # push_db 직전에 기록해 기존 DB 동기화를 그대로 탄다(pull 이 로컬을 덮어써도 안전).
+        # 사전선언 조건(단독 AUC 95%CI 하한>0.5·walk-forward 증분) 통과 전엔 확률에 절대 안 붙임.
+        try:
+            osig = deribit.collect()
+            if osig:
+                store.record_btc_options(conn, {"trade_date": rep["trade_date"], "slot": slot,
+                                                "kst": now.strftime("%Y-%m-%d %H:%M:%S"), **osig})
+                print(f"  옵션관측: 스큐 {osig.get('skew_25d')}% · GEX {osig.get('gex'):+,.0f} · "
+                      f"DVOL {osig.get('dvol')} (관측 전용·미채점 · 누적 {store.btc_options_count(conn)})")
+        except Exception:  # noqa — 관측 전용, 파이프라인 무영향
+            pass
         conn.close()
         conn = None
         remote.push_db(DB_LOCAL, env)

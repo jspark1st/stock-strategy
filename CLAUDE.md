@@ -258,7 +258,7 @@ BTC 상세는 **HANDOFF_BTC.md** (이 파일의 주식 로그보다 그쪽이 So
 
 ### 지금 서버·repo
 - **KS6F-JNT-3-VM-1** `~/overnight_report` (구 KS5F `~/stock_strategy` 는 폐기).
-- Python은 **`.venv/bin/python`** (시스템 python3 에 pytest/httpx 없음). 테스트 **358 collected** (2026-08-31, `.venv`).
+- Python은 **`.venv/bin/python`** (시스템 python3 에 pytest/httpx 없음). 테스트 **364 collected** (2026-08-31, `.venv`).
 - 라이브: https://easystock-junaitech.vercel.app — `public/index.html` push → Vercel.
 - 마지막 사이트 배포: `2ee469a` (2026-08-22 11:11, HTML만).
 
