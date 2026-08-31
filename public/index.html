@@ -1335,7 +1335,7 @@
     <div class="view-head">
       <div class="view-title">BTCUSDT <span class="view-sub">· 비트코인 선물</span> <span class="badge badge-info">세션 스냅샷</span></div>
       <div class="dt-chip"><span class="dt-date">📅 2026-08-31 · 8월 31일 (월)</span><span class="dt-time">🕐 09:30 KST 기준</span></div>
-      <div class="slot-pick"><label class="slot-lab">날짜 <select class="slot-sel" onchange="if(this.value) location=this.value"><option value="/#btc-perp" selected>2026-08-31</option><option value="/archive/btc/2026-08-30-2200.html#btc-perp">2026-08-30</option><option value="/archive/btc/2026-08-29-2200.html#btc-perp">2026-08-29</option><option value="/archive/btc/2026-08-28-2200.html#btc-perp">2026-08-28</option><option value="/archive/btc/2026-08-27-2200.html#btc-perp">2026-08-27</option><option value="/archive/btc/2026-08-26-2200.html#btc-perp">2026-08-26</option><option value="/archive/btc/2026-08-25-2200.html#btc-perp">2026-08-25</option><option value="/archive/btc/2026-08-24-2200.html#btc-perp">2026-08-24</option><option value="/archive/btc/2026-08-23-2200.html#btc-perp">2026-08-23</option><option value="/archive/btc/2026-08-22-2200.html#btc-perp">2026-08-22</option><option value="/archive/btc/2026-08-21-2200.html#btc-perp">2026-08-21</option></select></label><div class="slot-regs"><a class="slot-chip active" href="/#btc-perp">09:30</a></div><span class="slot-hint">정규 하루 2회(09:30·22:00 KST) · 수동은 목록</span></div>
+      <div class="slot-pick"><div class="btc-datewrap"><label class="slot-lab">날짜 <select class="slot-sel btc-datesel" onchange="if(this.value) location=this.value"><option value="/#btc-perp" selected>2026-08-31</option><option value="/archive/btc/2026-08-30-2200.html#btc-perp">2026-08-30</option><option value="/archive/btc/2026-08-29-2200.html#btc-perp">2026-08-29</option><option value="/archive/btc/2026-08-28-2200.html#btc-perp">2026-08-28</option><option value="/archive/btc/2026-08-27-2200.html#btc-perp">2026-08-27</option><option value="/archive/btc/2026-08-26-2200.html#btc-perp">2026-08-26</option><option value="/archive/btc/2026-08-25-2200.html#btc-perp">2026-08-25</option><option value="/archive/btc/2026-08-24-2200.html#btc-perp">2026-08-24</option><option value="/archive/btc/2026-08-23-2200.html#btc-perp">2026-08-23</option><option value="/archive/btc/2026-08-22-2200.html#btc-perp">2026-08-22</option><option value="/archive/btc/2026-08-21-2200.html#btc-perp">2026-08-21</option></select></label></div><div class="slot-regs"><a class="slot-chip active" href="/#btc-perp">09:30</a></div><span class="slot-hint">정규 하루 2회(09:30·22:00 KST) · 수동은 목록</span></div>
       <div class="basis"><span class="basis-k">기준</span> 2026-08-31 09:30 KST · 마크 77,871.9 (<span style="color:var(--up)">+0.31%</span>)
         · 나스닥 마감 -0.52% · 실시간 아님
         <span class="basis-note">· 모든 시각 KST(한국 표준시)</span></div>
@@ -1770,10 +1770,18 @@ What is going on your mind? ht | KuCoin</a> <span class="badge badge-warn">제�
         return hr;
       }
       if(!curDate||dates.indexOf(curDate)<0) curDate=dates[0];
-      sel.innerHTML=dates.map(function(d){
-        return '<option value="'+landing(byDate[d])+'"'+(d===curDate?' selected':'')+'>'+d+'</option>';
-      }).join('');
-      if(!sel.getAttribute('onchange')) sel.setAttribute('onchange','if(this.value) location=this.value');
+      // 드롭다운 대신 달력 — 수백일 쌓이면 드롭다운은 끝없이 길어진다. 주식과 동일한 __mountCal 재사용.
+      var gp=sel.parentElement&&sel.parentElement.parentElement;
+      if(window.__mountCal&&gp&&!sel.__cal){
+        sel.__cal=1;
+        window.__mountCal({ anchor: gp, hide: sel.parentElement, dates: dates, cur: curDate,
+          hrefOf: function(d){ return byDate[d]?landing(byDate[d]):'/#btc-perp'; } });
+      } else {                                   // 폴백(__mountCal 없음/구조 다름): 기존 드롭다운
+        sel.innerHTML=dates.map(function(d){
+          return '<option value="'+landing(byDate[d])+'"'+(d===curDate?' selected':'')+'>'+d+'</option>';
+        }).join('');
+        if(!sel.getAttribute('onchange')) sel.setAttribute('onchange','if(this.value) location=this.value');
+      }
       // 슬롯 칩도 라이브 매니페스트로 다시 그린다 — 아카이브 페이지는 렌더 시점 슬롯만 구워져(09:30
       // 페이지엔 22:00 칩이 없어 '눌렀더니 22:00 이 사라지는' 것처럼 보였다). 그날 정규 슬롯 전부 표시.
       var regsEl=document.querySelector('.slot-regs');

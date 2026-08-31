@@ -1973,8 +1973,12 @@ def _btc_slot_picker(r: dict, date: str, items: list | None = None) -> str:
         land = _btc_day_landing(by_date[dd], r)
         date_opts.append(f'<option value="{esc(land)}"{" selected" if dd == d else ""}>'
                          f'{esc(dd)}</option>')
-    date_html = (f'<label class="slot-lab">날짜 <select class="slot-sel" '
-                 f'onchange="if(this.value) location=this.value">{"".join(date_opts)}</select></label>')
+    # 날짜는 달력 위젯(__mountCal)이 로드 시 이 select 를 대체한다 — 수백일 쌓여도 드롭다운처럼
+    # 끝없이 길어지지 않게. wrapper 로 감싸 달력이 정확히 이 자리에 붙게 하고, 폴백(file://)은 select 유지.
+    date_html = (f'<div class="btc-datewrap"><label class="slot-lab">날짜 '
+                 f'<select class="slot-sel btc-datesel" '
+                 f'onchange="if(this.value) location=this.value">{"".join(date_opts)}</select>'
+                 f'</label></div>')
 
     regs, manuals = [], []
     for x in sorted(day, key=lambda z: z.get("slot") or ""):
@@ -3123,10 +3127,18 @@ BTC_DATESEL_SYNC = """<script>
         return hr;
       }
       if(!curDate||dates.indexOf(curDate)<0) curDate=dates[0];
-      sel.innerHTML=dates.map(function(d){
-        return '<option value="'+landing(byDate[d])+'"'+(d===curDate?' selected':'')+'>'+d+'</option>';
-      }).join('');
-      if(!sel.getAttribute('onchange')) sel.setAttribute('onchange','if(this.value) location=this.value');
+      // 드롭다운 대신 달력 — 수백일 쌓이면 드롭다운은 끝없이 길어진다. 주식과 동일한 __mountCal 재사용.
+      var gp=sel.parentElement&&sel.parentElement.parentElement;
+      if(window.__mountCal&&gp&&!sel.__cal){
+        sel.__cal=1;
+        window.__mountCal({ anchor: gp, hide: sel.parentElement, dates: dates, cur: curDate,
+          hrefOf: function(d){ return byDate[d]?landing(byDate[d]):'/#btc-perp'; } });
+      } else {                                   // 폴백(__mountCal 없음/구조 다름): 기존 드롭다운
+        sel.innerHTML=dates.map(function(d){
+          return '<option value="'+landing(byDate[d])+'"'+(d===curDate?' selected':'')+'>'+d+'</option>';
+        }).join('');
+        if(!sel.getAttribute('onchange')) sel.setAttribute('onchange','if(this.value) location=this.value');
+      }
       // 슬롯 칩도 라이브 매니페스트로 다시 그린다 — 아카이브 페이지는 렌더 시점 슬롯만 구워져(09:30
       // 페이지엔 22:00 칩이 없어 '눌렀더니 22:00 이 사라지는' 것처럼 보였다). 그날 정규 슬롯 전부 표시.
       var regsEl=document.querySelector('.slot-regs');
