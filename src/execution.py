@@ -86,7 +86,7 @@ def order_card(market: str, direction: str, etf_quote: dict, beta_info: dict,
             "beta": beta, "tracking_error_pct": beta_info.get("tracking_error_pct"),
             "etf_levels": etf_levels, "index_levels": index_levels, "warnings": warns,
             "hts_sell": hts,
-            "note": "지수 레벨을 베타로 ETF 가격에 변환한 참고치 — 실주문 아님(L0/L1)"}
+            "note": "지수 기준으로 환산한 참고 가격입니다 · 실주문 아님"}
 
 
 def hts_sell_settings(instrument: str, direction: str, price: float | None,

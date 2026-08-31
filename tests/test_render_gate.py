@@ -303,7 +303,7 @@ def test_preopen_order_card_renders_reference_table():
     r["id"] = "kospi-preopen"
     r["report_type"] = "preopen"
     html = rr.build_order_card(r)
-    assert "상품 주문 카드" in html
+    assert "상품 주문(ETF)" in html
     assert "KODEX 200" in html
     assert "전일 마감 앵커 환산" in html
     assert "고급매도설정 추천" not in html
@@ -315,4 +315,4 @@ def test_build_paper_hidden_when_no_trades():
     assert rr.build_paper({}) == ""
     html = rr.build_paper({"paper": {"n": 3, "win_rate": 0.67,
                                      "avg_net_pct": 0.4, "cum_net_pct": 1.2}})
-    assert "Paper 성적" in html and "누적 순손익" in html and "비용 차감" in html
+    assert "모의 성적" in html and "누적 순손익" in html and "비용 차감" in html

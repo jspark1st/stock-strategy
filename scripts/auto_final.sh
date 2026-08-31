@@ -52,6 +52,12 @@ fi
 "$PY" scripts/health_check.py >> "$LOG" 2>&1 || \
   echo "[$(date '+%F %T')] (참고) 헬스체크 실패 — 무시하고 진행" >> "$LOG"
 
+# 5b) 사용자 관점 UI 자가비평 — 규칙(결정론)만 매일. 깨진 링크·게이트 모순·도달불가·전문용어 잔재를
+# 점검해 report_review(market='UI')에 누적, 고심각이면 경보. LLM 제안은 주 1회 별도(auto_ui_review.sh).
+# 강요된 비평 금지: 규칙은 '있으면 진짜 있는 것'만 잡는다. 읽기+DB기록만·비파괴.
+"$PY" scripts/run_ui_review.py --write --no-llm >> "$LOG" 2>&1 || \
+  echo "[$(date '+%F %T')] (참고) UI 규칙 비평 실패 — 무시하고 진행" >> "$LOG"
+
 # 6) 자가학습 DB 백업 — 채점이 막 반영된 직후 스냅샷(유일본 보호). 실패해도 배포는 진행.
 "$PY" scripts/backup_db.py >> "$LOG" 2>&1 || \
   echo "[$(date '+%F %T')] ALERT: DB 백업 실패(auto_final)" >> out/alerts.log
