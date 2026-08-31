@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="준스탁">
+  <defs>
+    <linearGradient id="bg" x1="0.18" y1="0" x2="0.82" y2="1">
+      <stop offset="0" stop-color="#258a92"/>
+      <stop offset="1" stop-color="#0b2b30"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.32" cy="0.24" r="0.62">
+      <stop offset="0" stop-color="#3da8b0" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#3da8b0" stop-opacity="0"/>
+    </radialGradient>
+    <mask id="moon">
+      <circle cx="389" cy="120" r="59" fill="#fff"/>
+      <circle cx="410" cy="105" r="55" fill="#000"/>
+    </mask>
+  </defs>
+  <rect width="512" height="512" rx="120" fill="url(#bg)"/>
+  <rect width="512" height="512" rx="120" fill="url(#glow)"/>
+  <!-- 상승 캔들 3 (한국 상승=빨강) -->
+  <g stroke-linecap="butt">
+    <line x1="138" y1="256" x2="138" y2="404" stroke="#ffd9a8" stroke-width="11"/>
+    <rect x="104" y="287" width="69" height="87" rx="5" fill="#f15553"/>
+    <line x1="256" y1="169" x2="256" y2="348" stroke="#ffd9a8" stroke-width="11"/>
+    <rect x="221" y="205" width="69" height="107" rx="5" fill="#ff7a70"/>
+    <line x1="374" y1="95" x2="374" y2="277" stroke="#ffd9a8" stroke-width="11"/>
+    <rect x="339" y="128" width="69" height="113" rx="5" fill="#fbb219"/>
+  </g>
+  <!-- 초승달 (오버나이트) -->
+  <circle cx="389" cy="120" r="59" fill="#f4eacf" mask="url(#moon)"/>
+</svg>

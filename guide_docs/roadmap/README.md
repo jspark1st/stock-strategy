@@ -61,6 +61,9 @@ vol_tilt 는 이미 철회됨. 구 라벨(종가→종가) 이득을 이유로 �
 - t1601 suffix: `probe_investor_map.py` conf≥0.95 일 때만 네이버→LS 이전 **결정**. 추측 매핑 금지.
 - 데이터 갭: 거래대금 20일 · 야간선물 % · 동시호가 확정 — 소스 확보 전 구현 금지.
 - 사용자: `.env` `backup_remote=…` (오프박스). Vercel `view_password` · `auth_token`.
+- **인증 계정제 전환(미착수·사용자 승인 후)**: 현 단일 비번 게이트(`middleware.js`·`login.html`·
+  `api/login.js`) → 회원가입 + per-user ID/PW. users 테이블(비번 해시)·세션 토큰·미들웨어 교체.
+  fail-closed 유지. 브랜드는 준스탁(2026-08-31 리브랜딩 완료: 아이콘·매니페스트·게이트·대시보드).
 
 ### P3 — 하지 말 것 (로드맵이 아님)
 

@@ -82,7 +82,7 @@ def _ask_size(env: dict) -> tuple[float, float]:
 
 def menu() -> int:
     env = load_env()
-    print("easystock BTC")
+    print("준스탁 BTC")
     lev, mar = _ask_size(env)
     while True:
         print("  1) 미리보기 (dry-run · 웹/텔레그램/DB 없음)")

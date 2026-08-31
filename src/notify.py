@@ -42,7 +42,7 @@ def build_report_summary(reports: list, kind: str, trade_date: str,
     각 시장: 총점·등급·익일상승% · 진입게이트(관망/진입). 진입 가능하면 ETF 손절/목표가도.
     권위 판정은 entry.allow(6조건 AND) — 없으면 등급 게이트로 폴백.
     """
-    out = [f"📊 easystock · {kind} · {trade_date}"]
+    out = [f"📊 준스탁 · {kind} · {trade_date}"]
     for r in reports:
         label = r.get("label")
         if not label:
@@ -103,7 +103,7 @@ def build_btc_summary(rep: dict, last_grade: dict | None = None,
     gate_txt = "관망/현금" if blocked else "진입 검토"
     if gate.get("no_trade") and (rep.get("core_missing") or rep.get("data_status") == "core_missing"):
         gate_txt = "관망/현금 · 코어 결측"
-    lines = [f"easystock · BTC 선물 · {as_of}",
+    lines = [f"준스탁 · BTC 선물 · {as_of}",
              f"• BTCUSDT: {tp}·{grade} · {pp} · {gate_txt}"]
     if last_grade and last_grade.get("correct") is not None:
         hit = "적중" if last_grade["correct"] else "오판"

@@ -1,0 +1,19 @@
+{
+  "name": "준스탁 · 오버나이트 리포트",
+  "short_name": "준스탁",
+  "description": "장 마감 매수 → 익일 시가 매도, 코스피·코스닥·BTC 방향 예측 대시보드.",
+  "lang": "ko",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#141311",
+  "theme_color": "#141311",
+  "categories": ["finance", "productivity"],
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

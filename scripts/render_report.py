@@ -2369,8 +2369,15 @@ TEMPLATE = r"""<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
 <meta name="theme-color" content="#141311"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-<title>easystock {{DATE}}</title>
+<meta name="apple-mobile-web-app-title" content="준스탁"/>
+<meta name="application-name" content="준스탁"/>
+<link rel="icon" href="/icons/favicon.svg" type="image/svg+xml"/>
+<link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png"/>
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png"/>
+<link rel="manifest" href="/manifest.webmanifest"/>
+<title>준스탁 {{DATE}}</title>
 <script>try{var t=localStorage.getItem('theme');if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
 <style>
   :root, [data-theme="dark"] {
@@ -2408,7 +2415,10 @@ TEMPLATE = r"""<!doctype html>
   .sidebar{width:252px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);
     padding:18px 14px;position:sticky;top:0;height:100vh;height:100dvh;overflow-y:auto;
     display:flex;flex-direction:column;gap:6px}
-  .brand{font-weight:800;font-size:1.02rem}
+  .brand{font-weight:800;font-size:1.08rem;display:flex;align-items:center;gap:8px;
+    letter-spacing:-.01em}
+  .brand-mark{border-radius:7px;flex:0 0 auto;box-shadow:0 1px 4px rgba(0,0,0,.35)}
+  .topnav .brand-mark{border-radius:6px}
   .brand-sub{font-size:.74rem;color:var(--muted);margin-bottom:8px}
   .date-nav{margin:0 0 14px}
   .stock-datesel{border:1px solid var(--border);background:var(--surface2);color:var(--text);
@@ -2709,7 +2719,7 @@ TEMPLATE = r"""<!doctype html>
 <a class="skip-link" href="#main">본문으로 건너뛰기</a>
 <div class="app">
   <aside class="sidebar" id="sidebar" aria-label="사이드바">
-    <div class="brand">📊 easystock</div>
+    <div class="brand"><img class="brand-mark" src="/icons/favicon.svg" width="24" height="24" alt=""/>준스탁</div>
     <div class="brand-sub">by junaitech</div>
     <div class="date-nav cal-wrap"><label class="slot-lab">📅 날짜
       <select class="stock-datesel" aria-label="날짜 선택" onchange="if(this.value) location=this.value">
@@ -2727,7 +2737,7 @@ TEMPLATE = r"""<!doctype html>
     <div class="topnav">
       <button class="hamb" type="button" aria-label="메뉴 열기" aria-expanded="false"
         aria-controls="sidebar" onclick="window.__toggleSidebar()">☰</button>
-      <strong>easystock</strong>
+      <img class="brand-mark" src="/icons/favicon.svg" width="21" height="21" alt=""/><strong>준스탁</strong>
     </div>
     {{VIEWS}}
     <p class="disc">투자 판단의 참고 자료이며 투자 권유가 아님.</p>
