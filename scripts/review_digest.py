@@ -85,6 +85,7 @@ def build(db: str = DB, since: str | None = None) -> tuple[str, str]:
         _why = {"btc_gate_block": "BTC 게이트 엄격=설계", "no_discrimination": "AUC≈0.5=데이터 한계",
                 "btc_core_unaligned": "BTC 코어 정렬 상시 관측=설계", "sample_short": "n<40 표본 대기",
                 "calib_slope_floor": "정직한 무신호=데이터",
+                "gate_on_degenerate_prob": "기울기 하한 파생=데이터(설계상 매일 표기)",
                 "mixed_signals": "코어 소수 팩터 상시 관측", "news_dead": "재료 상시 제외=설계"}
         for d in acc:
             md.append(f"| {d['n']} | `{d.get('code')}` | {d.get('title')} "

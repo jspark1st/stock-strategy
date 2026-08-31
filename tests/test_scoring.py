@@ -123,6 +123,19 @@ def test_flow_retail_only_extra_penalty():
     assert "개인만" in penalized.comment
 
 
+def test_flow_both_net_sell_not_labeled_mixed():
+    """외국인·기관 둘 다 순매도인데 '수급 혼조'라 오서술하던 버그(narrative_mismatch) 회귀 고정.
+    점수는 불변, 코멘트만 정확화."""
+    s = score_flow(FlowInput(foreign_net=-9706, inst_net=-5892, retail_net=-244))
+    assert s.comment == "외국인·기관 동반 순매도"     # '혼조' 아님
+    # 방향이 엇갈릴 때만 '혼조'
+    m = score_flow(FlowInput(foreign_net=3000, inst_net=-3000, retail_net=0))
+    assert m.comment == "수급 혼조"
+    # 동반 순매수는 기존대로(회귀 방지)
+    b = score_flow(FlowInput(foreign_net=3000, inst_net=3000, retail_net=0))
+    assert b.comment == "외국인·기관 동반 순매수"
+
+
 def test_flow_streak_clamped():
     s = score_flow(FlowInput(foreign_net=0, inst_net=0, foreign_streak=5))  # 5여도 +10만
     assert s.score == pytest.approx(60.0)

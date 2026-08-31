@@ -257,7 +257,7 @@ LLM_CODES = {
 #   news_dead         재료 상시 제외 = 설계(검증 불가 팩터에 가중 안 줌)
 ACCEPTED_CODES = frozenset({
     "btc_gate_block", "btc_core_unaligned", "no_discrimination", "calib_slope_floor",
-    "sample_short", "mixed_signals", "news_dead",
+    "gate_on_degenerate_prob", "sample_short", "mixed_signals", "news_dead",
 })
 
 _CRITIC_SYS = (

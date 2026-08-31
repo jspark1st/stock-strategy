@@ -135,8 +135,10 @@ def score_flow(inp: FlowInput) -> SubScore:
         comment = f"외국인 {abs(inp.foreign_streak)}거래일 연속 순매도"
     elif inp.foreign_net > 0 and inp.inst_net > 0:
         comment = "외국인·기관 동반 순매수"
+    elif inp.foreign_net < 0 and inp.inst_net < 0:
+        comment = "외국인·기관 동반 순매도"          # 둘 다 순매도인데 '혼조'라 오서술하던 버그
     else:
-        comment = "수급 혼조"
+        comment = "수급 혼조"                         # 방향이 엇갈릴 때만(외국인↔기관)
     return SubScore("flow", LABELS["flow"], WEIGHTS["flow"], round(score, 1), observed, comment)
 
 
