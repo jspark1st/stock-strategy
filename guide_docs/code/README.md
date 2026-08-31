@@ -57,7 +57,7 @@ BTC 전용(`src/btc_*.py`, `run_btc.py`, `auto_btc.sh`)은 주식 `scoring.py` �
 ## 테스트
 
 ```bash
-.venv/bin/python -m pytest tests/ -q          # 수집 기준 347 (2026-08-30)
+.venv/bin/python -m pytest tests/ -q          # 수집 기준 349 (2026-08-31)
 .venv/bin/python -m pytest tests/test_scoring.py -q
 ```
 
