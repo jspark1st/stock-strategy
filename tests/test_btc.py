@@ -437,8 +437,7 @@ def test_btc_hero_shrink_is_not_self_learn():
         "calibration": None,
         "accuracy": {"n": 1},
     })
-    assert "불일치 수축 전 56%" in html
-    assert "수축 후 55%" in html
+    assert "확률 조정 56% → 55%" in html
     assert "자가학습 보정 전" not in html
     stock = build_hero({
         "report_type": "close", "total": 60, "grade": "우호",
@@ -446,7 +445,7 @@ def test_btc_hero_shrink_is_not_self_learn():
         "calibration": {"n": 149, "source": "bootstrap"},
     })
     # 델타 전체를 '자가학습 보정'으로 귀속하지 않는다(캘리브+틸트+수축 종합).
-    assert "원시 70% → 최종 66%" in stock
+    assert "원시 확률 70%" in stock and "최종 66%" in stock
     assert "자가학습 보정 전" not in stock
 
 

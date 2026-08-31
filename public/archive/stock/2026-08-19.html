@@ -187,6 +187,8 @@
   .donut .inner{width:86px;height:86px;border-radius:50%;background:var(--surface);display:grid;place-items:center;font-weight:800;font-size:1.3rem;font-variant-numeric:tabular-nums}
   .donut-na{background:var(--surface2)}
   .hero-note{grid-column:1/-1;text-align:center;font-size:.76rem;color:var(--muted);margin-top:-4px}
+  .hero-note.hero-caution{color:var(--caution);font-size:.8rem}
+  .hero-note .info{vertical-align:baseline}
 
   /* 신뢰도 칩 */
   .conf-row{display:flex;gap:10px;flex-wrap:wrap;margin:-6px 0 14px}
@@ -415,7 +417,7 @@
 - 시장: 코스피 6,471.2 (-5.80%) · 원달러 1,394.1
 
 ## 총점 28.8 · 등급 위험 · 익일 시가 상승확률 57.6% / 하락 42.4%
-- (원시 6.8% → 캘리브 57.6% · bootstrap n=149 · 단일 상승레짐 기저율 앵커, 하락장 미검증)
+- (원시 6.8% → 캘리브 57.6% · bootstrap n=149 · 단일 상승장 기저율 앵커, 하락장 미검증)
 - 진입 판정: 차단 (방향 long) · 사유: 게이트 신규진입 허용, 방향 확률 임계, 신뢰도 임계
 - 신뢰도: 완전성 100.0% × 표본보정 0.50 (표본 1/250)
 
@@ -527,7 +529,7 @@
     </div>
     <div class="stat"><div class="donut" style="--p:58;--dc:var(--up)"><div class="inner" style="color:var(--up)">58%</div></div><div class="lbl">익일 시가 상승 확률</div></div>
     <div class="stat"><div class="donut" style="--p:42;--dc:var(--down)"><div class="inner" style="color:var(--down)">42%</div></div><div class="lbl">익일 시가 하락 확률</div></div>
-    <div class="hero-note">원시 7% → 최종 58% · 캘리브레이션·판별신호·신호수축 종합(세부는 아래 주의 신호)</div><div class="hero-note" style="color:var(--caution)">※ 58% 는 40–60% 판별 미확보 구간(캘리브 기저율) — 방향 베팅 근거 아님, 등급·총점과 별개 축</div><div class="hero-note" style="color:var(--caution)">※ 확률은 단일 상승레짐(표본 n=149) 기저율 앵커 · 하락장 미검증</div></div>
+    <div class="hero-note hero-caution"><b>이 확률은 방향을 정하는 근거로 쓰기 어렵습니다 (50%에 가까움).</b> <button class="info" type="button" aria-label="설명 보기">i<span class="info-pop">원시 확률 7%를 캘리브레이션·판별 신호·신호 수축으로 조정해 최종 58%가 됐습니다. 58%는 40–60% 판별 미확보 구간이라 방향 예측력이 확보되지 않았습니다 — 방향 베팅 근거가 아니며 등급·총점과는 별개 축입니다. 확률은 2026 상반기 단일 상승장(표본 n=149) 기저율에 앵커돼 있어 하락·횡보장은 미검증입니다.</span></button></div></div>
     <div class="card confirm-diff"><h2>확정 대조 <span class="pill pill-ghost">2026-08-19 15:00 KST → 마감 확정</span><button class="info" type="button" aria-label="설명 보기">i<span class="info-pop">주문 시점(장중 잠정) 판단이 마감 확정치로 어떻게 바뀌었는지 보여줍니다.</span></button></h2><table class="cd-table"><thead><tr><th>항목</th><th>잠정</th><th></th><th>확정</th><th>변화</th></tr></thead><tbody><tr><td>총점</td><td class="cd-b">27.90</td><td class="cd-arrow">→</td><td class="cd-a">28.80</td><td style="color:var(--up)">+0.90</td></tr><tr><td>익일상승</td><td class="cd-b">57.40%</td><td class="cd-arrow">→</td><td class="cd-a">57.60%</td><td style="color:var(--up)">+0.20%</td></tr><tr><td>종가</td><td class="cd-b">6,463.58</td><td class="cd-arrow">→</td><td class="cd-a">6,471.17</td><td style="color:var(--up)">+7.59</td></tr><tr><td>등락률</td><td class="cd-b">-5.91%</td><td class="cd-arrow">→</td><td class="cd-a">-5.80%</td><td style="color:var(--up)">+0.11%</td></tr><tr><td>외국인</td><td class="cd-b">-29,708.00억</td><td class="cd-arrow">→</td><td class="cd-a">-34,884.00억</td><td style="color:var(--down)">-5,176.00억</td></tr><tr><td>기관</td><td class="cd-b">-13,625.00억</td><td class="cd-arrow">→</td><td class="cd-a">-13,232.00억</td><td style="color:var(--up)">+393.00억</td></tr></tbody></table><div class="ov-trans" style="margin-top:8px">확정 컨펌 행동: <span class="pill" style="background:var(--good)">HOLD</span> <span class="muted">확률 약화 -0.2%p &lt; 10%p — 유지</span></div></div>
     
     
@@ -543,13 +545,13 @@
     <div class="card"><h2>종가 진입 게이트 <span class="badge badge-warn">진입 차단</span><button class="info" type="button" aria-label="설명 보기">i<span class="info-pop">전부 충족일 때만 진입(총점이 아니라 조건 조합)</span></button></h2><ul class="gate-ul"><li><span class="chk-no">✕</span> 게이트 신규진입 허용 <span class="muted">· 위험 등급 차단</span></li><li><span class="chk-ok">✓</span> 필수 데이터 100% <span class="muted">· 100%</span></li><li><span class="chk-ok">✓</span> 데이터 신선도 <span class="muted">· 미측정</span></li><li><span class="chk-no">✕</span> 방향 확률 임계 <span class="muted">· 58%</span></li><li><span class="chk-no">✕</span> 신뢰도 임계 <span class="muted">· 0.30</span></li><li><span class="chk-ok">✓</span> 이벤트 잠금 없음 <span class="muted">· 없음</span></li></ul></div>
     
   <div class="card">
-    <h2>ATR 매매 플랜 <span class="pill" style="background:var(--caution)">신규 진입 차단</span>
-      <span class="pill pill-ghost">등급 게이트 차단 — 신규 진입 없음</span></h2>
+    <h2>매매 계획 <span class="pill" style="background:var(--caution)">신규 진입 차단</span>
+      <span class="pill pill-ghost">등급 게이트 차단 — 신규 진입 없음</span><button class="info" type="button" aria-label="설명 보기">i<span class="info-pop">ATR = 하룻밤 사이 예상 변동폭(σ_AM)입니다. 주 타점은 '오버나이트(익일 오전) ±1σ_AM'이며, 기본 청산은 08:50 장전 재평가(시간청산)이고 손절·목표는 안전망입니다. 표의 다일(여러 날) 타점은 보유를 연장할 때만 참고합니다. 지수 포인트 기준의 참고 타점입니다. edge·켈리는 익일 방향확률을 손익비 승률로 간주해 계산한 값이라 목표·손절 도달 확률과는 다릅니다 — 비중은 항상 게이트·상한 안에서. 투자 권유가 아닙니다.</span></button></h2>
     <div class="tiles"><div class="tile"><div class="tile-lbl">진입가</div><div class="tile-val" style="color:var(--text)">6,471.17</div></div><div class="tile"><div class="tile-lbl">손절가</div><div class="tile-val" style="color:var(--down)">6,251.80</div><div class="tile-sub">권장 6,251.80·ATR</div></div><div class="tile"><div class="tile-lbl">목표가</div><div class="tile-val" style="color:var(--up)">6,690.54</div></div><div class="tile"><div class="tile-lbl">손익비</div><div class="tile-val" style="color:var(--accent)">1 : 1.0</div></div><div class="tile"><div class="tile-lbl">edge</div><div class="tile-val" style="color:var(--up)">+0.076</div><div class="tile-sub">손익분기 0.50</div></div><div class="tile"><div class="tile-lbl">권장비중</div><div class="tile-val" style="color:var(--caution)">0%</div><div class="tile-sub">등급 게이트 차단 → 0%</div></div></div>
     <div class="atr-extra">익일 오전 예상변동 σ_AM 3.4%(갭 2.5% ⊕ 오전버퍼 · 일간 ATR의 0.53배) · ATR14 원본 413.50 → 적용(정규화) 413.12 · 변동성 국면 35% · 구조 손절(스윙) 6,080.25 · 눌림 참고 6,264.61 · 트레일링(Chandelier) 5,931.91</div>
     
     <div class="obs muted">등급 게이트: 신규 진입 차단 — 권장비중 0%(관망/현금). 아래 타점은 보유분 관리·역방향 참고용 수치일 뿐 신규 베팅 근거가 아니다.</div>
-    <div class="sub-h" style="margin-top:10px">참고 · 다일 보유 시 R배수 타점
+    <div class="sub-h" style="margin-top:10px">참고 · 여러 날 보유 시 타점
       <span class="pill pill-ghost">우리 전략은 오버나이트 1회</span></div>
     <div class="table-wrap">
       <table class="mini">
@@ -558,12 +560,8 @@
       </table>
     </div>
     
-    <div class="note muted">주 타점은 <b>오버나이트(익일 오전) ±1σ_AM</b> — 기본 청산은
-      08:50 장전 재평가(시간청산)이고 손절/목표는 안전망이다. 위 표의 다일 타점은 보유 연장 시 참고.
-      지수 포인트 기준 <b>참고</b> 타점. edge·켈리는 <b>익일 방향확률(p)</b>을 손익비
-      승률로 간주한 값 — 목표·손절 도달 확률과는 다르므로 비중은 항상 게이트·상한 안에서. 투자 권유 아님.</div>
   </div>
-    <div class="card"><h2>상품 주문 카드 <span class="pill pill-ghost">KODEX 200 069500</span></h2><div class="note muted">지수 레벨을 베타로 ETF 가격에 변환 · 베타 1.225 · 추적오차 1.071% · NAV괴리 -0.01% · ETF 기준가 101,760</div><table class="cd-table"><thead><tr><th>레벨</th><th style="text-align:right">지수</th><th></th><th style="text-align:right">ETF가</th></tr></thead><tbody><tr><td>진입</td><td style="text-align:right">6,471.17</td><td class="cd-arrow">→</td><td style="text-align:right;font-weight:800">101,760.00</td></tr><tr><td>손절</td><td style="text-align:right">6,251.80</td><td class="cd-arrow">→</td><td style="text-align:right;font-weight:800">97,534.23</td></tr><tr><td>목표</td><td style="text-align:right">6,690.54</td><td class="cd-arrow">→</td><td style="text-align:right;font-weight:800">105,985.77</td></tr></tbody></table><div class="atr-warn" style="margin-top:8px">진입 게이트 차단 — 신규 진입·자동매도 설정 없음(관망/현금). 위 지수↔ETF 환산은 참고용이며, 보유분이 있을 때만 관리에 쓰세요.</div><ul class="risk-ul" style="margin-top:8px"><li>추적오차 일간 1.07% — 지수와 괴리 가능</li><li>일간 추종 ETF — 장기 보유 시 복리 괴리. 갭 발생 시 손절 미체결 가능성.</li></ul><div class="note muted">지수 레벨을 베타로 ETF 가격에 변환한 참고치 — 실주문 아님(L0/L1)</div></div>
+    <div class="card"><h2>상품 주문(ETF) <span class="pill pill-ghost">KODEX 200 069500</span><button class="info" type="button" aria-label="설명 보기">i<span class="info-pop">지수 레벨을 ETF의 민감도(베타)로 환산해 ETF 가격으로 바꾼 값입니다 · 베타 1.225 · 추적오차 1.071% · NAV괴리 -0.01%.</span></button></h2><div class="note muted">ETF 기준가 101,760</div><table class="cd-table"><thead><tr><th>레벨</th><th style="text-align:right">지수</th><th></th><th style="text-align:right">ETF가</th></tr></thead><tbody><tr><td>진입</td><td style="text-align:right">6,471.17</td><td class="cd-arrow">→</td><td style="text-align:right;font-weight:800">101,760.00</td></tr><tr><td>손절</td><td style="text-align:right">6,251.80</td><td class="cd-arrow">→</td><td style="text-align:right;font-weight:800">97,534.23</td></tr><tr><td>목표</td><td style="text-align:right">6,690.54</td><td class="cd-arrow">→</td><td style="text-align:right;font-weight:800">105,985.77</td></tr></tbody></table><div class="atr-warn" style="margin-top:8px">진입 게이트 차단 — 신규 진입·자동매도 설정 없음(관망/현금). 위 지수↔ETF 환산은 참고용이며, 보유분이 있을 때만 관리에 쓰세요.</div><ul class="risk-ul" style="margin-top:8px"><li>추적오차 일간 1.07% — 지수와 괴리 가능</li><li>일간 추종 ETF — 장기 보유 시 복리 괴리. 갭 발생 시 손절 미체결 가능성.</li></ul><div class="note muted">지수 레벨을 베타로 ETF 가격에 변환한 참고치 — 실주문 아님(L0/L1)</div></div>
     
   <div class="card">
     <h2>익일 시나리오</h2>
@@ -734,7 +732,7 @@
 - 시장: 코스닥 824.5 (-1.17%) · 원달러 1,394.1
 
 ## 총점 47.9 · 등급 약세 · 익일 시가 상승확률 55.1% / 하락 44.9%
-- (원시 33.0% → 캘리브 55.1% · bootstrap n=149 · 단일 상승레짐 기저율 앵커, 하락장 미검증)
+- (원시 33.0% → 캘리브 55.1% · bootstrap n=149 · 단일 상승장 기저율 앵커, 하락장 미검증)
 - 진입 판정: 차단 (방향 long) · 사유: 방향 확률 임계, 신뢰도 임계
 - 신뢰도: 완전성 100.0% × 표본보정 0.50 (표본 1/250)
 
@@ -848,7 +846,7 @@
     </div>
     <div class="stat"><div class="donut" style="--p:55;--dc:var(--up)"><div class="inner" style="color:var(--up)">55%</div></div><div class="lbl">익일 시가 상승 확률</div></div>
     <div class="stat"><div class="donut" style="--p:45;--dc:var(--down)"><div class="inner" style="color:var(--down)">45%</div></div><div class="lbl">익일 시가 하락 확률</div></div>
-    <div class="hero-note">원시 33% → 최종 55% · 캘리브레이션·판별신호·신호수축 종합(세부는 아래 주의 신호)</div><div class="hero-note" style="color:var(--caution)">※ 55% 는 40–60% 판별 미확보 구간(캘리브 기저율) — 방향 베팅 근거 아님, 등급·총점과 별개 축</div><div class="hero-note" style="color:var(--caution)">※ 확률은 단일 상승레짐(표본 n=149) 기저율 앵커 · 하락장 미검증</div></div>
+    <div class="hero-note hero-caution"><b>이 확률은 방향을 정하는 근거로 쓰기 어렵습니다 (50%에 가까움).</b> <button class="info" type="button" aria-label="설명 보기">i<span class="info-pop">원시 확률 33%를 캘리브레이션·판별 신호·신호 수축으로 조정해 최종 55%가 됐습니다. 55%는 40–60% 판별 미확보 구간이라 방향 예측력이 확보되지 않았습니다 — 방향 베팅 근거가 아니며 등급·총점과는 별개 축입니다. 확률은 2026 상반기 단일 상승장(표본 n=149) 기저율에 앵커돼 있어 하락·횡보장은 미검증입니다.</span></button></div></div>
     <div class="card confirm-diff"><h2>확정 대조 <span class="pill pill-ghost">2026-08-19 15:00 KST → 마감 확정</span><button class="info" type="button" aria-label="설명 보기">i<span class="info-pop">주문 시점(장중 잠정) 판단이 마감 확정치로 어떻게 바뀌었는지 보여줍니다.</span></button></h2><table class="cd-table"><thead><tr><th>항목</th><th>잠정</th><th></th><th>확정</th><th>변화</th></tr></thead><tbody><tr><td>총점</td><td class="cd-b">47.80</td><td class="cd-arrow">→</td><td class="cd-a">47.90</td><td style="color:var(--up)">+0.10</td></tr><tr><td>익일상승</td><td class="cd-b">54.70%</td><td class="cd-arrow">→</td><td class="cd-a">55.10%</td><td style="color:var(--up)">+0.40%</td></tr><tr><td>종가</td><td class="cd-b">824.85</td><td class="cd-arrow">→</td><td class="cd-a">824.46</td><td style="color:var(--down)">-0.39</td></tr><tr><td>등락률</td><td class="cd-b">-1.12%</td><td class="cd-arrow">→</td><td class="cd-a">-1.17%</td><td style="color:var(--down)">-0.05%</td></tr><tr><td>외국인</td><td class="cd-b">-196.00억</td><td class="cd-arrow">→</td><td class="cd-a">147.00억</td><td style="color:var(--up)">+343.00억</td></tr><tr><td>기관</td><td class="cd-b">691.00억</td><td class="cd-arrow">→</td><td class="cd-a">499.00억</td><td style="color:var(--down)">-192.00억</td></tr></tbody></table><div class="ov-trans" style="margin-top:8px">확정 컨펌 행동: <span class="pill" style="background:var(--good)">HOLD</span> <span class="muted">확률 약화 -0.4%p &lt; 10%p — 유지</span></div></div>
     
     
@@ -864,13 +862,13 @@
     <div class="card"><h2>종가 진입 게이트 <span class="badge badge-warn">진입 차단</span><button class="info" type="button" aria-label="설명 보기">i<span class="info-pop">전부 충족일 때만 진입(총점이 아니라 조건 조합)</span></button></h2><ul class="gate-ul"><li><span class="chk-ok">✓</span> 게이트 신규진입 허용 <span class="muted">· 허용</span></li><li><span class="chk-ok">✓</span> 필수 데이터 100% <span class="muted">· 100%</span></li><li><span class="chk-ok">✓</span> 데이터 신선도 <span class="muted">· 미측정</span></li><li><span class="chk-no">✕</span> 방향 확률 임계 <span class="muted">· 55%</span></li><li><span class="chk-no">✕</span> 신뢰도 임계 <span class="muted">· 0.30</span></li><li><span class="chk-ok">✓</span> 이벤트 잠금 없음 <span class="muted">· 없음</span></li></ul></div>
     
   <div class="card">
-    <h2>ATR 매매 플랜 <span class="pill" style="background:var(--caution)">진입 게이트 차단</span>
-      <span class="pill pill-ghost">진입 게이트 차단 — 방향 확률 임계, 신뢰도 임계</span><span class="pill pill-ghost">변동성 저변동</span></h2>
+    <h2>매매 계획 <span class="pill" style="background:var(--caution)">진입 게이트 차단</span>
+      <span class="pill pill-ghost">진입 게이트 차단 — 방향 확률 임계, 신뢰도 임계</span><span class="pill pill-ghost">변동성 저변동</span><button class="info" type="button" aria-label="설명 보기">i<span class="info-pop">ATR = 하룻밤 사이 예상 변동폭(σ_AM)입니다. 주 타점은 '오버나이트(익일 오전) ±1σ_AM'이며, 기본 청산은 08:50 장전 재평가(시간청산)이고 손절·목표는 안전망입니다. 표의 다일(여러 날) 타점은 보유를 연장할 때만 참고합니다. 지수 포인트 기준의 참고 타점입니다. edge·켈리는 익일 방향확률을 손익비 승률로 간주해 계산한 값이라 목표·손절 도달 확률과는 다릅니다 — 비중은 항상 게이트·상한 안에서. 투자 권유가 아닙니다.</span></button></h2>
     <div class="tiles"><div class="tile"><div class="tile-lbl">진입가</div><div class="tile-val" style="color:var(--text)">824.46</div></div><div class="tile"><div class="tile-lbl">손절가</div><div class="tile-val" style="color:var(--down)">804.84</div><div class="tile-sub">권장 804.84·ATR</div></div><div class="tile"><div class="tile-lbl">목표가</div><div class="tile-val" style="color:var(--up)">844.08</div></div><div class="tile"><div class="tile-lbl">손익비</div><div class="tile-val" style="color:var(--accent)">1 : 1.0</div></div><div class="tile"><div class="tile-lbl">edge</div><div class="tile-val" style="color:var(--up)">+0.051</div><div class="tile-sub">손익분기 0.50</div></div><div class="tile"><div class="tile-lbl">권장비중</div><div class="tile-val" style="color:var(--caution)">0%</div><div class="tile-sub">진입 게이트 차단(방향 확률 임계, 신뢰도 임계) → 0%</div></div></div>
     <div class="atr-extra">익일 오전 예상변동 σ_AM 2.4%(갭 1.6% ⊕ 오전버퍼 · 일간 ATR의 0.47배) · ATR14 원본 42.02 → 적용(정규화) 42.02 · 변동성 국면 7% · 구조 손절(스윙) 748.19 · 눌림 참고 803.45 · 트레일링(Chandelier) 748.94</div>
     
     <div class="obs muted">진입 게이트 차단 — 방향 확률 임계, 신뢰도 임계. 권장비중 0%(관망/현금). 아래 타점은 보유분 관리·참고용 수치일 뿐 신규 베팅 근거가 아니다.</div>
-    <div class="sub-h" style="margin-top:10px">참고 · 다일 보유 시 R배수 타점
+    <div class="sub-h" style="margin-top:10px">참고 · 여러 날 보유 시 타점
       <span class="pill pill-ghost">우리 전략은 오버나이트 1회</span></div>
     <div class="table-wrap">
       <table class="mini">
@@ -879,12 +877,8 @@
       </table>
     </div>
     
-    <div class="note muted">주 타점은 <b>오버나이트(익일 오전) ±1σ_AM</b> — 기본 청산은
-      08:50 장전 재평가(시간청산)이고 손절/목표는 안전망이다. 위 표의 다일 타점은 보유 연장 시 참고.
-      지수 포인트 기준 <b>참고</b> 타점. edge·켈리는 <b>익일 방향확률(p)</b>을 손익비
-      승률로 간주한 값 — 목표·손절 도달 확률과는 다르므로 비중은 항상 게이트·상한 안에서. 투자 권유 아님.</div>
   </div>
-    <div class="card"><h2>상품 주문 카드 <span class="pill pill-ghost">KODEX 코스닥150 229200</span></h2><div class="note muted">지수 레벨을 베타로 ETF 가격에 변환 · 베타 1.187 · 추적오차 0.759% · NAV괴리 -0.02% · ETF 기준가 14,230</div><table class="cd-table"><thead><tr><th>레벨</th><th style="text-align:right">지수</th><th></th><th style="text-align:right">ETF가</th></tr></thead><tbody><tr><td>진입</td><td style="text-align:right">824.46</td><td class="cd-arrow">→</td><td style="text-align:right;font-weight:800">14,230.00</td></tr><tr><td>손절</td><td style="text-align:right">804.84</td><td class="cd-arrow">→</td><td style="text-align:right;font-weight:800">13,828.00</td></tr><tr><td>목표</td><td style="text-align:right">844.08</td><td class="cd-arrow">→</td><td style="text-align:right;font-weight:800">14,632.00</td></tr></tbody></table><div class="atr-warn" style="margin-top:8px">진입 게이트 차단 — 신규 진입·자동매도 설정 없음(관망/현금). 위 지수↔ETF 환산은 참고용이며, 보유분이 있을 때만 관리에 쓰세요.</div><ul class="risk-ul" style="margin-top:8px"><li>추적오차 일간 0.76% — 지수와 괴리 가능</li><li>일간 추종 ETF — 장기 보유 시 복리 괴리. 갭 발생 시 손절 미체결 가능성.</li></ul><div class="note muted">지수 레벨을 베타로 ETF 가격에 변환한 참고치 — 실주문 아님(L0/L1)</div></div>
+    <div class="card"><h2>상품 주문(ETF) <span class="pill pill-ghost">KODEX 코스닥150 229200</span><button class="info" type="button" aria-label="설명 보기">i<span class="info-pop">지수 레벨을 ETF의 민감도(베타)로 환산해 ETF 가격으로 바꾼 값입니다 · 베타 1.187 · 추적오차 0.759% · NAV괴리 -0.02%.</span></button></h2><div class="note muted">ETF 기준가 14,230</div><table class="cd-table"><thead><tr><th>레벨</th><th style="text-align:right">지수</th><th></th><th style="text-align:right">ETF가</th></tr></thead><tbody><tr><td>진입</td><td style="text-align:right">824.46</td><td class="cd-arrow">→</td><td style="text-align:right;font-weight:800">14,230.00</td></tr><tr><td>손절</td><td style="text-align:right">804.84</td><td class="cd-arrow">→</td><td style="text-align:right;font-weight:800">13,828.00</td></tr><tr><td>목표</td><td style="text-align:right">844.08</td><td class="cd-arrow">→</td><td style="text-align:right;font-weight:800">14,632.00</td></tr></tbody></table><div class="atr-warn" style="margin-top:8px">진입 게이트 차단 — 신규 진입·자동매도 설정 없음(관망/현금). 위 지수↔ETF 환산은 참고용이며, 보유분이 있을 때만 관리에 쓰세요.</div><ul class="risk-ul" style="margin-top:8px"><li>추적오차 일간 0.76% — 지수와 괴리 가능</li><li>일간 추종 ETF — 장기 보유 시 복리 괴리. 갭 발생 시 손절 미체결 가능성.</li></ul><div class="note muted">지수 레벨을 베타로 ETF 가격에 변환한 참고치 — 실주문 아님(L0/L1)</div></div>
     
   <div class="card">
     <h2>익일 시나리오</h2>

@@ -82,26 +82,26 @@ def _cal_report(a, source="bootstrap", n=149):
 
 def test_regime_anchor_badge_shown_for_stock():
     # 단일 상승레짐 적합이면 '기저율 앵커·하락장 미검증' 고지가 뜬다.
-    assert "단일 상승레짐" in rr.build_hero(_cal_report(0.0104))
+    assert "단일 상승장" in rr.build_hero(_cal_report(0.0104))
 
 
 def test_slope_floor_warning_when_score_no_influence():
     # 기울기가 하한(0.005) 근처 → 총점이 확률에 영향 없음을 경고.
-    assert "총점이 확률에 거의 영향 없음" in rr.build_hero(_cal_report(0.005))
+    assert "총점이 확률에 거의 영향을 주지 못합니다" in rr.build_hero(_cal_report(0.005))
     # 기울기가 충분하면 그 경고는 없다(배지는 여전히 있음).
     h = rr.build_hero(_cal_report(0.05))
-    assert "총점이 확률에 거의 영향 없음" not in h
-    assert "단일 상승레짐" in h
+    assert "총점이 확률에 거의 영향을 주지 못합니다" not in h
+    assert "단일 상승장" in h
 
 
 def test_regime_badge_absent_for_sot_and_btc():
     # SoT 폴백(캘리브 없음)엔 레짐 배지 없음.
-    assert "단일 상승레짐" not in rr.build_hero(_cal_report(0.0104, source="sot"))
+    assert "단일 상승장" not in rr.build_hero(_cal_report(0.0104, source="sot"))
     # BTC 는 별도 트랙 — 적용 안 함.
     btc = {"total": 55.5, "grade": "중립", "p_long": 0.6, "p_short": 0.4,
            "report_type": "btc_perp",
            "calibration": {"source": "btc", "n": 10, "a": 0.005}}
-    assert "단일 상승레짐" not in rr.build_hero(btc)
+    assert "단일 상승장" not in rr.build_hero(btc)
 
 
 # ── D. 전체 복사(LLM 이어붙이기) ──────────────────────────────────────
@@ -150,7 +150,7 @@ def test_report_text_respects_sample_discipline():
 
 def test_report_text_regime_anchor_disclosed():
     t = rr.build_report_text(_full_report())
-    assert "단일 상승레짐" in t          # 복사본에도 레짐 편향 고지
+    assert "단일 상승장" in t          # 복사본에도 레짐 편향 고지
 
 
 def test_report_text_widened_sections():
@@ -396,7 +396,7 @@ def test_atr_badge_downgraded_on_all_block_paths():
     # 초록 '매수 우위'로 남으면 안 된다 — build_conclusion 배지와 대칭이어야 한다(재감사 발견).
     import re
     def badge(h):
-        m = re.search(r'ATR 매매 플랜 <span class="pill" style="background:([^"]+)">([^<]+)</span>', h)
+        m = re.search(r'매매 계획 <span class="pill" style="background:([^"]+)">([^<]+)</span>', h)
         return (m.group(1), m.group(2)) if m else (None, None)
 
     atr = {"direction": "long", "instrument": "KODEX 200",

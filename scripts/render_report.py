@@ -235,51 +235,48 @@ def build_hero(r: dict) -> str:
     if not btc and _cal0.get("slope_at_floor"):
         up_lbl, down_lbl = "상승 기저율(예측 아님)", "하락 기저율(예측 아님)"
     raw = r.get("p_up_raw")
+    # 히어로 정직성 노트 — 표면엔 초보자용 '쉬운 한 줄' 경고만, 기술 상세(원시→최종·판별 미확보
+    # 구간·레짐/기울기)는 ⓘ 안으로. 경고 자체(방향 근거로 쓰기 어렵다)는 표면에 남긴다.
     calib = ""
-    if raw is not None and p_up is not None and abs(raw - p_up) > 1e-9:
+    if btc:
         learned = (r.get("calibration") or {}).get("n") or 0
-        if btc and learned < 40:
-            calib = (f'<div class="hero-note">불일치 수축 전 {raw*100:.0f}% '
-                     f'→ 수축 후 {p_up*100:.0f}% · 자가학습 보정 아님</div>')
-        else:
-            # raw(=SoT 원시 시그모이드) → 최종은 캘리브레이션뿐 아니라 판별틸트·대형주착시·
-            # 신호일치 수축까지 다 접은 값이다. 델타 전체를 '자가학습 보정'으로 귀속하면 오독 →
-            # '종합 조정'으로 표기하고 세부는 주의 신호로 넘긴다.
-            calib = (f'<div class="hero-note">원시 {raw*100:.0f}% → 최종 {p_up*100:.0f}% '
-                     f'· 캘리브레이션·판별신호·신호수축 종합(세부는 아래 주의 신호)</div>')
-    elif p_up is not None:
-        # 점추정임을 명시 — 신뢰구간 없는 단일 확률을 4자리로 과신하지 않도록.
         n_acc = (r.get("accuracy") or {}).get("n") or 0
-        if btc and n_acc < 40:
-            calib = '<div class="hero-note">방향 확률은 점추정 · 성적 n&lt;40 — 캘리브·성적 참고 금지</div>'
-        else:
-            calib = '<div class="hero-note">방향 확률은 점추정(신뢰구간 없음) · 표본 누적 시 캘리브레이션</div>'
-    # 판별 미확보 밴드: 캘리브레이션된 확률이 기저율(≈50%) 근처면(±8%p) 방향 edge 가 사실상
-    # 없다(단일레짐 AUC≈0.5). '58%' 같은 거짓 정밀도가 방향 베팅 근거로 읽히거나, 등급이 다른
-    # 두 시장의 확률이 뒤바뀌어(약세 58% > 우호 54%) 모순처럼 보이는 것을 막는다. 게이트 임계와
-    # 무관한 **표시 전용** 정직성 밴드.
-    if not btc and p_up is not None and abs(p_up - 0.5) < 0.08:
-        calib += ('<div class="hero-note" style="color:var(--caution)">'
-                  f'※ {p_up*100:.0f}% 는 40–60% 판별 미확보 구간(캘리브 기저율) — '
-                  '방향 베팅 근거 아님, 등급·총점과 별개 축</div>')
-    # 레짐 편향 고지: 캘리브레이터가 2026 상반기 **단일 상승레짐**으로 적합됐다 → 확률이 그 구간의
-    # 기저 상승률(~60%)에 앵커돼, 추세가 꺾이면(하락/횡보) 체계적으로 과대낙관이 된다. 또 기울기가
-    # 하한(_MIN_SLOPE=0.005) 근처면 총점이 확률에 사실상 영향을 못 준다(확률≈절편). 표시 전용.
-    cal_meta = r.get("calibration") or {}
-    if not btc and cal_meta.get("source") and cal_meta["source"] != "sot":
-        parts = [f'확률은 단일 상승레짐(표본 n={cal_meta.get("n")}) 기저율 앵커 · 하락장 미검증']
-        a = cal_meta.get("a")
-        if cal_meta.get("slope_at_floor") or (a is not None and a <= 0.006):
-            span = cal_meta.get("prob_span_pp")
-            msg = '캘리브 기울기 하한 고착 — 총점이 확률에 거의 영향 없음'
-            if span is not None:
-                msg += f'(관측 총점 전 구간이 만드는 확률 폭 {span:.1f}%p)'
-            rs = cal_meta.get("raw_slope")
-            if rs is not None and rs < 0:
-                msg += ' · 원시 기울기 음(-) = 총점이 오히려 역방향 — 하한 클램프로 방어 중'
-            parts.append(msg)
-        calib += ('<div class="hero-note" style="color:var(--caution)">※ '
-                  + ' · '.join(parts) + '</div>')
+        if raw is not None and p_up is not None and abs(raw - p_up) > 1e-9 and learned < 40:
+            calib = (f'<div class="hero-note">확률 조정 {raw*100:.0f}% → {p_up*100:.0f}%'
+                     f'{_info("자가학습 보정이 아니라, 신호가 엇갈릴 때 확률을 50% 쪽으로 좁힌 값입니다.")}</div>')
+        elif p_up is not None and n_acc < 40:
+            calib = (f'<div class="hero-note">방향 확률은 참고용'
+                     f'{_info("신뢰구간 없는 점추정이고, 검증 표본(n&lt;40)이 부족해 성적·보정은 참고만 하세요.")}</div>')
+    else:
+        _d, _caution = [], ""
+        if raw is not None and p_up is not None and abs(raw - p_up) > 1e-9:
+            _d.append(f"원시 확률 {raw*100:.0f}%를 캘리브레이션·판별 신호·신호 수축으로 조정해 "
+                      f"최종 {p_up*100:.0f}%가 됐습니다.")
+        elif p_up is not None:
+            _d.append("방향 확률은 신뢰구간이 없는 점추정입니다.")
+        if p_up is not None and abs(p_up - 0.5) < 0.08:
+            _caution = "이 확률은 방향을 정하는 근거로 쓰기 어렵습니다 (50%에 가까움)."
+            _d.append(f"{p_up*100:.0f}%는 40–60% 판별 미확보 구간이라 방향 예측력이 확보되지 "
+                      "않았습니다 — 방향 베팅 근거가 아니며 등급·총점과는 별개 축입니다.")
+        cal_meta = r.get("calibration") or {}
+        if cal_meta.get("source") and cal_meta["source"] != "sot":
+            if not _caution:
+                _caution = "이 확률은 상승장 데이터로 학습돼 하락장은 아직 검증되지 않았습니다."
+            reg = (f"확률은 2026 상반기 단일 상승장(표본 n={cal_meta.get('n')}) 기저율에 앵커돼 "
+                   "있어 하락·횡보장은 미검증입니다.")
+            a = cal_meta.get("a")
+            if cal_meta.get("slope_at_floor") or (a is not None and a <= 0.006):
+                span = cal_meta.get("prob_span_pp")
+                reg += " 또한 지금은 총점이 확률에 거의 영향을 주지 못합니다"
+                reg += (f"(총점 전 구간이 만드는 확률 폭 {span:.1f}%p)." if span is not None else ".")
+                rs = cal_meta.get("raw_slope")
+                if rs is not None and rs < 0:
+                    reg += " 원시로는 총점이 오히려 역방향이라 하한으로 방어 중입니다."
+            _d.append(reg)
+        if _caution or _d:
+            lead = f'<b>{_caution}</b> ' if _caution else "방향 확률은 참고용 점추정입니다. "
+            cls = "hero-note hero-caution" if _caution else "hero-note"
+            calib = f'<div class="{cls}">{lead}{_info(" ".join(_d))}</div>'
     return f"""
     <div class="stat">
       <div class="big" style="color:var(--accent)">{total_txt}</div>
@@ -494,9 +491,11 @@ def build_order_card(r: dict) -> str:
     pre_note = (' · 전일 마감 앵커 환산 — 개장 후 시가·괴리 재확인'
                 if r.get("report_type") == "preopen"
                 or (r.get("id") or "").endswith("-preopen") else "")
-    return (f'<div class="card"><h2>상품 주문 카드 '
-            f'<span class="pill pill-ghost">{esc(oc.get("instrument",""))} {esc(oc.get("shcode",""))}</span></h2>'
-            f'<div class="note muted">지수 레벨을 베타로 ETF 가격에 변환 · {esc(" · ".join(meta))} · ETF 기준가 {fmt(oc.get("etf_price"),0)}{pre_note}</div>'
+    oc_info = _info("지수 레벨을 ETF의 민감도(베타)로 환산해 ETF 가격으로 바꾼 값입니다"
+                    + ((" · " + esc(" · ".join(meta))) if meta else "") + ".")
+    return (f'<div class="card"><h2>상품 주문(ETF) '
+            f'<span class="pill pill-ghost">{esc(oc.get("instrument",""))} {esc(oc.get("shcode",""))}</span>{oc_info}</h2>'
+            f'<div class="note muted">ETF 기준가 {fmt(oc.get("etf_price"),0)}{pre_note}</div>'
             f'<table class="cd-table"><thead><tr><th>레벨</th><th style="text-align:right">지수</th>'
             f'<th></th><th style="text-align:right">ETF가</th></tr></thead><tbody>'
             f'{_row("entry","진입")}{_row("stop","손절")}{_row("target","목표")}</tbody></table>'
@@ -589,7 +588,7 @@ def build_performance(r: dict) -> str:
         extra += (f' · 평균 MFE {signed(mfe)}% / MAE {signed(mae)}%'
                   f' (최대 유리·불리, n={p.get("mfe_mae_n", 0)})')
     return (f'<div class="card"><h2>모델 검증 성과 {status}'
-            f'{_info("확률이 역사적으로 무엇을 의미했는지입니다. 표본이 부족하면 수치는 참고용입니다.")}</h2>'
+            f'{_info("과거 예측이 실제로 얼마나 맞았는지입니다. 적중률=맞힌 비율, Brier=확률 오차(낮을수록 정확), AUC=방향 구분력(0.5=동전던지기·1.0=완벽). 표본이 부족하면 수치는 참고용입니다.")}</h2>'
             f'<table class="cd-table"><thead><tr><th>기간</th><th style="text-align:right">표본</th>'
             f'<th style="text-align:right">적중률</th><th style="text-align:right">Brier</th>'
             f'</tr></thead><tbody>{wr}</tbody></table>{cal}'
@@ -804,15 +803,21 @@ def build_atr_plan(r: dict) -> str:
                    f'{esc(r.get("anchor_date", "전일"))} 종가 기준이다. 오늘 시가가 갭으로 벌어지면 '
                    '진입·손절 거리가 달라지므로 개장 후 재계산할 것.</div>'
                    if r.get("report_type") == "preopen" else "")
+    atr_info = _info(
+        "ATR = 하룻밤 사이 예상 변동폭(σ_AM)입니다. 주 타점은 '오버나이트(익일 오전) ±1σ_AM'이며, "
+        "기본 청산은 08:50 장전 재평가(시간청산)이고 손절·목표는 안전망입니다. 표의 다일(여러 날) 타점은 "
+        f"보유를 연장할 때만 참고합니다. 지수 포인트 기준의 참고 타점입니다{esc(instr_txt)}. "
+        "edge·켈리는 익일 방향확률을 손익비 승률로 간주해 계산한 값이라 목표·손절 도달 확률과는 다릅니다 "
+        "— 비중은 항상 게이트·상한 안에서. 투자 권유가 아닙니다.")
     return f"""
   <div class="card">
-    <h2>ATR 매매 플랜 <span class="pill" style="background:{dcol}">{dlabel}</span>
-      <span class="pill pill-ghost">{qual}</span>{regime_pill}</h2>
+    <h2>매매 계획 <span class="pill" style="background:{dcol}">{dlabel}</span>
+      <span class="pill pill-ghost">{qual}</span>{regime_pill}{atr_info}</h2>
     <div class="tiles">{tiles}</div>
     <div class="atr-extra">{' · '.join(extra)}</div>
     {warn}
     <div class="obs muted">{esc(obs_comment)}</div>
-    <div class="sub-h" style="margin-top:10px">참고 · 다일 보유 시 R배수 타점
+    <div class="sub-h" style="margin-top:10px">참고 · 여러 날 보유 시 타점
       <span class="pill pill-ghost">우리 전략은 오버나이트 1회</span></div>
     <div class="table-wrap">
       <table class="mini">
@@ -821,10 +826,6 @@ def build_atr_plan(r: dict) -> str:
       </table>
     </div>
     {anchor_note}
-    <div class="note muted">주 타점은 <b>오버나이트(익일 오전) ±1σ_AM</b> — 기본 청산은
-      08:50 장전 재평가(시간청산)이고 손절/목표는 안전망이다. 위 표의 다일 타점은 보유 연장 시 참고.
-      지수 포인트 기준 <b>참고</b> 타점{instr_txt}. edge·켈리는 <b>익일 방향확률(p)</b>을 손익비
-      승률로 간주한 값 — 목표·손절 도달 확률과는 다르므로 비중은 항상 게이트·상한 안에서. 투자 권유 아님.</div>
   </div>"""
 
 
@@ -1132,11 +1133,12 @@ def build_paper(r: dict) -> str:
         _tile("평균 순손익", (signed(avg) + "%") if avg is not None else "—"),
         _tile("승률", pct(wr) if wr is not None else "—"),
     ])
+    paper_info = _info("실제 주문이 아니라 가상으로 기록한 성적입니다. 종가에 사서 익일 시가에 파는 "
+                       "방식(지수로 근사)이고, 매매 왕복 비용을 뺀 순손익을 누적합니다.")
     return f"""
   <div class="card">
-    <h2>Paper 성적 <span class="pill pill-ghost">가상체결·비용차감(L1)</span></h2>
+    <h2>모의 성적 <span class="pill pill-ghost">실주문 아님</span>{paper_info}</h2>
     <div class="tiles">{tiles}</div>
-    <div class="note muted">종가 매수→익일 시가 매도(오버나이트, 지수 프록시) · 실주문 아님 · 왕복비용 차감.</div>
   </div>"""
 
 
@@ -1387,7 +1389,7 @@ def build_report_text(r: dict) -> str:
         if r.get("p_up_raw") is not None:
             note = f" (원시 {pct(r['p_up_raw'])} → 캘리브 {pct(r.get('p_up'))}"
             if cal.get("source") and cal["source"] != "sot":
-                note += f" · {cal['source']} n={cal.get('n')} · 단일 상승레짐 기저율 앵커, 하락장 미검증"
+                note += f" · {cal['source']} n={cal.get('n')} · 단일 상승장 기저율 앵커, 하락장 미검증"
             L.append("-" + note + ")")
     # 진입 판정 — 상단 blocked(entry.allow=False OR preopen_state in NO_TRADE/EXIT_OPEN)를 따른다.
     # 개장전 EXIT_OPEN 은 entry.allow 가 전일값이라 True 로 남으므로 원시 allow 를 쓰면 같은 복사
@@ -2067,7 +2069,11 @@ def _btc_mtf_table(r: dict) -> str:
             v = (mtf.get(tf) or {}).get(k)
             rows += f'<td style="text-align:right">{fmt(v, 2) if isinstance(v, float) else (v if v is not None else "—")}</td>'
         rows += "</tr>"
-    return f'<div class="card"><h2>MTF 지표</h2><table class="cd-table"><thead>{head}</thead><tbody>{rows}</tbody></table></div>'
+    mtf_info = _info("여러 시간대(1시간·4시간·일)의 기술적 보조지표 모음입니다. RSI·MACD·Stoch 등은 "
+                     "추세와 과열/과매도를 보는 지표로, 중급 이상 참고용입니다.")
+    return (f'<div class="card"><h2>여러 시간대 기술지표{mtf_info}</h2>'
+            f'<div class="table-wrap"><table class="cd-table"><thead>{head}</thead>'
+            f'<tbody>{rows}</tbody></table></div></div>')
 
 
 def render_report_view(r: dict, date: str) -> str:
@@ -2598,6 +2604,8 @@ TEMPLATE = r"""<!doctype html>
   .donut .inner{width:86px;height:86px;border-radius:50%;background:var(--surface);display:grid;place-items:center;font-weight:800;font-size:1.3rem;font-variant-numeric:tabular-nums}
   .donut-na{background:var(--surface2)}
   .hero-note{grid-column:1/-1;text-align:center;font-size:.76rem;color:var(--muted);margin-top:-4px}
+  .hero-note.hero-caution{color:var(--caution);font-size:.8rem}
+  .hero-note .info{vertical-align:baseline}
 
   /* 신뢰도 칩 */
   .conf-row{display:flex;gap:10px;flex-wrap:wrap;margin:-6px 0 14px}
