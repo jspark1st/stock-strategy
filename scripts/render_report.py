@@ -16,8 +16,10 @@
 """
 from __future__ import annotations
 
+import datetime as _dt
 import html
 import json
+import re as _re
 import sys
 from pathlib import Path
 
@@ -111,6 +113,38 @@ def _info(text: str) -> str:
         return ""
     return (f'<button class="info" type="button" aria-label="설명 보기">i'
             f'<span class="info-pop">{text}</span></button>')
+
+
+_WEEKDAY_KR = ["월", "화", "수", "목", "금", "토", "일"]
+
+
+def _fmt_date_kr(d: str) -> str:
+    """YYYY-MM-DD → 'M월 D일 (요일)'. 실패하면 빈 문자열."""
+    try:
+        y, m, dd = str(d).split("-")
+        wd = _WEEKDAY_KR[_dt.date(int(y), int(m), int(dd)).weekday()]
+        return f"{int(m)}월 {int(dd)}일 ({wd})"
+    except Exception:  # noqa
+        return ""
+
+
+def _time_from_as_of(as_of) -> str:
+    """as_of 문자열에서 HH:MM 을 뽑는다. 예 '2026-08-31 08:00 KST' → '08:00'."""
+    m = _re.search(r"(\d{1,2}:\d{2})", str(as_of or ""))
+    return m.group(1) if m else ""
+
+
+def _datetime_chip(r: dict, slot_time: str = "") -> str:
+    """리포트 날짜·기준시각을 크게 보이는 칩으로 — 초보자가 '언제 것'인지 한눈에."""
+    td = str(r.get("trade_date") or "")
+    if not td:
+        return ""
+    t = slot_time or _time_from_as_of(r.get("as_of"))
+    dkr = _fmt_date_kr(td)
+    date_txt = f"{td} · {dkr}" if dkr else td
+    time_html = f'<span class="dt-time">🕐 {esc(t)} KST 기준</span>' if t else ""
+    return (f'<div class="dt-chip"><span class="dt-date">📅 {esc(date_txt)}</span>'
+            f'{time_html}</div>')
 
 
 # ── 뷰 부품 ─────────────────────────────────────────────────────────────────
@@ -1656,10 +1690,9 @@ def build_review_card(r: dict) -> str:
     if not allf:
         return ""
     return (f'<div class="card"><h2>리포트 자가비평 '
-            f'<span class="pill pill-ghost">{len(allf)}건</span></h2>'
-            f'<ul class="rv-list">{_review_items_html(allf)}</ul>'
-            f'<div class="note muted">규칙 기반(결정론) + Gemini 비평 · 자동 반영 아님 — '
-            f'개선 백로그로 누적해 보고서를 점진 강화</div></div>')
+            f'<span class="pill pill-ghost">{len(allf)}건</span>'
+            f'{_info("규칙 기반(결정론) 점검 + Gemini 비평입니다. 자동 반영이 아니라, 개선 백로그로 누적해 보고서를 점진적으로 강화합니다.")}</h2>'
+            f'<ul class="rv-list">{_review_items_html(allf)}</ul></div>')
 
 
 def build_review_view(bundle: dict) -> str:
@@ -1689,10 +1722,9 @@ def build_review_view(bundle: dict) -> str:
             f'<span class="rv-title">{esc(d.get("title") or "")}</span></div></li>'
             for d in rec[:12])
         blocks.append(f'<div class="card"><h2>개선 백로그(누적 반복) '
-                      f'<span class="pill pill-ghost">{dg.get("n_total", 0)}건</span></h2>'
-                      f'<ul class="rv-list">{rows}</ul>'
-                      f'<div class="note muted">규칙 발견이 반복될수록 구조적 결함 → 우선 개선 대상. '
-                      f'누적본은 월간 다이제스트로도 보고.</div></div>')
+                      f'<span class="pill pill-ghost">{dg.get("n_total", 0)}건</span>'
+                      f'{_info("규칙 발견이 반복될수록 구조적 결함일 가능성이 커 우선 개선 대상입니다. 누적본은 월간 다이제스트로도 보고합니다.")}</h2>'
+                      f'<ul class="rv-list">{rows}</ul></div>')
     body = "".join(blocks) or ('<div class="card"><p class="muted">오늘 비평 항목 없음 — '
                                '파이프라인 재실행 후 채워진다.</p></div>')
     return (f'<div class="view-head"><div class="view-title">리포트 자가비평 '
@@ -1754,7 +1786,8 @@ def render_btc_view(r: dict, date: str) -> str:
             if r.get("clip_bound") else "")
     return f"""
     <div class="view-head">
-      <div class="view-title">BTCUSDT <span class="view-sub">· 비트코인 선물 · {esc(r.get("trade_date", date))} {slot}</span> {_status_badge(r)}</div>
+      <div class="view-title">BTCUSDT <span class="view-sub">· 비트코인 선물</span> {_status_badge(r)}</div>
+      {_datetime_chip(r, slot_time=_btc_hhmm(slot))}
       {picker}
       <div class="basis"><span class="basis-k">기준</span> {as_of} · 마크 {fmt(mark,1)} ({chg_html})
         · {esc(r.get("nasdaq_txt") or "")} · 실시간 아님
@@ -1829,15 +1862,18 @@ def _btc_conv_card(r: dict) -> str:
     if sa is not None:
         metrics.append(f'가중 일치도 <b>{sa*100:.0f}%</b> (확률 수축용)')
     met_html = '<div class="note muted">' + " · ".join(metrics) + "</div>"
+    conv_info = _info(
+        "세 숫자는 분모가 다릅니다. 관점 다수결=방향을 낸 팩터, "
+        f"코어 정렬=기술·파생·체결이 추천 방향과 같은 개수(필요 {need}), "
+        "가중 일치도=확률 수축용. 괴리가 나면 차트·규제를 심리보다 우선합니다.")
     return f"""
     <div class="card">
-      <h2>수렴 / 괴리 <span class="pill pill-ghost">{kind} · 확신도 {conf}</span></h2>
+      <h2>수렴 / 괴리 <span class="pill pill-ghost">{kind} · 확신도 {conf}</span>{conv_info}</h2>
       <p class="headline">{esc(c.get("sentence") or "")}</p>
       {pri_html}
       {met_html}
       <div class="conf-row" style="margin-top:10px">{chips}</div>
       <table class="cd-table"><thead><tr><th>관점</th><th>신호</th></tr></thead><tbody>{rows}</tbody></table>
-      <div class="note muted">세 숫자는 분모가 다르다. 관점 다수결=방향 낸 팩터 · 코어 정렬=기술·파생·체결이 추천 방향과 같은 개수(필요 {need}) · 가중 일치도=확률 수축. 괴리면 차트·규제 &gt; 심리.</div>
     </div>"""
 
 
@@ -1861,16 +1897,17 @@ def _btc_sns_card(r: dict) -> str:
                  f'<span class="mtime">{esc(t.get("hhmm",""))}</span> {body}{why}</li>')
     ul = f'<ul class="mat-ul">{rows}</ul>' if rows else '<p class="muted">커뮤니티 토픽 없음</p>'
     bias = sns.get("bias")
+    sns_info = _info("가격을 다시 설명하거나 BTC와 무관한 항목은 극성 집계에서 제외합니다"
+                     "(차트·펀딩과 이중 계상을 막기 위해).")
     return f"""
     <div class="card">
-      <h2>SNS 토픽 <span class="pill pill-ghost">참고 · 극단 역행 · 뉴스 점수와 분리</span></h2>
+      <h2>SNS 토픽 <span class="pill pill-ghost">참고 · 극단 역행 · 뉴스 점수와 분리</span>{sns_info}</h2>
       <div class="tiles">
         {_tile("Fear&Greed", str(r.get("fng") if r.get("fng") is not None else "—"))}
         {_tile("커뮤니티 극성", f"{bias:+.2f}" if bias is not None else "결측")}
         {_tile("극성 집계", f"{sns.get('pos',0)}호/{sns.get('neg',0)}악 · {sns.get('counted',0)}/{sns.get('n',0)}건")}
       </div>
       {ul}
-      <div class="note muted">가격 재서술·BTC 무관 항목은 극성에서 제외한다(차트·펀딩과 이중 계상 방지).</div>
     </div>"""
 
 
@@ -2003,15 +2040,15 @@ def _btc_pos_card(r: dict) -> str:
     ls_g, ls_t = r.get("ls_global"), r.get("ls_top")
     def _ls(v):
         return f"{v:.4f}" if isinstance(v, (int, float)) else "—"
-    return (f'<div class="card"><h2>포지셔닝</h2>'
+    return (f'<div class="card"><h2>포지셔닝'
+            f'{_info("LS 글로벌(계정 수 비율)과 탑(상위 포지션 비율)은 정의가 다릅니다. 한 숫자로 섞어 쓰지 않습니다.")}</h2>'
             f'<div class="tiles">'
             f'{_tile("사분면", str(q))}'
             f'{_tile("LS 글로벌", _ls(ls_g), sub="계정 수 비율")}'
             f'{_tile("LS 탑", _ls(ls_t), sub="탑 포지션 비율 · 점수에 우선")}'
             f'{_tile("Fear&Greed", str(r.get("fng") if r.get("fng") is not None else "—"))}'
             f'{_tile("나스닥", esc(r.get("nasdaq_txt") or "—"))}'
-            f'</div>'
-            f'<div class="note muted">LS 글로벌과 탑은 정의가 다르다. 한 숫자로 섞어 쓰지 않는다.</div></div>')
+            f'</div></div>')
 
 
 def _btc_mtf_table(r: dict) -> str:
@@ -2045,7 +2082,8 @@ def render_report_view(r: dict, date: str) -> str:
                      if headline else "")
     return f"""
     <div class="view-head">
-      <div class="view-title">{label} <span class="view-sub">· {group} · {view_date}</span> {_status_badge(r)}</div>
+      <div class="view-title">{label} <span class="view-sub">· {group}</span> {_status_badge(r)}</div>
+      {_datetime_chip(r)}
       {build_stage_strip(r)}
       <div class="muted">{build_market_line(r.get('market', {}))}</div>
       {build_basis(r)}
@@ -2499,6 +2537,14 @@ TEMPLATE = r"""<!doctype html>
   .view-head{margin-bottom:16px}
   .view-title{font-size:1.5rem;font-weight:800}
   .view-sub{font-size:.9rem;font-weight:500;color:var(--muted)}
+  /* 날짜·기준시각 칩 — '언제 것인지' 크게 보이게 */
+  .dt-chip{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+  .dt-chip span{font-size:.9rem;font-weight:700;padding:6px 13px;border-radius:999px;
+    background:var(--surface2);border:1px solid var(--border);color:var(--text);
+    font-variant-numeric:tabular-nums;line-height:1.3}
+  .dt-chip .dt-time{color:var(--accent);
+    border-color:color-mix(in srgb,var(--accent) 42%,var(--border));
+    background:color-mix(in srgb,var(--accent) 12%,var(--surface2))}
   .muted{color:var(--muted)}
   .badge{font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap}
   .badge-warn{background:color-mix(in srgb,var(--neutral) 20%,transparent);color:var(--neutral)}
@@ -2592,10 +2638,13 @@ TEMPLATE = r"""<!doctype html>
 
   /* ⓘ 정보 팝오버 — 복잡한 설명/방법론을 표면에서 숨기고 탭/호버 시에만 노출(초보자 가독성) */
   .info{position:relative;display:inline-flex;align-items:center;justify-content:center;
-    width:16px;height:16px;border-radius:50%;border:1px solid var(--border);background:var(--surface2);
-    color:var(--muted);font-size:.7rem;font-weight:800;font-style:normal;line-height:1;padding:0;
-    cursor:pointer;flex:0 0 auto;vertical-align:middle;-webkit-appearance:none;appearance:none}
+    width:17px;height:17px;border-radius:50%;border:1px solid var(--border);background:var(--surface2);
+    color:var(--muted);font-size:.72rem;font-weight:800;font-style:normal;line-height:1;padding:0;
+    cursor:pointer;flex:0 0 auto;vertical-align:middle;-webkit-appearance:none;appearance:none;
+    -webkit-tap-highlight-color:transparent}
+  .info::after{content:"";position:absolute;inset:-9px}  /* 손가락 탭 영역 확대(≈35px) */
   .info:hover,.info:focus-visible{color:var(--text);border-color:var(--muted);outline:none}
+  .info.open{color:var(--text);border-color:var(--accent);background:color-mix(in srgb,var(--accent) 16%,var(--surface2))}
   .info-pop{position:absolute;top:calc(100% + 7px);left:50%;transform:translateX(-50%);z-index:40;
     display:none;width:max-content;max-width:min(280px,76vw);background:var(--surface);
     border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:.76rem;font-weight:400;
