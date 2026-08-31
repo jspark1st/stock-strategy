@@ -209,13 +209,13 @@ def test_sidebar_groups_by_asset_then_market():
     # A안(2026-08-30): 사이드바 = 자산군(주식/가상화폐) → 시장(코스피/코스닥/BTC) 2단.
     # 한 시장의 국면(장마감/개장전)은 사이드바에서 한 아이템으로 합치고 data-views 로 포섭.
     html = rr.build_sidebar([
-        {"id": "kosdaq-close", "group": "코스닥", "label": "장마감전 분석",
+        {"id": "kosdaq-close", "group": "코스닥", "label": "장 마감 전·후 분석",
          "ph": False, "total": 32.3, "grade": "위험"},
         {"id": "kospi-preopen", "group": "코스피", "label": "개장전 분석",
          "ph": False, "total": 66.2, "grade": "우호"},
         {"id": "btc-perp", "group": "비트코인 선물", "label": "BTCUSDT",
          "ph": False, "total": 57.6, "grade": "중립"},
-        {"id": "kospi-close", "group": "코스피", "label": "장마감전 분석",
+        {"id": "kospi-close", "group": "코스피", "label": "장 마감 전·후 분석",
          "ph": False, "total": 54.8, "grade": "약세"},
         {"id": "kosdaq-preopen", "group": "코스닥", "label": "개장전 분석",
          "ph": False, "total": 56.6, "grade": "중립"},
@@ -237,7 +237,7 @@ def test_sidebar_groups_by_asset_then_market():
 
 def test_view_tabs_phase_links_and_horizon():
     # A안 뷰 상단 탭: 지평(단기 활성·중기/장기 예정) + 국면(형제 뷰 링크).
-    mv = {"코스피": {"장마감전 분석": "kospi-close", "개장전 분석": "kospi-preopen"}}
+    mv = {"코스피": {"장 마감 전·후 분석": "kospi-close", "개장전 분석": "kospi-preopen"}}
     html = rr._view_tabs("코스피", "kospi-close", mv)
     # 지평 행: 단기만 활성, 나머지 예정
     assert 'vtab active">단기' in html
@@ -247,7 +247,7 @@ def test_view_tabs_phase_links_and_horizon():
     # 현재 국면(장마감)은 active 로 서버렌더(각 뷰가 제 탭을 들고 있어 JS 불필요)
     assert 'vtab active" data-target="kospi-close"' in html
     # 국면 라벨 순서: 장마감전 먼저(NAV_ITEM_ORDER)
-    assert html.index("장마감전 분석") < html.index("개장전 분석")
+    assert html.index("장 마감 전·후 분석") < html.index("개장전 분석")
 
 
 def test_preopen_placeholder_reachable_via_phase_tab():
@@ -280,7 +280,7 @@ def test_normalize_remaps_legacy_nav():
             {"id": "kospi-preopen", "group": "개장 전", "label": "코스피", "total": 2},
         ]
     })
-    assert b["reports"][0]["group"] == "코스피" and b["reports"][0]["label"] == "장마감전 분석"
+    assert b["reports"][0]["group"] == "코스피" and b["reports"][0]["label"] == "장 마감 전·후 분석"
     assert b["reports"][1]["group"] == "코스피" and b["reports"][1]["label"] == "개장전 분석"
 
 

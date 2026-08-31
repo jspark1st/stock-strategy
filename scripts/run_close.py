@@ -50,7 +50,7 @@ from src.models import (
     FlowInput, MarketSnapshot, NewsInput, ValueInput,
 )
 from src.scoring import score_close
-from render_report import render
+from render_report import render, LABEL_CLOSE
 
 KST = timezone(timedelta(hours=9))
 DB_LOCAL = ROOT / "data" / "history.db"
@@ -476,7 +476,7 @@ def build_report(cfg: dict, ls, client, conn, env, session_of: dict,
     rep = result.to_report_dict(sources=sources)
     rep["id"] = cfg["id"]
     rep["group"] = cfg["label"]          # 코스피 / 코스닥
-    rep["label"] = "장마감전 분석"
+    rep["label"] = LABEL_CLOSE            # '장 마감 전·후 분석'(15:00 잠정·16:30 확정 공용)
     rep["data_source"] = session.source
     rep["charts"] = {"index": _index_charts(market, client, session, intraday_series)}
     rep["intraday"] = intraday_block

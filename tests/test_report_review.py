@@ -6,7 +6,7 @@ from src import report_review, store
 
 
 def _report(**over):
-    base = {"id": "kospi-close", "group": "코스피", "label": "장마감전 분석",
+    base = {"id": "kospi-close", "group": "코스피", "label": "장 마감 전·후 분석",
             "trade_date": "2026-08-27", "total": 53.7, "grade": "약세",
             "p_up": 0.5755, "p_down": 0.4245,
             "calibration": {"source": "bootstrap", "n": 149, "a": 0.005},

@@ -20,7 +20,7 @@ def test_load_stock_reports_uses_latest_preopen_not_close_date(tmp_path, monkeyp
     # 마감: 금요일 08-28 (월요일 아침엔 이게 최신 마감)
     _write(tmp_path / "bundle_2026-08-28.json", {
         "trade_date": "2026-08-28",
-        "reports": [{"id": "kospi-close", "report_type": "close", "label": "장마감전 분석",
+        "reports": [{"id": "kospi-close", "report_type": "close", "label": "장 마감 전·후 분석",
                      "as_of": "2026-08-28 15:00 KST"}]})
     # 전일 개장전(08-28) — 덮어쓰면 안 되는 옛것
     old = tmp_path / "preopen_2026-08-28.json"

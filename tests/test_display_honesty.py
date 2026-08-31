@@ -106,7 +106,7 @@ def test_regime_badge_absent_for_sot_and_btc():
 
 # ── D. 전체 복사(LLM 이어붙이기) ──────────────────────────────────────
 def _full_report():
-    return {"id": "kospi-close", "label": "장마감전 분석", "group": "코스피",
+    return {"id": "kospi-close", "label": "장 마감 전·후 분석", "group": "코스피",
             "trade_date": "2026-08-27", "total": 53.7, "grade": "약세",
             "p_up": 0.5755, "p_down": 0.4245, "p_up_raw": 0.4675,
             "calibration": {"source": "bootstrap", "n": 149, "a": 0.0104},
@@ -128,7 +128,7 @@ def _full_report():
 def test_report_text_has_core_sections():
     t = rr.build_report_text(_full_report())
     # 2026-08-28: 확률 라벨이 **지평을 명시**한다("익일 시가" — 익일 종가가 아니다).
-    for must in ("# 장마감전 분석 · 코스피 · 2026-08-27", "총점 53.7", "등급 약세",
+    for must in ("# 장 마감 전·후 분석 · 코스피 · 2026-08-27", "총점 53.7", "등급 약세",
                  "익일 시가 상승확률", "항목별 점수", "종가 강도", "투자자 수급",
                  "진입 판정: 차단", "익일 시나리오", "주의 신호"):
         assert must in t, must
@@ -426,7 +426,7 @@ def test_build_overnight_respects_slope_floor():
 
 
 def test_copy_widget_and_script_in_render():
-    r2 = dict(_full_report(), id="kosdaq-close", label="장마감전 분석", group="코스닥")
+    r2 = dict(_full_report(), id="kosdaq-close", label="장 마감 전·후 분석", group="코스닥")
     html = rr.render({"trade_date": "2026-08-27", "reports": [_full_report(), r2]})
     assert html.count('class="copy-btn"') >= 2      # 코스피·코스닥 뷰 각각
     assert html.count('class="copy-src"') >= 2

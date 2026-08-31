@@ -55,7 +55,7 @@ def _is_stock_close(r: dict) -> bool:
     if i == "btc-perp" or r.get("report_type") == "btc_perp":
         return False
     return (r.get("report_type") == "close" or i.endswith("-close")
-            or lab in ("장 마감", "장마감전 분석") or g == "장 마감")
+            or lab in ("장 마감", "장마감전 분석", "장 마감 전·후 분석") or g == "장 마감")
 
 
 def _is_stock_preopen(r: dict) -> bool:
