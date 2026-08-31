@@ -104,6 +104,15 @@ def esc(x) -> str:
     return html.escape(str(x)) if x is not None else ""
 
 
+def _info(text: str) -> str:
+    """제목 옆 작은 ⓘ — 탭/호버 시 설명 팝오버. 복잡한 방법론·근거를 표면에서 숨겨 초보자
+    가독성을 높인다(핵심 숫자·판정만 표면, '왜/어떻게'는 여기로). text 는 신뢰된 정적 문자열."""
+    if not text:
+        return ""
+    return (f'<button class="info" type="button" aria-label="설명 보기">i'
+            f'<span class="info-pop">{text}</span></button>')
+
+
 # ── 뷰 부품 ─────────────────────────────────────────────────────────────────
 def build_market_line(m: dict) -> str:
     parts = []
@@ -289,10 +298,10 @@ def build_confidence(r: dict) -> str:
                      f'<b style="color:{_conf_color(dc)}">{dc*100:.0f}%</b>{note}</span>')
     if oc is not None:
         od = r.get("optional_detail") or {}
-        onote = "프로그램수급 " + ("수집" if od.get("program_net") else "미수집")
-        onote += " · 야간선물 미연동 · 미국선물 미연동"
+        onote = "프로그램 수급 " + ("수집됨" if od.get("program_net") else "미수집")
+        onote += " · 야간선물 미연동 · 미국선물 미연동 (보조 지표라 점수 비중은 낮습니다)"
         chips.append(f'<span class="conf-chip">선택 입력 '
-                     f'<b style="color:var(--muted)">{oc*100:.0f}%</b> · {onote}</span>')
+                     f'<b style="color:var(--muted)">{oc*100:.0f}%</b> {_info(onote)}</span>')
     # 확정성
     defin = "장중 잠정" if r.get("intraday_snapshot") else "마감 확정"
     dcol = "var(--neutral)" if r.get("intraday_snapshot") else "var(--good)"
@@ -306,14 +315,15 @@ def build_confidence(r: dict) -> str:
             nn, ms = cd.get("n", 0), cd.get("min_sample")
             legacy = (f'일치도 {cd["agreement"]*100:.0f}% × '
                       if cd.get("agreement") is not None else "")
-            formula = (f' <span class="muted">= 완전성 {cd["completeness"]*100:.0f}% × '
-                       f'{legacy}표본보정 {cd["sample_factor"]:.2f}'
-                       f'(표본 {nn}/{ms} — 검증 실적 아님, 부족분 할인)</span>')
+            info_txt = (f'신뢰도 = 데이터 완전성 {cd["completeness"]*100:.0f}% × {legacy}표본보정 '
+                        f'{cd["sample_factor"]:.2f} (검증 표본 {nn}/{ms}). 이 표본은 '
+                        f'적중 실적이 아니라, 데이터 품질을 검증 표본이 부족한 만큼 할인한 값입니다.')
         else:
             nn = r.get("confidence_sample_n")
-            formula = f" · 표본 {nn}" if nn is not None else ""
+            info_txt = (f'검증 표본 {nn}회.' if nn is not None
+                        else '데이터 완전성에 표본 보정을 곱한 값입니다.')
         chips.append(f'<span class="conf-chip">신뢰도 '
-                     f'<b style="color:{_conf_color(conf, 0.7, 0.4)}">{conf:.2f}</b>{formula}</span>')
+                     f'<b style="color:{_conf_color(conf, 0.7, 0.4)}">{conf:.2f}</b> {_info(info_txt)}</span>')
     if sa is not None:
         chips.append(f'<span class="conf-chip">신호 일치도 '
                      f'<b style="color:{_conf_color(sa, 0.8, 0.5)}">{sa*100:.0f}%</b></span>')
@@ -337,8 +347,8 @@ def build_contributions(r: dict) -> str:
                  f'<td style="text-align:right">{c.get("weight_eff",0)*100:.1f}%</td>'
                  f'<td style="text-align:right;color:{dir_color(-tc)}">{signed(tc)}점</td>'
                  f'<td style="text-align:right;color:{dir_color(-pp)}">{signed(pp)}%p</td></tr>')
-    return (f'<div class="card"><h2>판정 기여도 <span class="pill pill-ghost">중립 50 대비</span></h2>'
-            f'<div class="note muted">각 항목이 총점과 하락확률을 얼마나 밀었는지(하락확률 기여 = 근사)</div>'
+    return (f'<div class="card"><h2>판정 기여도 <span class="pill pill-ghost">중립 50 대비</span>'
+            f'{_info("각 항목이 총점과 하락확률을 얼마나 밀었는지 보여줍니다. 하락확률 기여는 근사치입니다.")}</h2>'
             f'<table class="cd-table"><thead><tr><th>항목</th><th style="text-align:right">점수</th>'
             f'<th style="text-align:right">가중</th><th style="text-align:right">총점기여</th>'
             f'<th style="text-align:right">하락확률기여</th></tr></thead><tbody>{rows}</tbody></table></div>')
@@ -371,8 +381,7 @@ def build_entry_gate(r: dict) -> str:
     title = "전일 종가 진입 게이트" if preopen else "종가 진입 게이트"
     note = ("개장 08:50 상태가 권위 — 아래 체크리스트는 전일 종가 시점 기록이다."
             if preopen else "전부 충족일 때만 진입(총점이 아니라 조건 조합)")
-    return (f'<div class="card"><h2>{title} {verdict}</h2>'
-            f'<div class="note muted">{note}</div>'
+    return (f'<div class="card"><h2>{title} {verdict}{_info(note)}</h2>'
             f'<ul class="gate-ul">{rows}</ul></div>')
 
 
@@ -393,8 +402,8 @@ def build_hypotheses(r: dict) -> str:
         rows += (f'<li><div class="hyp-claim">가설: {esc(h.get("claim",""))}</div>'
                  f'<div class="muted">근거: {esc(h.get("basis",""))}</div>'
                  f'<div class="muted">반증: {esc(h.get("counter",""))}</div></li>')
-    return (f'<div class="card"><h2>가설·해석 <span class="badge badge-warn">해석 · 사실 아님</span></h2>'
-            f'<div class="note muted">관측 사실·모델 판정과 구분되는 추론. 반증 조건이 나오면 폐기.</div>'
+    return (f'<div class="card"><h2>가설·해석 <span class="badge badge-warn">해석 · 사실 아님</span>'
+            f'{_info("관측 사실·모델 판정과 구분되는 추론입니다. 반증 조건이 나오면 폐기합니다.")}</h2>'
             f'<ul class="hyp-ul">{rows}</ul></div>')
 
 
@@ -414,8 +423,8 @@ def build_lineage(r: dict) -> str:
                  f'<td>{esc(m.get("as_of",""))}</td>'
                  f'<td style="color:{scol};font-weight:700">{esc(st)}</td>'
                  f'<td class="muted">{esc(m.get("scope",""))}</td></tr>')
-    return (f'<div class="card"><h2>데이터 계보 <span class="pill pill-ghost">모델 입력값 기준</span></h2>'
-            f'<div class="note muted">화면 수치 = 아래 출처·시각·상태의 값. 기사 인용치와 시점·집계가 다를 수 있음</div>'
+    return (f'<div class="card"><h2>데이터 계보 <span class="pill pill-ghost">모델 입력값 기준</span>'
+            f'{_info("화면 수치는 아래 출처·시각·상태의 값입니다. 기사 인용치와 시점·집계가 다를 수 있습니다.")}</h2>'
             f'<div style="overflow-x:auto"><table class="cd-table"><thead><tr><th>지표</th><th>출처</th>'
             f'<th>기준시각</th><th>상태</th><th>범위</th></tr></thead><tbody>{rows}</tbody></table></div></div>')
 
@@ -513,9 +522,9 @@ def build_performance(r: dict) -> str:
     # 'AUC 1.0' 이 실력으로 오인되는 것을 막는다(build_accuracy 와 동일 규율).
     if (p.get("n_total") or 0) < 40:
         return (f'<div class="card"><h2>모델 검증 성과 '
-                f'<span class="pill pill-ghost">측정 시작</span></h2>'
-                f'<p class="note muted">검증 표본 {p.get("n_total", 0)}회 — 적중률·AUC·Brier 를 '
-                f'표시하지 않는다. 40회(약 20일)가 쌓이기 전엔 성적으로 읽지 말 것.</p></div>')
+                f'<span class="pill pill-ghost">측정 시작</span>'
+                f'{_info("적중률·AUC·Brier 는 검증 표본 40회(약 20일)가 쌓이기 전엔 표시하지 않습니다. 소표본 성적을 실력으로 오인하지 않기 위해서입니다.")}</h2>'
+                f'<p class="note muted">검증 표본 {p.get("n_total", 0)}회 — 아직 성적으로 읽기엔 부족합니다.</p></div>')
     wins = p["windows"]
     wr = ""
     for w in ("20", "60", "120", "250"):
@@ -545,8 +554,8 @@ def build_performance(r: dict) -> str:
     if mfe is not None or mae is not None:
         extra += (f' · 평균 MFE {signed(mfe)}% / MAE {signed(mae)}%'
                   f' (최대 유리·불리, n={p.get("mfe_mae_n", 0)})')
-    return (f'<div class="card"><h2>모델 검증 성과 {status}</h2>'
-            f'<div class="note muted">확률이 역사적으로 무엇을 의미하는지 — 표본 부족 시 수치는 참고만</div>'
+    return (f'<div class="card"><h2>모델 검증 성과 {status}'
+            f'{_info("확률이 역사적으로 무엇을 의미했는지입니다. 표본이 부족하면 수치는 참고용입니다.")}</h2>'
             f'<table class="cd-table"><thead><tr><th>기간</th><th style="text-align:right">표본</th>'
             f'<th style="text-align:right">적중률</th><th style="text-align:right">Brier</th>'
             f'</tr></thead><tbody>{wr}</tbody></table>{cal}'
@@ -567,10 +576,10 @@ def build_preopen_state(r: dict) -> str:
     xtxt = (f'<div class="note muted">개장 후 청산 규칙: {esc(xp.get("description",""))}</div>'
             if xp.get("description") else '')
     return (f'<div class="card"><h2>개장 전 최종 결정 '
-            f'<span class="pill" style="background:{scol}">{esc(st["state"])}</span></h2>'
+            f'<span class="pill" style="background:{scol}">{esc(st["state"])}</span>'
+            f'{_info("전날 종가 진입분에 대한 개장 시점 행동입니다. 위험등급의 신규 진입은 계속 차단됩니다.")}</h2>'
             f'<div class="ov-trans"><b>{esc(st.get("action",""))}</b>'
-            f'<span class="muted"> — {esc(st.get("reason",""))}{cmtxt}</span></div>{xtxt}'
-            f'<div class="note muted">전날 종가 진입분에 대한 개장 행동. 위험등급 신규진입은 계속 차단.</div></div>')
+            f'<span class="muted"> — {esc(st.get("reason",""))}{cmtxt}</span></div>{xtxt}</div>')
 
 
 def build_conclusion(r: dict) -> str:
@@ -1065,12 +1074,12 @@ def build_accuracy(r: dict) -> str:
         _tile("실제 시가상승 빈도", pct(acc.get('primary_realized_up_rate'))),
     ]
     tiles = "".join(tile_list)
+    info_pop = _info("매일 예측을 DB에 누적하고 익일 실측으로 채점해 확률 보정에 반영합니다. "
+                     "주 지표 = 종가 매수→익일 시가 매도(실제 청산 기준). 종가→종가는 보조입니다.")
     return f"""
   <div class="card">
-    <h2>자가학습 정확도 <span class="pill pill-ghost">최근 성적</span></h2>
+    <h2>자가학습 정확도 <span class="pill pill-ghost">최근 성적</span>{info_pop}</h2>
     <div class="tiles">{tiles}</div>
-    <div class="note muted">매일 예측을 DB에 누적하고 익일 실측으로 채점 → 확률 캘리브레이션에 반영.
-      주 라벨 = <b>종가매수→익일 시가매도</b>(실제 청산 지평, 2026-08-28 전환). 종가→종가는 보조.</div>
   </div>"""
 
 
@@ -1192,8 +1201,8 @@ def build_confirm_diff(r: dict) -> str:
                     f'<span class="pill" style="background:{acol}">{esc(act["action"])}</span> '
                     f'<span class="muted">{esc(act.get("reason",""))}</span></div>')
     return (f'<div class="card confirm-diff"><h2>확정 대조 '
-            f'<span class="pill pill-ghost">{esc(cd.get("prov_as_of","15:00 KST 잠정"))} → 마감 확정</span></h2>'
-            f'<div class="note muted">주문 시점(장중 잠정) 판단이 확정치로 어떻게 바뀌었는지</div>'
+            f'<span class="pill pill-ghost">{esc(cd.get("prov_as_of","15:00 KST 잠정"))} → 마감 확정</span>'
+            f'{_info("주문 시점(장중 잠정) 판단이 마감 확정치로 어떻게 바뀌었는지 보여줍니다.")}</h2>'
             f'<table class="cd-table"><thead><tr><th>항목</th><th>잠정</th><th></th>'
             f'<th>확정</th><th>변화</th></tr></thead><tbody>{rows}</tbody></table>{act_html}</div>')
 
@@ -1262,11 +1271,11 @@ def build_overnight(r: dict) -> str:
         fut_html = (f'<div class="note muted" style="margin-top:6px">개장전 선물(실시간·참고·<b>점수 미반영</b>): '
                     f'{" · ".join(fut_items)}</div>')
     return (f'<div class="card"><h2>간밤 재평가 '
-            f'<span class="pill pill-ghost">미국장·환율 정량 반영</span></h2>'
+            f'<span class="pill pill-ghost">미국장·환율 정량 반영</span>'
+            f'{_info(f"총점·구조는 {anchor_lbl} 앵커(전일 마감)를 유지하고, 방향 확률만 간밤 미국장·환율로 유계 보정합니다.")}</h2>'
             f'{trans}{floor_note}{cm_html}<div class="note muted">{note}</div>'
             f'<table class="cd-table"><thead><tr><th>간밤 지표</th><th>등락</th><th>비중</th>'
-            f'</tr></thead><tbody>{rows}</tbody></table>{macro_html}{fut_html}'
-            f'<div class="note muted">총점·구조는 {anchor_lbl} 앵커, 방향확률만 간밤 반영(유계 보정).</div></div>')
+            f'</tr></thead><tbody>{rows}</tbody></table>{macro_html}{fut_html}</div>')
 
 
 def build_report_text(r: dict) -> str:
@@ -2581,6 +2590,21 @@ TEMPLATE = r"""<!doctype html>
   .mini th{color:var(--muted);font-weight:600;font-size:.76rem}
   .note{font-size:.78rem;margin-top:10px}
 
+  /* ⓘ 정보 팝오버 — 복잡한 설명/방법론을 표면에서 숨기고 탭/호버 시에만 노출(초보자 가독성) */
+  .info{position:relative;display:inline-flex;align-items:center;justify-content:center;
+    width:16px;height:16px;border-radius:50%;border:1px solid var(--border);background:var(--surface2);
+    color:var(--muted);font-size:.7rem;font-weight:800;font-style:normal;line-height:1;padding:0;
+    cursor:pointer;flex:0 0 auto;vertical-align:middle;-webkit-appearance:none;appearance:none}
+  .info:hover,.info:focus-visible{color:var(--text);border-color:var(--muted);outline:none}
+  .info-pop{position:absolute;top:calc(100% + 7px);left:50%;transform:translateX(-50%);z-index:40;
+    display:none;width:max-content;max-width:min(280px,76vw);background:var(--surface);
+    border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:.76rem;font-weight:400;
+    font-style:normal;line-height:1.55;color:var(--text);text-align:left;white-space:normal;
+    box-shadow:0 10px 28px rgba(0,0,0,.4);letter-spacing:normal}
+  .info.open .info-pop{display:block}
+  @media(hover:hover){ .info:hover .info-pop{display:block} }
+  h2 .info{margin-left:-2px}
+
   /* 시나리오 */
   .scen{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
   .scen-card{background:var(--surface2);border-radius:10px;padding:14px;font-size:.9rem}
@@ -2873,6 +2897,17 @@ TEMPLATE = r"""<!doctype html>
 
   var toTop=document.querySelector('.to-top');
   if(toTop){ window.addEventListener('scroll', function(){ toTop.hidden = window.scrollY < 400; }, {passive:true}); }
+
+  /* ⓘ 정보 팝오버 — 탭하면 열고, 다른 곳/다른 ⓘ 누르면 닫힌다(모바일 대응) */
+  document.addEventListener('click', function(e){
+    var b = e.target.closest ? e.target.closest('.info') : null;
+    var opened = document.querySelectorAll('.info.open');
+    for(var i=0;i<opened.length;i++){ if(opened[i]!==b) opened[i].classList.remove('open'); }
+    if(b){ e.preventDefault(); e.stopPropagation(); b.classList.toggle('open'); }
+  });
+  document.addEventListener('keydown', function(e){
+    if(e.key==='Escape'){ var o=document.querySelectorAll('.info.open'); for(var i=0;i<o.length;i++) o[i].classList.remove('open'); }
+  });
 
   syncThemeMeta();
   var s=startId(); if(s) activate(s);
