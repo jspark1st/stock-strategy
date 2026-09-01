@@ -2695,10 +2695,10 @@ TEMPLATE = r"""<!doctype html>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <meta name="apple-mobile-web-app-title" content="준스탁"/>
 <meta name="application-name" content="준스탁"/>
-<link rel="icon" href="/icons/favicon.svg" type="image/svg+xml"/>
-<link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png"/>
-<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png"/>
-<link rel="manifest" href="/manifest.webmanifest"/>
+<link rel="icon" href="/icons/favicon.svg?v=2" type="image/svg+xml"/>
+<link rel="icon" href="/icons/favicon-32.png?v=2" sizes="32x32" type="image/png"/>
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=2"/>
+<link rel="manifest" href="/manifest.webmanifest?v=2"/>
 <title>준스탁 {{DATE}}</title>
 <script>try{var t=localStorage.getItem('theme');if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
 <style>
@@ -3072,7 +3072,7 @@ TEMPLATE = r"""<!doctype html>
 <a class="skip-link" href="#main">본문으로 건너뛰기</a>
 <div class="app">
   <aside class="sidebar" id="sidebar" aria-label="사이드바">
-    <div class="brand"><img class="brand-mark" src="/icons/favicon.svg" width="36" height="36" alt=""/>준스탁</div>
+    <div class="brand"><img class="brand-mark" src="/icons/favicon.svg?v=2" width="36" height="36" alt=""/>준스탁</div>
     <div class="brand-sub">by junaitech</div>
     <div class="date-nav cal-wrap"><label class="slot-lab">📅 날짜
       <select class="stock-datesel" aria-label="날짜 선택" onchange="if(this.value) location=this.value">
@@ -3090,7 +3090,7 @@ TEMPLATE = r"""<!doctype html>
     <div class="topnav">
       <button class="hamb" type="button" aria-label="메뉴 열기" aria-expanded="false"
         aria-controls="sidebar" onclick="window.__toggleSidebar()">☰</button>
-      <img class="brand-mark" src="/icons/favicon.svg" width="28" height="28" alt=""/><strong>준스탁</strong>
+      <img class="brand-mark" src="/icons/favicon.svg?v=2" width="28" height="28" alt=""/><strong>준스탁</strong>
     </div>
     {{VIEWS}}
     <p class="disc">투자 판단의 참고 자료이며 투자 권유가 아님.</p>

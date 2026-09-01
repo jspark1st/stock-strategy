@@ -1,19 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="준스탁">
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#1b8f86"/>
-      <stop offset="1" stop-color="#082c34"/>
-    </linearGradient>
-    <radialGradient id="glow" cx="0.28" cy="0.24" r="0.6">
-      <stop offset="0" stop-color="#35c9b4" stop-opacity="0.30"/>
-      <stop offset="1" stop-color="#35c9b4" stop-opacity="0"/>
-    </radialGradient>
-  </defs>
-  <rect width="512" height="512" rx="120" fill="url(#bg)"/>
-  <rect width="512" height="512" rx="120" fill="url(#glow)"/>
-  <!-- 상승 화살표 차트 -->
-  <polyline points="82,358 189,266 282,323 400,168" fill="none" stroke="#ffcf5a"
-            stroke-width="56" stroke-linecap="round" stroke-linejoin="round"/>
-  <polygon points="432,126 429,252 311,162" fill="#ffcf5a"/>
-  <circle cx="82" cy="358" r="30" fill="#ffffff"/>
+  <!-- ㅈ 모노그램 (2026-09-01 확정) — 앰버 지평선 · 화이트 밤(종가 매수) · 레드 아침 상승(시가 매도) -->
+  <rect width="512" height="512" rx="120" fill="#141311"/>
+  <rect x="75" y="75" width="362" height="59" rx="29.5" fill="#fab219"/>
+  <path d="M256 176 L133 437" stroke="#e8e6e3" stroke-width="69" stroke-linecap="round" fill="none"/>
+  <path d="M256 176 L379 437" stroke="#e5484d" stroke-width="69" stroke-linecap="round" fill="none"/>
 </svg>
