@@ -1741,6 +1741,70 @@ def build_review_view(bundle: dict) -> str:
             f'</div>{body}')
 
 
+def _btc_direction_band(total: float | None) -> str:
+    """표시 전용 방향 편향 밴드 — **게이트 결합 grade_of 와 별개**(임계 불변).
+    BTC 는 midpoint 50 대칭이라 50 중심으로 서술한다(총점 54=중립-강세). 자가비평이
+    지적한 '54인데 약세' 혼선을, 등급 밴드를 안 건드리고 표시로 분리한다."""
+    if total is None:
+        return "—"
+    if total >= 71:
+        return "과열 강세"
+    if total >= 61:
+        return "강세"
+    if total >= 53:
+        return "중립-강세"
+    if total >= 48:
+        return "중립"
+    if total >= 40:
+        return "중립-약세"
+    return "약세"
+
+
+def _btc_decision_card(r: dict) -> str:
+    """판정 분해 — 방향 점수(모델) / 리스크 오버레이 / 실행(게이트) 을 분리.
+    '총점 54인데 왜 관망?' 을 즉시 이해하게 한다(등급·확률·차단을 한 라벨로 뭉치지 않음)."""
+    if r.get("report_type") != "btc_perp":
+        return ""
+    total = r.get("total")
+    if total is None:
+        return ""
+    gate = r.get("gate") or {}
+    reasons = gate.get("reasons") or []
+    verdict = r.get("verdict") or "NO_TRADE"
+    blocked = bool(gate.get("new_entry_blocked") or verdict == "NO_TRADE")
+    overlay = "관망 우세" if blocked else "없음"
+    reason_txt = " · ".join(reasons[:3])
+    note = (f'<div class="note muted">차단 사유 · {esc(reason_txt)}</div>'
+            if blocked and reason_txt else "")
+    return (
+        '<div class="card"><h2>판정 분해'
+        + _info("방향 점수(모델 예측)와 실행(거래 게이트)은 별개입니다. 점수가 강세여도 "
+                "일봉 과열·매크로·쏠림이 겹치면 실행은 관망합니다.")
+        + '</h2><div class="tiles">'
+        + _tile("방향 점수", fmt(total), sub=_btc_direction_band(total))
+        + _tile("리스크 오버레이", overlay)
+        + _tile("실행", esc(verdict))
+        + '</div>' + note + '</div>')
+
+
+def build_btc_reopen(r: dict) -> str:
+    """BTC 재검토 체크리스트 — **실제 게이트 차단 사유(gate_reasons)에서 결정론 생성**.
+    예전엔 LLM 자유서술이라 실제 차단 조건(괴리·확신도)이 아닌 엉뚱한 조건(일치도)을 적어
+    자가비평이 '임계 모순' 으로 지적했다. 이제 막는 것과 재개 조건이 항상 일치한다."""
+    gate = r.get("gate") or {}
+    reasons = gate.get("reasons") or []
+    blocked = bool(gate.get("new_entry_blocked") or (r.get("verdict") or "") == "NO_TRADE")
+    if not blocked:
+        return ""
+    items = "".join(f"<li>{esc(x)}</li>" for x in reasons) or "<li>게이트 차단(사유 미기록)</li>"
+    return (
+        '<div class="card"><h2>신규 진입을 막는 조건'
+        + _info("아래는 이번 회차에서 실제로 진입을 막은 게이트 사유입니다. 다음 발행에서 "
+                "이것들이 해소되면 진입을 재평가합니다. 임계는 게이트가 판정합니다.")
+        + f'</h2><ul class="check">{items}</ul>'
+        + '<div class="note muted">다음 발행에서 위 사유가 모두 해소되면 신규 진입 재평가.</div></div>')
+
+
 def render_btc_view(r: dict, date: str) -> str:
     """BTCUSDT 전용 뷰. ETF/HTS/수급/3단계 루프 없음."""
     nar = r.get("narrative", {}) or {}
@@ -1804,6 +1868,7 @@ def render_btc_view(r: dict, date: str) -> str:
     {headline_html}
     <div class="card hero">{build_hero(r)}</div>
     {clip}
+    {_btc_decision_card(r)}
     {conv_html}
     {concl}
     {targets}
@@ -1819,7 +1884,7 @@ def render_btc_view(r: dict, date: str) -> str:
     {build_materials(r)}
     {build_accuracy(r)}
     {build_paper(r)}
-    {build_reopen(r)}"""
+    {build_btc_reopen(r)}"""
 
 
 def _btc_conv_card(r: dict) -> str:
@@ -2051,7 +2116,7 @@ def _btc_pos_card(r: dict) -> str:
     def _ls(v):
         return f"{v:.4f}" if isinstance(v, (int, float)) else "—"
     return (f'<div class="card"><h2>포지셔닝'
-            f'{_info("LS 글로벌(계정 수 비율)과 탑(상위 포지션 비율)은 정의가 다릅니다. 한 숫자로 섞어 쓰지 않습니다.")}</h2>'
+            f'{_info("출처 Binance USD-M. LS 글로벌(계정 수 비율)과 탑(상위 포지션 비율)은 정의(분모)가 다릅니다. 한 숫자로 섞어 쓰지 않습니다.")}</h2>'
             f'<div class="tiles">'
             f'{_tile("사분면", str(q))}'
             f'{_tile("LS 글로벌", _ls(ls_g), sub="계정 수 비율")}'

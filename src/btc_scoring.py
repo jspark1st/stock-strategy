@@ -167,7 +167,8 @@ def score_deriv(funding_now: float | None, funding_avg: float | None,
     otxt = f"{oi_chg*100:+.1f}%" if oi_chg is not None else "—"
     o30 = f" · 30일비 {oi_chg_30d*100:+.1f}%" if oi_chg_30d is not None else ""
     axis = "세션" if oi_chg_session is not None else "30일"
-    observed = f"펀딩 {ftxt} · OI {axis} {otxt}{o30 if axis == '세션' else ''} · {q}"
+    observed = (f"펀딩 {ftxt}(8h) · OI {axis} {otxt}{o30 if axis == '세션' else ''} · {q}"
+                f" · Binance USD-M")
     comment = {"Q1": "롱 군집", "Q2": "숏 군집", "Q3": "롱 청산", "Q4": "숏 청산"}.get(q, "파생 중립")
     if extreme:
         comment += " · 극단 역행"

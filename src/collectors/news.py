@@ -450,7 +450,15 @@ def _dedup_events(mats: list[Material]) -> list[Material]:
 _BTC_SKIP_HOST = ("listverse.com", "boredpanda.com", "buzzfeed.com", "ranker.com")
 _BTC_SKIP_RE = re.compile(
     r"(?:straight out of hollywood|heists?(?:\s+and|\s+that)|"
-    r"history of (?:the )?(?:biggest|greatest)|listicle|clickbait)",
+    r"history of (?:the )?(?:biggest|greatest)|listicle|clickbait|"
+    # 해킹 '통계·역사·리스트·회고' — 방향 재료 아님(라이브 단일 해킹은 _tag_btc 가 악재 유지).
+    # 'top N'(숫자 필수)·biggest·history 등 리스트 신호가 있어야 매칭 → 라이브 단발 해킹은 제외 안 함.
+    r"(?:biggest|greatest|worst|top \d+|history of|list of)[\w\s]{0,24}hacks|"
+    r"hacks (?:of \d{4}|in history|of all time|ranked|explained)|"
+    r"hack (?:report|roundup|statistics|list)|"
+    # 알트코인 프리세일·홍보성 SEO — BTC 방향과 무관.
+    r"presale|pre-sale|best (?:crypto|coins?|altcoins?|tokens?) to buy|"
+    r"next (?:bitcoin|big|100x)|\b100x\b|hidden gem|to buy (?:now|today|in \d{4}))",
     re.I)
 
 

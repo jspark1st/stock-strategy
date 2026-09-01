@@ -714,3 +714,41 @@ def test_tech_comment_matches_score_direction():
             "macd_hist": -1, "rsi": 44, "adx": 18, "st_dir": -1}
     td = score_tech(down)
     assert _side_of(td["score"]) == "Short" and "약세" in td["comment"]
+
+
+def test_btc_direction_band_display_decoupled_from_grade():
+    """자가비평 '54인데 약세' 혼선: 표시용 방향 밴드는 midpoint 50 대칭 기준(등급밴드와 별개)."""
+    import render_report as rr
+    assert rr._btc_direction_band(54.4) == "중립-강세"   # grade_of 로는 '약세'
+    assert rr._btc_direction_band(50) == "중립"
+    assert rr._btc_direction_band(72) == "과열 강세"
+    assert rr._btc_direction_band(38) == "약세"
+
+
+def test_btc_reopen_derived_from_gate_reasons():
+    """재검토 체크리스트는 LLM 자유서술이 아니라 실제 gate_reasons 에서 생성 —
+    막는 것과 재개 조건이 항상 일치(자가비평 '임계 모순' 해소)."""
+    import render_report as rr
+    blocked = {"report_type": "btc_perp", "verdict": "NO_TRADE",
+               "gate": {"new_entry_blocked": True,
+                        "reasons": ["수렴 게이트(괴리·확신도 Low) — 관망",
+                                    "과열 추격 금지(4H RSI 82≥80) — 관망"]}}
+    h = rr.build_btc_reopen(blocked)
+    assert "수렴 게이트(괴리·확신도 Low)" in h and "과열 추격 금지" in h
+    # 진입 허용이면 체크리스트 없음
+    ok = {"report_type": "btc_perp", "verdict": "LONG",
+          "gate": {"new_entry_blocked": False, "reasons": []}}
+    assert rr.build_btc_reopen(ok) == ""
+
+
+def test_news_filter_excludes_hack_stats_and_presale():
+    """방향 무관 기사 점수 제외(참고): 해킹 통계·역사·프리세일 홍보.
+    단 라이브 단일 해킹은 여전히 악재로 채점(방향 재료)."""
+    from src.collectors.news import classify_kind_btc, _tag_btc
+    assert classify_kind_btc("The Biggest Crypto Hacks of 2026, Ranked") == "참고"
+    assert classify_kind_btc("Top 10 Exchange Hacks in History") == "참고"
+    assert classify_kind_btc("Best Altcoins To Buy Now Before Presale Ends") == "참고"
+    assert classify_kind_btc("Next 100x Meme Coin Presale Is Live") == "참고"
+    # 라이브 단일 해킹은 방향 재료로 유지(참고 아님)
+    assert classify_kind_btc("Major exchange hacked, $200M drained") == "재료"
+    assert _tag_btc("Major exchange hacked, $200M drained") == "악재"
