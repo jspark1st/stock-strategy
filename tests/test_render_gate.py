@@ -34,13 +34,15 @@ def _report(entry_allow, grade_blocked, kelly=8.5):
 
 
 def test_atr_card_respects_full_entry_gate():
-    """등급 통과·진입게이트 차단 → '진입 자격 ✓' 아님, 권장비중 0%, 실행수단 미표시."""
+    """등급 통과·진입게이트 차단 → 타점·손절·목표 **비공개**(2026-09-01 사용자 결정 —
+    '관망' 옆에 실행 가격을 노출하지 않는다). 차단 사유·재평가 시점만 표시."""
     html = rr.build_atr_plan(_report(entry_allow=False, grade_blocked=False))
     assert "진입 자격 ✓" not in html            # 모순 표시 제거
     assert "진입 게이트 차단" in html             # 권위 게이트 따름
     assert "실제 체결 수단" not in html           # 차단 시 체결수단 미표시
-    # 권장비중 0%(등급 배수 50% × 켈리로 8.5% 였으나 진입 차단이므로 실효 0)
-    assert ">0%<" in html
+    assert "비공개" in html                       # 실행 가격 숨김
+    assert "진입가" not in html and "손절가" not in html and "목표가" not in html
+    assert "신규 진입을 막는 조건" in html         # 빈자리엔 차단 사유·재개 조건
 
 
 def test_reconcile_atr_gates_data_at_source():
@@ -127,11 +129,12 @@ def _order_card_report(entry_allow, grade_blocked=False, preopen_state=None):
 
 
 def test_order_card_suppresses_hts_when_entry_blocked():
-    """진입 게이트 차단이면 HTS 고급매도설정(실행 세팅) 미표시 — 매매결론·ATR 카드와 정합."""
+    """진입 게이트 차단이면 HTS 세팅은 물론 **환산 가격표까지 비공개**(2026-09-01 결정)."""
     html = rr.build_order_card(_order_card_report(entry_allow=False))
     assert "고급매도설정 추천" not in html      # 100% 자동매도 세팅 노출 금지
     assert "가능수량 100%" not in html
-    assert "진입 게이트 차단" in html            # 명시 강등
+    assert "주문 없음" in html and "진입이 허용된 회차에만" in html
+    assert "cd-arrow" not in html                 # 지수→ETF 환산표 행 자체 숨김
 
 
 def test_order_card_suppressed_on_no_trade_preopen():
@@ -301,14 +304,17 @@ def test_preopen_order_card_copied_from_close_on_normalize():
 
 
 def test_preopen_order_card_renders_reference_table():
-    r = _order_card_report(entry_allow=False)
+    """개장전 카드: **허용 상태면** 앵커 환산표 표시, 차단이면 비공개(2026-09-01 결정)."""
+    r = _order_card_report(entry_allow=True)
     r["id"] = "kospi-preopen"
     r["report_type"] = "preopen"
     html = rr.build_order_card(r)
-    assert "상품 주문(ETF)" in html
-    assert "KODEX 200" in html
-    assert "전일 마감 앵커 환산" in html
-    assert "고급매도설정 추천" not in html
+    assert "상품 주문(ETF)" in html and "KODEX 200" in html
+    assert "전일 마감 앵커 환산" in html            # 허용 시 앵커 환산 유지
+    rb = _order_card_report(entry_allow=False)
+    rb["id"] = "kospi-preopen"; rb["report_type"] = "preopen"
+    hb = rr.build_order_card(rb)
+    assert "전일 마감 앵커 환산" not in hb and "주문 없음" in hb
 
 
 def test_build_paper_placeholder_when_no_trades():
@@ -370,3 +376,25 @@ def test_paper_card_placeholder_keeps_market_parity():
     filled = rr.build_paper({"paper": {"n": 3, "cum_net_pct": 1.2, "avg_net_pct": 0.4,
                                        "win_rate": 0.67}})
     assert "모의 성적" in filled and "3회" in filled
+
+
+def test_trade_state_card_authoritative(monkeypatch=None):
+    """실행 상태 단일 카드(10초 의사결정, 2026-09-01) — 권위 값만 표시:
+    차단→관망·현금/0%/사유, 허용→진입 허용/켈리%, preopen NO_TRADE→관망·현금."""
+    blocked = {"gate": {"new_entry_blocked": False},
+               "entry": {"allow": False, "blocked_reasons": ["방향 확률 임계", "신뢰도 임계"]},
+               "confidence": 0.52, "accuracy": {"n": 9}}
+    h = rr.build_trade_state(blocked)
+    assert "관망·현금" in h and ">0%<" in h
+    assert "방향 확률 임계" in h                 # 차단 사유 노출
+    assert "측정중(n" in h                       # 신뢰도 n<40 규율
+    allowed = {"gate": {"new_entry_blocked": False}, "entry": {"allow": True},
+               "confidence": 0.9, "accuracy": {"n": 50},
+               "atr": {"primary": {"kelly_pct": 8.0}}}
+    ha = rr.build_trade_state(allowed)
+    assert "진입 허용" in ha and "8%" in ha
+    pre = {"gate": {"new_entry_blocked": False}, "entry": {"allow": True},
+           "preopen_state": {"state": "NO_TRADE", "reason": "재료 미충족"},
+           "report_type": "preopen", "confidence": 0.5, "accuracy": {"n": 9}}
+    hp = rr.build_trade_state(pre)
+    assert "관망·현금" in hp and "09:00 개장 확인" in hp and "재료 미충족" in hp

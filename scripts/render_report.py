@@ -510,10 +510,17 @@ def build_order_card(r: dict) -> str:
     if oc.get("disparity_pct") is not None: meta.append(f"NAV괴리 {oc['disparity_pct']:+.2f}%")
     if oc.get("spread") is not None: meta.append(f"스프레드 {oc['spread']}")
     warns = "".join(f"<li>{esc(w)}</li>" for w in (oc.get("warnings") or []))
-    hts_block = ('<div class="atr-warn" style="margin-top:8px">진입 게이트 차단 — '
-                 '신규 진입·자동매도 설정 없음(관망/현금). 위 지수↔ETF 환산은 참고용이며, '
-                 '보유분이 있을 때만 관리에 쓰세요.</div>'
-                 if no_position else build_hts_sell(oc))
+    # 차단/관망이면 **환산 가격표까지 비공개** — "관망" 옆의 진입·손절·목표 ETF가는 결국
+    # 실행 가격으로 읽힌다(외부 비평·BTC 트랙 정합, 사용자 결정 2026-09-01).
+    if no_position:
+        return (f'<div class="card"><h2>상품 주문(ETF) '
+                f'<span class="pill pill-ghost">{esc(oc.get("instrument",""))} {esc(oc.get("shcode",""))}</span>'
+                f'<span class="pill" style="background:var(--caution)">주문 없음</span>'
+                f'{_info("진입 게이트가 닫힌 회차에는 실행 가격(진입·손절·목표 ETF가)을 노출하지 않습니다. 허용 회차에만 지수→ETF 환산표와 자동매도 설정이 표시됩니다.")}</h2>'
+                f'<p class="note muted">신규 주문·자동매도 설정 없음(관망/현금). 지수↔ETF 환산가는 '
+                f'<b>진입이 허용된 회차에만</b> 표시합니다.</p>'
+                f'<div class="note muted">보유분이 있다면 매매 계획 카드의 차단 사유·재평가 시점을 따르세요.</div></div>')
+    hts_block = build_hts_sell(oc)
     pre_note = (' · 전일 마감 앵커 환산 — 개장 후 시가·괴리 재확인'
                 if r.get("report_type") == "preopen"
                 or (r.get("id") or "").endswith("-preopen") else "")
@@ -836,6 +843,31 @@ def build_atr_plan(r: dict) -> str:
         f"보유를 연장할 때만 참고합니다. 지수 포인트 기준의 참고 타점입니다{esc(instr_txt)}. "
         "edge·켈리는 익일 방향확률을 손익비 승률로 간주해 계산한 값이라 목표·손절 도달 확률과는 다릅니다 "
         "— 비중은 항상 게이트·상한 안에서. 투자 권유가 아닙니다.")
+    # 신규 진입이 없는 상태(차단/관망/청산)면 **타점·손절·목표 비공개** — "관망" 옆에 실행
+    # 가격이 보이면 구독자가 그 가격으로 진입한다(외부 비평·BTC 트랙 정합, 사용자 결정
+    # 2026-09-01). 보유분 관리(REDUCE/HOLD_FULL)는 기존 포지션의 손절·목표 관리용이라 유지.
+    if no_position:
+        _reasons = list(entry.get("blocked_reasons") or [])
+        if blocked and not _reasons:
+            _reasons = ["등급 게이트(위험) — 신규 진입 차단"]
+        if exit_open and not _reasons:
+            _reasons = ["개장 즉시 청산(EXIT_OPEN) — 개장전 재평가 결과" if pstate == "EXIT_OPEN"
+                        else "관망(NO_TRADE) — 개장전 재평가 결과"]
+        _items = "".join(f"<li>{esc(x)}</li>" for x in _reasons) or "<li>조건 미충족</li>"
+        _nxt = ("16:30 마감 확정 회차" if r.get("intraday_snapshot")
+                else "당일 09:00 개장 확인" if r.get("report_type") == "preopen"
+                else "익일 08:00 개장 전 재평가")
+        return f"""
+  <div class="card">
+    <h2>매매 계획 <span class="pill" style="background:{dcol}">{dlabel}</span>
+      <span class="pill pill-ghost">{qual}</span>{atr_info}</h2>
+    <p class="note muted">타점·손절·목표 <b>비공개</b> — 신규 진입이 허용된 회차에만 표시합니다
+      (관망 상태에서 실행 가격을 노출하지 않는 원칙).</p>
+    <div class="sub-h">신규 진입을 막는 조건 (해소 시 재평가)</div>
+    <ul class="check">{_items}</ul>
+    <div class="note muted">다음 재평가: {_nxt}</div>
+    {anchor_note}
+  </div>"""
     return f"""
   <div class="card">
     <h2>매매 계획 <span class="pill" style="background:{dcol}">{dlabel}</span>
@@ -2236,6 +2268,53 @@ def _btc_mtf_table(r: dict) -> str:
             f'<tbody>{rows}</tbody></table></div></div>')
 
 
+def build_trade_state(r: dict) -> str:
+    """실행 상태 단일 카드(10초 의사결정) — 등급·확률·게이트·비중이 흩어져 '약세인데 57%?'
+    로 읽히던 것을 BTC 판정분해 패턴으로 통합(사용자 승인 2026-09-01). **권위 값만** 표시:
+    실행=entry.allow+preopen_state(등급 게이트 포함), 익스포저=게이트 정합 비중, 신뢰도=confidence."""
+    gate = r.get("gate") or {}
+    entry = r.get("entry") or {}
+    ps = r.get("preopen_state") or {}
+    pstate = ps.get("state")
+    blocked_grade = bool(gate.get("new_entry_blocked"))
+    entry_blocked = entry.get("allow") is False
+    exit_open = pstate in ("NO_TRADE", "EXIT_OPEN")
+    manage = pstate in ("REDUCE", "HOLD_FULL")
+    if blocked_grade or entry_blocked or exit_open:
+        state = "개장 청산" if pstate == "EXIT_OPEN" else "관망·현금"
+        scol, expo = "var(--caution)", "0%"
+    elif manage:
+        state = "보유 일부 축소" if pstate == "REDUCE" else "보유 유지"
+        scol, expo = "var(--neutral)", "신규 0%"
+    else:
+        state, scol = "진입 허용", "var(--good)"
+        kelly = ((r.get("atr") or {}).get("primary") or {}).get("kelly_pct")
+        expo = f"{kelly:.0f}%" if kelly is not None else "—"
+    conf = r.get("confidence")
+    conf_txt = f"{conf*100:.0f}%" if isinstance(conf, (int, float)) else "—"
+    n_acc = (r.get("accuracy") or {}).get("n") or 0
+    conf_sub = "측정중(n<40)" if n_acc < 40 else "완전성×표본보정"
+    reasons = list(entry.get("blocked_reasons") or [])
+    if exit_open and ps.get("reason"):
+        reasons = [ps["reason"]] + reasons
+    if blocked_grade and not reasons:
+        reasons = ["등급 게이트(위험) — 신규 진입 차단"]
+    reason_txt = " · ".join(reasons[:3])
+    nxt = ("16:30 마감 확정" if r.get("intraday_snapshot")
+           else "09:00 개장 확인" if r.get("report_type") == "preopen"
+           else "익일 08:00 개장 전")
+    note = (f'<div class="note muted">차단 사유 · {esc(reason_txt)}</div>'
+            if reason_txt and state != "진입 허용" else "")
+    return (f'<div class="card"><h2>실행 상태'
+            f'{_info("방향 점수·확률(모델)과 매매 여부(게이트)는 별개 축입니다. 이 카드가 실행의 권위 판정이며, 아래 점수·확률 카드는 그 근거 설명입니다.")}</h2>'
+            f'<div class="tiles">'
+            + _tile("실행", state, scol)
+            + _tile("권장 익스포저", expo)
+            + _tile("판단 신뢰도", conf_txt, sub=conf_sub)
+            + _tile("다음 재평가", nxt)
+            + "</div>" + note + "</div>")
+
+
 def render_report_view(r: dict, date: str) -> str:
     if r.get("report_type") == "btc_perp" or r.get("id") == "btc-perp":
         return render_btc_view(r, date)
@@ -2259,6 +2338,7 @@ def render_report_view(r: dict, date: str) -> str:
     {headline_html}
 
     <div class="card hero">{build_hero(r)}</div>
+    {build_trade_state(r)}
     {build_confirm_diff(r)}
     {build_overnight(r)}
     {build_preopen_state(r)}
