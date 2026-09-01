@@ -177,7 +177,9 @@ def score_deriv(funding_now: float | None, funding_avg: float | None,
     # 사분면 정의를 라벨에 박는다 — Q 는 **펀딩부호×OI증감**(가격축 아님). 정교한 독자도
     # 'Q1=가격↑×OI↑' 로 오독했다(자가비평) → 명시. OI 단위는 계약(BTC, USD 명목가 아님).
     q_def = {"Q1": "OI↑·펀딩+", "Q2": "OI↑·펀딩−", "Q3": "OI↓·펀딩+", "Q4": "OI↓·펀딩−"}.get(q, "")
-    qtxt = f"{q}({q_def})" if q_def else q
+    # 'Q1' 숫자 라벨은 가격×OI 사분면으로 오독된다(자가비평 8라운드) → 해석 라벨로 교체.
+    q_label = {"Q1": "레버리지 롱군집", "Q2": "숏군집·OI↑", "Q3": "롱청산", "Q4": "숏청산"}.get(q, "")
+    qtxt = f"{q_label}({q_def})" if q_def else q
     # OI 단위는 **BTC(기초자산)** — Binance USD-M openInterest 는 계약수가 아니라 BTC 수량이다.
     observed = (f"펀딩 {ftxt}(8h) · OI {axis} {otxt}{o30 if axis == '세션' else ''} · {qtxt}"
                 f" · Binance USD-M · OI 단위 BTC(fapi raw · ×마크=명목가)")

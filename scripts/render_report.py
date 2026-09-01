@@ -1486,7 +1486,7 @@ def build_report_text(r: dict) -> str:
             (f"코어 정렬 {r.get('core_aligned')}/3 (필요 {r.get('core_needed')} · "
              f"기술·파생·체결 · {_btc_candidate_label(r)})"
              if r.get("core_needed") is not None else None),
-            f"펀딩·OI 국면 {r.get('quadrant')}" if r.get("quadrant") else None,
+            f"펀딩·OI 국면 {_quad_label(r.get('quadrant'))}" if r.get("quadrant") else None,
             f"판정 {r.get('verdict')}" if r.get("verdict") else None,
             f"다음 세션 {r.get('next_session')}" if r.get("next_session") else None,
         ) if x]
@@ -1782,6 +1782,25 @@ def _btc_direction_band(total: float | None) -> str:
     return "약세"
 
 
+_QUAD_LABEL = {"Q1": "레버리지 롱군집", "Q2": "숏군집·OI↑", "Q3": "롱청산", "Q4": "숏청산"}
+
+
+def _quad_label(q: str | None) -> str:
+    """펀딩×OI 국면을 서술 라벨로 — 'Q1' 숫자는 가격×OI 사분면 오독을 부른다(자가비평)."""
+    return _QUAD_LABEL.get(q or "", q or "—")
+
+
+def _price_oi_tile(r: dict) -> str:
+    """가격×OI(textbook) 사분면 참고 타일 — 펀딩×OI 국면과 별개(비평 A안). 관측 필드에서."""
+    obs = r.get("_gate_obs") or {}
+    q = obs.get("price_oi_quad")
+    if not q:
+        return ""
+    pc = obs.get("price_chg")
+    sub = f"가격 {pc*100:+.2f}%/세션" if pc is not None else "textbook 가격×OI"
+    return _tile("가격·OI(참고)", esc(q), sub=sub)
+
+
 def _btc_candidate_label(r: dict) -> str:
     """방향 라벨 — 진입 차단/미달이면 '추천'이 아니라 '후보(확률 미달)'로 표기.
     hero '방향 중립' 과 core '추천 Long' 이 모순돼 보이던 것 해소(자가비평). 58%는 MIN_P_EDGE."""
@@ -1863,7 +1882,7 @@ def render_btc_view(r: dict, date: str) -> str:
     concl = (f'<div class="card concl" style="border-left-color:{vcol}">'
              f'<div class="concl-badge" style="background:{vcol}">{esc(verdict)}</div>'
              f'<div class="concl-body"><div class="concl-text">{esc(nar.get("conclusion") or "")}</div>'
-             f'<div class="concl-gate">다음 세션 <b>{nxt}</b> · 펀딩·OI 국면 {esc(str(r.get("quadrant") or "—"))}'
+             f'<div class="concl-gate">다음 세션 <b>{nxt}</b> · 펀딩·OI 국면 {esc(_quad_label(r.get("quadrant")))}'
              f'{" · 게이트 차단" if blocked else ""}'
              f' · 등급배수 {esc(str((r.get("gate") or {}).get("position_scale", "—")))}'
              f' <span class="muted">(계좌 위험·확신 배수 아님)</span></div></div></div>')
@@ -2162,7 +2181,8 @@ def _btc_pos_card(r: dict) -> str:
     return (f'<div class="card"><h2>포지셔닝'
             f'{_info("출처 Binance USD-M. LS 글로벌(계정 수 비율)과 탑(상위 포지션 비율)은 정의(분모)가 다릅니다. 한 숫자로 섞어 쓰지 않습니다.")}</h2>'
             f'<div class="tiles">'
-            f'{_tile("펀딩·OI 국면", str(q), sub="가격축 아님")}'
+            f'{_tile("펀딩·OI 국면", _quad_label(q), sub="펀딩×OI(가격축 아님)")}'
+        f'{_price_oi_tile(r)}'
             f'{_tile("LS 글로벌", _ls(ls_g), sub="계정 수 비율")}'
             f'{_tile("LS 탑", _ls(ls_t), sub="탑 포지션 비율 · 점수에 우선")}'
             f'{_tile("Fear&Greed", str(r.get("fng") if r.get("fng") is not None else "—"))}'

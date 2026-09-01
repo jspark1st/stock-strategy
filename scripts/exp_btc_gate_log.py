@@ -68,6 +68,21 @@ def main() -> int:
     print("\n[롱 과밀(펀딩+ & OI↑)]")
     crowd = [r for r in rows if (r.get("funding") or 0) > 0 and (r.get("price_oi_quad") or "").endswith("OI↑)")]
     print(_line("펀딩+·OI↑", _stats(crowd)))
+    # 확률 보정(자가비평 #4) — 예측 방향확률 vs 실현 승률 + Brier. hit = 후보방향 R>0.
+    cal = [(r["p_long"] if r["cand_dir"] == "long" else 1 - r["p_long"],
+            1 if r["r_m2m"] > 0 else 0)
+           for r in rows if r.get("p_long") is not None and r.get("cand_dir")]
+    if cal:
+        brier = sum((p - h) ** 2 for p, h in cal) / len(cal)
+        print(f"\n[확률 보정] n={len(cal)} · Brier {brier:.3f} (낮을수록 좋음·0.25=무정보)")
+        for lo, hi in ((0.50, 0.55), (0.55, 0.60), (0.60, 0.65), (0.65, 0.70), (0.70, 1.01)):
+            g = [(p, h) for p, h in cal if lo <= p < hi]
+            if g:
+                pm = sum(p for p, _ in g) / len(g)
+                wr = sum(h for _, h in g) / len(g)
+                print(f"  예측 {lo*100:.0f}–{hi*100:.0f}%: n={len(g)} · 예측평균 {pm*100:.0f}% "
+                      f"· 실현승률 {wr*100:.0f}%")
+        print("  → 예측평균 ≈ 실현승률이면 보정 양호. 크게 어긋나면 캘리브레이션 재적합/임계 재검토.")
     bmean = sb.get("mean_R")
     if sb.get("n", 0) >= MIN_N and bmean is not None:
         if bmean <= 0:
