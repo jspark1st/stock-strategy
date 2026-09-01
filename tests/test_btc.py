@@ -928,3 +928,25 @@ def test_conv_card_exposes_confidence_reason():
     assert "괴리" in h                       # 반대 팩터 존재
     assert "다수결" in h and "<67%" in h      # 66.7% < 67% 노출
     assert "확신도 규칙" in h                 # 규칙 자체도 ⓘ 에 노출
+
+
+def test_btc_gate_log_enriched_fields_and_mfe_mae(tmp_path):
+    """forward-log 확장: 팩터 투표·원천수치·가격×OI·MFE/MAE 저장(검증 엔진용)."""
+    conn = store.connect(tmp_path / "h.db")
+    store.record_btc_gate(conn, {
+        "trade_date": "2026-09-01", "slot": "0930", "mark": 100000, "verdict": "NO_TRADE",
+        "blocked": True, "cand_dir": "long", "atr_dist": 1000,
+        "tech_vote": "Long", "deriv_vote": "Flat", "flow_vote": "Long", "news_vote": "Short",
+        "funding": 0.0089, "oi_raw": 108000, "oi_notional": 8.5e9,
+        "top_ls": 2.13, "global_ls": 1.02, "majority_ratio": 0.667,
+        "price_chg": 0.012, "price_oi_quad": "가Q1(가격↑OI↑)"})
+    row = store.btc_gate_rows(conn)[0]
+    assert row["tech_vote"] == "Long" and row["news_vote"] == "Short"
+    assert row["price_oi_quad"] == "가Q1(가격↑OI↑)" and row["top_ls"] == 2.13
+    # MFE/MAE: path_fn 이 구간 고/저 (102000,99000) 반환 → mfe +2.0R·mae -1.0R
+    n = store.grade_btc_gate(conn, "2026-09-01", "2200", 101000,
+                             path_fn=lambda *a: (102000.0, 99000.0))
+    assert n == 1
+    r = store.btc_gate_rows(conn)[0]
+    assert abs(r["r_m2m"] - 1.0) < 1e-6
+    assert abs(r["mfe_r"] - 2.0) < 1e-6 and abs(r["mae_r"] + 1.0) < 1e-6

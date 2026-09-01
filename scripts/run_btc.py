@@ -402,6 +402,35 @@ def build_report(now: datetime, env: dict, conn, dry_run: bool, manual: bool,
     }
     if acc:
         rep["accuracy"] = acc
+    # forward-log 관측 필드(전부 관측 전용·스코어링 무영향) — main() 이 store.record_btc_gate 로 적재.
+    _votes = {s.get("key"): btc_scoring._side_of(s.get("score"))
+              for s in (scored.get("subscores") or [])}
+    _h1s = snap.get("h1")
+    _cands = _h1s.candles if (_h1s and getattr(_h1s, "candles", None)) else []
+    _price_chg = _price_oi_quad = None
+    try:
+        if len(_cands) >= 13 and mark:
+            px_prev = _cands[-13].close   # ~12h 전(정규 슬롯 간격) 종가
+            if px_prev:
+                _price_chg = (mark - px_prev) / px_prev
+                if oi_session is not None:
+                    pu, ou = _price_chg > 0, oi_session > 0
+                    _price_oi_quad = ("가Q1(가격↑OI↑)" if pu and ou else
+                                      "가Q2(가격↓OI↑)" if (not pu) and ou else
+                                      "가Q3(가격↓OI↓)" if (not pu) and (not ou) else
+                                      "가Q4(가격↑OI↓)")
+    except Exception:  # noqa — 관측 전용
+        pass
+    _c = conv or {}
+    rep["_gate_obs"] = {
+        "tech_vote": _votes.get("tech"), "deriv_vote": _votes.get("deriv"),
+        "flow_vote": _votes.get("flow"), "env_vote": _votes.get("env"),
+        "news_vote": _votes.get("news"), "funding": funding_now, "oi_raw": oi,
+        "oi_notional": (oi * mark) if (oi and mark) else None,
+        "top_ls": ls_t.get("long_short"), "global_ls": ls_g.get("long_short"),
+        "majority_ratio": (_c.get("majority_n") / _c["directional"]) if _c.get("directional") else None,
+        "price_chg": _price_chg, "price_oi_quad": _price_oi_quad,
+    }
     return rep, _make_path_fn(snap.get("h1"))
 
 
@@ -579,7 +608,9 @@ def main() -> int:
         try:
             g = rep.get("gate") or {}
             cand = rep.get("_cand_dir") or "long"
-            store.grade_btc_gate(conn, rep["trade_date"], slot, rep.get("mark"))  # 직전 회차 R
+            store.grade_btc_gate(conn, rep["trade_date"], slot, rep.get("mark"),
+                                 path_fn=path_fn)  # 직전 회차 R + MFE/MAE(구간 고/저)
+            obs = rep.get("_gate_obs") or {}
             store.record_btc_gate(conn, {
                 "trade_date": rep["trade_date"], "slot": slot,
                 "kst": now.strftime("%Y-%m-%d %H:%M:%S"), "as_of": rep.get("as_of"),
@@ -588,7 +619,7 @@ def main() -> int:
                 "reasons": " / ".join(g.get("reasons") or []), "cand_dir": cand,
                 "p_long": rep.get("p_long"), "agreement": rep.get("signal_agreement"),
                 "core_aligned": rep.get("core_aligned"), "total": rep.get("total"),
-                "quadrant": rep.get("quadrant"), "atr_dist": rep.get("_gate_dist")})
+                "quadrant": rep.get("quadrant"), "atr_dist": rep.get("_gate_dist"), **obs})
             print(f"  게이트로그: {'차단' if g.get('new_entry_blocked') else '통과'} · "
                   f"후보 {cand} (관측 전용·누적 {store.btc_gate_count(conn)})")
         except Exception:  # noqa — 관측 전용, 파이프라인 무영향

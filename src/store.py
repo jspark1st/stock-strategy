@@ -178,8 +178,16 @@ CREATE TABLE IF NOT EXISTS btc_gate_log (
   total        REAL,
   quadrant     TEXT,
   atr_dist     REAL,        -- ATR 손절폭(R 환산 분모)
+  -- 팩터별 방향 투표(비교 그룹 분해용) + 원천 수치 + textbook 가격×OI 사분면(관측·점수 무관)
+  tech_vote    TEXT, deriv_vote TEXT, flow_vote TEXT, env_vote TEXT, news_vote TEXT,
+  funding      REAL, oi_raw REAL, oi_notional REAL, top_ls REAL, global_ls REAL,
+  majority_ratio REAL,      -- 다수결 비율(방향낸 팩터 다수비중)
+  price_chg    REAL,        -- 세션(≈12h) 가격 변화율
+  price_oi_quad TEXT,       -- 가격×OI 사분면(textbook, 펀딩×OI 국면과 별개)
   next_mark    REAL,        -- 다음 세션 마크(채점 시 채움)
   r_m2m        REAL,        -- 후보 방향 mark-to-market R = (next-mark)/dist·부호
+  mfe_r        REAL,        -- 최대 유리 이동(R) · mae_r 최대 역행(R) — 채점 시 klines 경로에서
+  mae_r        REAL,
   graded       INTEGER NOT NULL DEFAULT 0,
   UNIQUE(trade_date, slot)
 );
@@ -215,7 +223,23 @@ _MIGRATIONS = [("daily", "p_up_raw", "REAL"),
                ("daily", "outcome_open_chg_pct", "REAL"),
                ("daily", "overnight_correct", "INTEGER"),
                ("daily", "entry_allow", "INTEGER"),
-               ("daily", "entry_blocked", "TEXT")]
+               ("daily", "entry_blocked", "TEXT"),
+               # btc_gate_log forward-log 확장(2026-09-01) — 기존 라이브 테이블에 컬럼 추가.
+               ("btc_gate_log", "tech_vote", "TEXT"),
+               ("btc_gate_log", "deriv_vote", "TEXT"),
+               ("btc_gate_log", "flow_vote", "TEXT"),
+               ("btc_gate_log", "env_vote", "TEXT"),
+               ("btc_gate_log", "news_vote", "TEXT"),
+               ("btc_gate_log", "funding", "REAL"),
+               ("btc_gate_log", "oi_raw", "REAL"),
+               ("btc_gate_log", "oi_notional", "REAL"),
+               ("btc_gate_log", "top_ls", "REAL"),
+               ("btc_gate_log", "global_ls", "REAL"),
+               ("btc_gate_log", "majority_ratio", "REAL"),
+               ("btc_gate_log", "price_chg", "REAL"),
+               ("btc_gate_log", "price_oi_quad", "TEXT"),
+               ("btc_gate_log", "mfe_r", "REAL"),
+               ("btc_gate_log", "mae_r", "REAL")]
 
 
 def connect(path: str | Path) -> sqlite3.Connection:
@@ -1009,51 +1033,68 @@ def btc_options_count(conn: sqlite3.Connection) -> int:
 
 
 # ── BTC 게이트 forward-log(measure-first) — 관측 전용, 스코어링/게이트 무영향 ──────────
+_GATE_COLS = ("trade_date", "slot", "kst", "as_of", "mark", "verdict", "blocked", "reasons",
+              "cand_dir", "p_long", "agreement", "core_aligned", "total", "quadrant", "atr_dist",
+              "tech_vote", "deriv_vote", "flow_vote", "env_vote", "news_vote",
+              "funding", "oi_raw", "oi_notional", "top_ls", "global_ls", "majority_ratio",
+              "price_chg", "price_oi_quad")
+
+
 def record_btc_gate(conn: sqlite3.Connection, rec: dict) -> None:
-    """회차별 게이트 상태 1행 upsert(멱등). 다음 세션에 grade_btc_gate 가 R 을 채운다.
+    """회차별 게이트 상태 1행 upsert(멱등). 다음 세션에 grade_btc_gate 가 R·MFE/MAE 를 채운다.
     **정규 슬롯(0930/2200)만** 적재한다 — 수동 발행은 채점 지평이 없어 관측에서 뺀다."""
     if rec.get("slot") not in ("0930", "2200"):
         return
+    cols = ",".join(_GATE_COLS)
+    ph = ",".join("?" * len(_GATE_COLS))
+    upd = ",".join(f"{c}=excluded.{c}" for c in _GATE_COLS if c not in ("trade_date", "slot"))
+    vals = [(1 if rec.get(c) else 0) if c == "blocked" else rec.get(c) for c in _GATE_COLS]
     conn.execute(
-        "INSERT INTO btc_gate_log(trade_date,slot,kst,as_of,mark,verdict,blocked,reasons,"
-        "cand_dir,p_long,agreement,core_aligned,total,quadrant,atr_dist) "
-        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
-        "ON CONFLICT(trade_date,slot) DO UPDATE SET kst=excluded.kst,as_of=excluded.as_of,"
-        "mark=excluded.mark,verdict=excluded.verdict,blocked=excluded.blocked,"
-        "reasons=excluded.reasons,cand_dir=excluded.cand_dir,p_long=excluded.p_long,"
-        "agreement=excluded.agreement,core_aligned=excluded.core_aligned,total=excluded.total,"
-        "quadrant=excluded.quadrant,atr_dist=excluded.atr_dist",
-        (rec.get("trade_date"), rec.get("slot"), rec.get("kst"), rec.get("as_of"),
-         rec.get("mark"), rec.get("verdict"), 1 if rec.get("blocked") else 0,
-         rec.get("reasons"), rec.get("cand_dir"), rec.get("p_long"), rec.get("agreement"),
-         rec.get("core_aligned"), rec.get("total"), rec.get("quadrant"), rec.get("atr_dist")))
+        f"INSERT INTO btc_gate_log({cols}) VALUES({ph}) "
+        f"ON CONFLICT(trade_date,slot) DO UPDATE SET {upd}", vals)
     conn.commit()
 
 
+def _mfe_mae_r(cand: str, entry: float, dist: float, hi: float, lo: float) -> tuple:
+    """구간 고/저(hi,lo)에서 후보 방향 최대 유리/역행 이동을 R(=Δ/dist)로."""
+    if not entry or not dist or dist <= 0 or hi is None or lo is None:
+        return None, None
+    if cand == "long":
+        return round((hi - entry) / dist, 4), round((lo - entry) / dist, 4)
+    return round((entry - lo) / dist, 4), round((entry - hi) / dist, 4)
+
+
 def grade_btc_gate(conn: sqlite3.Connection, cur_trade_date: str, cur_slot: str,
-                   cur_mark: float | None) -> int:
-    """직전 미채점 회차의 후보 방향 mark-to-market R 을 이번 세션 마크로 채운다.
-    R = (next-mark − entry)/dist (long) 또는 (entry − next-mark)/dist (short). 차단·통과 무관
-    하게 후보 방향 R 을 남겨, 훗날 '게이트가 좋은 거래를 막았나 vs 손실을 걸렀나'를 비교한다.
-    반환: 채점한 행 수(0 또는 1). 정규 슬롯만 대상."""
+                   cur_mark: float | None, path_fn=None) -> int:
+    """직전 미채점 회차의 후보 방향 mark-to-market R + MFE/MAE 를 채운다.
+    R = (next-mark − entry)/dist (long) 또는 (entry − next-mark)/dist (short). MFE/MAE 는
+    path_fn(prev_date,prev_slot,cur_date,cur_slot)→(구간 고,저)에서. 차단·통과 무관하게 남겨
+    'E[R|pass] vs E[R|blocked]'를 비교한다. 반환: 채점한 행 수(0/1). 정규 슬롯만."""
     if cur_mark is None or cur_slot not in ("0930", "2200"):
         return 0
     row = conn.execute(
-        "SELECT id,mark,cand_dir,atr_dist FROM btc_gate_log WHERE graded=0 "
+        "SELECT id,trade_date,slot,mark,cand_dir,atr_dist FROM btc_gate_log WHERE graded=0 "
         "AND (trade_date < ? OR (trade_date = ? AND slot < ?)) "
         "ORDER BY trade_date DESC, slot DESC LIMIT 1",
         (cur_trade_date, cur_trade_date, cur_slot)).fetchone()
     if not row:
         return 0
-    rid, entry, cand, dist = row
+    rid, ptd, pslot, entry, cand, dist = row
     if not entry or not dist or dist <= 0 or cand not in ("long", "short"):
-        # R 산출 불가(데이터 결측) — graded 로 닫아 무한 대기 방지, R 은 NULL.
         conn.execute("UPDATE btc_gate_log SET graded=1, next_mark=? WHERE id=?", (cur_mark, rid))
         conn.commit()
         return 0
     r = (cur_mark - entry) / dist if cand == "long" else (entry - cur_mark) / dist
-    conn.execute("UPDATE btc_gate_log SET next_mark=?, r_m2m=?, graded=1 WHERE id=?",
-                 (cur_mark, round(r, 4), rid))
+    mfe = mae = None
+    if path_fn is not None:
+        try:
+            hilo = path_fn(ptd, pslot, cur_trade_date, cur_slot)
+            if hilo:
+                mfe, mae = _mfe_mae_r(cand, entry, dist, hilo[0], hilo[1])
+        except Exception:  # noqa — MFE/MAE best-effort, 실패해도 R 은 채운다
+            pass
+    conn.execute("UPDATE btc_gate_log SET next_mark=?, r_m2m=?, mfe_r=?, mae_r=?, graded=1 "
+                 "WHERE id=?", (cur_mark, round(r, 4), mfe, mae, rid))
     conn.commit()
     return 1
 
