@@ -157,6 +157,32 @@ CREATE TABLE IF NOT EXISTS btc_options (
   n_options    INTEGER,
   UNIQUE(trade_date, slot)
 );
+
+-- BTC 게이트 forward-log(2026-09-01 measure-first) — **관측 전용**, 스코어링/게이트 무영향.
+-- 회차별 게이트 상태 + 다음 세션 실현 R(m2m)을 쌓아, n 축적 후 '게이트가 좋은 거래를
+-- 놓쳤나 vs 손실을 막았나'를 판정한다(차단·통과 양쪽의 후보방향 counterfactual R 비교).
+CREATE TABLE IF NOT EXISTS btc_gate_log (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  trade_date   TEXT NOT NULL,
+  slot         TEXT NOT NULL DEFAULT '',
+  kst          TEXT,
+  as_of        TEXT,
+  mark         REAL,        -- 이 세션 마크(=후보 진입가)
+  verdict      TEXT,        -- LONG|SHORT|NO_TRADE
+  blocked      INTEGER,     -- 1=신규진입 차단
+  reasons      TEXT,        -- 차단 사유(' / ' join)
+  cand_dir     TEXT,        -- 후보 방향 long|short
+  p_long       REAL,
+  agreement    REAL,        -- signal_agreement(가중)
+  core_aligned INTEGER,
+  total        REAL,
+  quadrant     TEXT,
+  atr_dist     REAL,        -- ATR 손절폭(R 환산 분모)
+  next_mark    REAL,        -- 다음 세션 마크(채점 시 채움)
+  r_m2m        REAL,        -- 후보 방향 mark-to-market R = (next-mark)/dist·부호
+  graded       INTEGER NOT NULL DEFAULT 0,
+  UNIQUE(trade_date, slot)
+);
 """
 
 # 15:00 시점 '누적/종일' 비율 부트스트랩 — KODEX 200 / 코스닥150 10분봉 5거래일
@@ -980,3 +1006,64 @@ def btc_options_rows(conn: sqlite3.Connection) -> list[dict]:
 
 def btc_options_count(conn: sqlite3.Connection) -> int:
     return conn.execute("SELECT COUNT(*) FROM btc_options").fetchone()[0]
+
+
+# ── BTC 게이트 forward-log(measure-first) — 관측 전용, 스코어링/게이트 무영향 ──────────
+def record_btc_gate(conn: sqlite3.Connection, rec: dict) -> None:
+    """회차별 게이트 상태 1행 upsert(멱등). 다음 세션에 grade_btc_gate 가 R 을 채운다.
+    **정규 슬롯(0930/2200)만** 적재한다 — 수동 발행은 채점 지평이 없어 관측에서 뺀다."""
+    if rec.get("slot") not in ("0930", "2200"):
+        return
+    conn.execute(
+        "INSERT INTO btc_gate_log(trade_date,slot,kst,as_of,mark,verdict,blocked,reasons,"
+        "cand_dir,p_long,agreement,core_aligned,total,quadrant,atr_dist) "
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
+        "ON CONFLICT(trade_date,slot) DO UPDATE SET kst=excluded.kst,as_of=excluded.as_of,"
+        "mark=excluded.mark,verdict=excluded.verdict,blocked=excluded.blocked,"
+        "reasons=excluded.reasons,cand_dir=excluded.cand_dir,p_long=excluded.p_long,"
+        "agreement=excluded.agreement,core_aligned=excluded.core_aligned,total=excluded.total,"
+        "quadrant=excluded.quadrant,atr_dist=excluded.atr_dist",
+        (rec.get("trade_date"), rec.get("slot"), rec.get("kst"), rec.get("as_of"),
+         rec.get("mark"), rec.get("verdict"), 1 if rec.get("blocked") else 0,
+         rec.get("reasons"), rec.get("cand_dir"), rec.get("p_long"), rec.get("agreement"),
+         rec.get("core_aligned"), rec.get("total"), rec.get("quadrant"), rec.get("atr_dist")))
+    conn.commit()
+
+
+def grade_btc_gate(conn: sqlite3.Connection, cur_trade_date: str, cur_slot: str,
+                   cur_mark: float | None) -> int:
+    """직전 미채점 회차의 후보 방향 mark-to-market R 을 이번 세션 마크로 채운다.
+    R = (next-mark − entry)/dist (long) 또는 (entry − next-mark)/dist (short). 차단·통과 무관
+    하게 후보 방향 R 을 남겨, 훗날 '게이트가 좋은 거래를 막았나 vs 손실을 걸렀나'를 비교한다.
+    반환: 채점한 행 수(0 또는 1). 정규 슬롯만 대상."""
+    if cur_mark is None or cur_slot not in ("0930", "2200"):
+        return 0
+    row = conn.execute(
+        "SELECT id,mark,cand_dir,atr_dist FROM btc_gate_log WHERE graded=0 "
+        "AND (trade_date < ? OR (trade_date = ? AND slot < ?)) "
+        "ORDER BY trade_date DESC, slot DESC LIMIT 1",
+        (cur_trade_date, cur_trade_date, cur_slot)).fetchone()
+    if not row:
+        return 0
+    rid, entry, cand, dist = row
+    if not entry or not dist or dist <= 0 or cand not in ("long", "short"):
+        # R 산출 불가(데이터 결측) — graded 로 닫아 무한 대기 방지, R 은 NULL.
+        conn.execute("UPDATE btc_gate_log SET graded=1, next_mark=? WHERE id=?", (cur_mark, rid))
+        conn.commit()
+        return 0
+    r = (cur_mark - entry) / dist if cand == "long" else (entry - cur_mark) / dist
+    conn.execute("UPDATE btc_gate_log SET next_mark=?, r_m2m=?, graded=1 WHERE id=?",
+                 (cur_mark, round(r, 4), rid))
+    conn.commit()
+    return 1
+
+
+def btc_gate_rows(conn: sqlite3.Connection) -> list[dict]:
+    """게이트 forward-log 전부(시간순). exp 가 blocked vs 통과의 R 분포를 비교한다."""
+    cur = conn.execute("SELECT * FROM btc_gate_log ORDER BY trade_date, slot")
+    cols = [c[0] for c in cur.description]
+    return [dict(zip(cols, r)) for r in cur.fetchall()]
+
+
+def btc_gate_count(conn: sqlite3.Connection) -> int:
+    return conn.execute("SELECT COUNT(*) FROM btc_gate_log").fetchone()[0]

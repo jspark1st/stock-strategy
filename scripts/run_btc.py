@@ -352,6 +352,10 @@ def build_report(now: datetime, env: dict, conn, dry_run: bool, manual: bool,
         if a:
             chg_pct = (b / a - 1) * 100
 
+    # 게이트 forward-log 용 후보방향 타점폭(dist) — 차단 세션도 counterfactual R 을 재려면
+    # 필요. 게이트 무관하게 계산(스코어링 무영향). main() 이 rep 에서 읽어 적재한다.
+    _cand = "long" if (scored.get("p_long") or 0.5) >= 0.5 else "short"
+    _gate_dist = (btc_scoring.session_targets(mark or 0.0, h1s.get("atr"), _cand) or {}).get("dist")
     rep = {
         "id": "btc-perp", "group": "비트코인 선물", "label": "BTCUSDT",
         "report_type": "btc_perp", "trade_date": trade_date, "slot": slot,
@@ -392,6 +396,7 @@ def build_report(now: datetime, env: dict, conn, dry_run: bool, manual: bool,
             "sns": "alternative.me Fear&Greed + Tavily community",
         },
         "sources": (materials.sources() if materials else []) + (nar.sources or []),
+        "_gate_dist": _gate_dist, "_cand_dir": _cand,   # 게이트 forward-log 용(내부)
     }
     if acc:
         rep["accuracy"] = acc
@@ -564,6 +569,26 @@ def main() -> int:
                                                 "kst": now.strftime("%Y-%m-%d %H:%M:%S"), **osig})
                 print(f"  옵션관측: 스큐 {osig.get('skew_25d')}% · GEX {osig.get('gex'):+,.0f} · "
                       f"DVOL {osig.get('dvol')} (관측 전용·미채점 · 누적 {store.btc_options_count(conn)})")
+        except Exception:  # noqa — 관측 전용, 파이프라인 무영향
+            pass
+        # 게이트 forward-log(measure-first 2026-09-01) — 회차 게이트 상태 + 다음 세션 실현 R.
+        # 스코어링/게이트 무관·별도 테이블·실패 무해. n 축적 후 '게이트가 좋은 거래를 막았나
+        # vs 손실을 걸렀나'를 exp 로 판정(차단·통과 양쪽 후보방향 counterfactual R 비교).
+        try:
+            g = rep.get("gate") or {}
+            cand = rep.get("_cand_dir") or "long"
+            store.grade_btc_gate(conn, rep["trade_date"], slot, rep.get("mark"))  # 직전 회차 R
+            store.record_btc_gate(conn, {
+                "trade_date": rep["trade_date"], "slot": slot,
+                "kst": now.strftime("%Y-%m-%d %H:%M:%S"), "as_of": rep.get("as_of"),
+                "mark": rep.get("mark"), "verdict": rep.get("verdict"),
+                "blocked": g.get("new_entry_blocked"),
+                "reasons": " / ".join(g.get("reasons") or []), "cand_dir": cand,
+                "p_long": rep.get("p_long"), "agreement": rep.get("signal_agreement"),
+                "core_aligned": rep.get("core_aligned"), "total": rep.get("total"),
+                "quadrant": rep.get("quadrant"), "atr_dist": rep.get("_gate_dist")})
+            print(f"  게이트로그: {'차단' if g.get('new_entry_blocked') else '통과'} · "
+                  f"후보 {cand} (관측 전용·누적 {store.btc_gate_count(conn)})")
         except Exception:  # noqa — 관측 전용, 파이프라인 무영향
             pass
         conn.close()

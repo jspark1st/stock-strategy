@@ -866,3 +866,30 @@ def test_convergence_drops_sns_pillar_when_excluded():
     # sns 가 있으면 심리 관점 유지(하위호환)
     conv2 = build_convergence(subs + [{"key": "sns", "label": "SNS 심리", "score": 46}])
     assert any("심리" in p["label"] for p in conv2["pillars"])
+
+
+def test_btc_gate_forward_log(tmp_path):
+    """게이트 forward-log: 회차 상태 적재 + 다음 세션에 후보방향 m2m R 채움.
+    수동 슬롯은 제외, 정규 슬롯만. 차단/통과 무관하게 R 을 남긴다."""
+    conn = store.connect(tmp_path / "h.db")
+    # 세션1: 차단(NO_TRADE)이어도 후보 long·dist 기록
+    store.record_btc_gate(conn, {"trade_date": "2026-09-01", "slot": "0930",
+                                 "mark": 100000, "verdict": "NO_TRADE", "blocked": True,
+                                 "reasons": "수렴 게이트", "cand_dir": "long",
+                                 "p_long": 0.62, "agreement": 0.63, "core_aligned": 2,
+                                 "total": 55.0, "quadrant": "Q1", "atr_dist": 1000})
+    assert store.btc_gate_count(conn) == 1
+    # 수동 슬롯은 무시
+    store.record_btc_gate(conn, {"trade_date": "2026-09-01", "slot": "1530",
+                                 "mark": 100500, "cand_dir": "long", "atr_dist": 1000})
+    assert store.btc_gate_count(conn) == 1
+    # 세션2(다음 정규 슬롯) → 세션1의 R 채움: (101000-100000)/1000 = +1.0
+    n = store.grade_btc_gate(conn, "2026-09-01", "2200", 101000)
+    assert n == 1
+    store.record_btc_gate(conn, {"trade_date": "2026-09-01", "slot": "2200",
+                                 "mark": 101000, "verdict": "LONG", "blocked": False,
+                                 "cand_dir": "long", "atr_dist": 1000})
+    rows = store.btc_gate_rows(conn)
+    s1 = [r for r in rows if r["slot"] == "0930"][0]
+    assert s1["graded"] == 1 and abs(s1["r_m2m"] - 1.0) < 1e-6
+    assert s1["blocked"] == 1          # 차단 세션도 R 을 남긴다(counterfactual)
