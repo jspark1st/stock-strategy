@@ -21,6 +21,7 @@
 | 9 | **quant 확장 서브스코어(0.15)** | 6팩터 | RSI·MACD·볼린저·OBV·추세정렬+마감 1시간봉을 7번째 팩터로(재정규화) | ⚠ **판별력 검증 없음**(하네스 미측정)·내부 공선성. 다레짐 후 검증 필요 | ✅(미검증) | `quant.py` |
 | 10 | **간밤 정량 재평가(개장전 한정)** | 없음 | 간밤 미국장 blend×K + 환율을 전일 p_up 에 유계 가산(±0.12). **인과상 개장전만**, 마감엔 미적용 | walk-forward 개장전 OOS AUC 0.505→0.597(KOSPI). 마감엔 미래참조라 금지 | ✅(preopen) | `overnight.py`, `run_preopen.py` |
 | 11 | **close→open 지평 병행 측정** | 라벨=익일 종가 | 라벨(next-close)은 유지하되 **실거래 지평(종가→익일 시가)** 정답률을 나란히 채점·표시 | exp_paper 가 드러낸 지평 불일치를 라이브·하네스가 관측 | ✅(측정) | `store.accuracy(overnight_*)`, `backtest.evaluate` |
+| 12 | **σ_AM 갭 성분 EWMA(λ=0.94)** | 갭 등가중 std(60일) | RiskMetrics EWMA(유효 기억 ~33일) — 변동성 군집 반응 | 6년(1,499갭·2022 하락장 포함) walk-forward: QLIKE 유의 개선 **DM t=4.9(KOSPI)/4.7(KOSDAQ)**, 양 시장·양 반기 전부. 1σ 커버리지 66~73%(목표 68.3%, KOSDAQ 은 보수 방향으로 소폭 과대). BTC 12h 에서도 동일 방향 확인(주식 경로만 반영) | ✅ | `atr.overnight_sigma`, `exp_vol_forecast.py` |
 
 ## 인프라 확장(스코어링 공식 아님 — 참고)
 데이터 계보·불변 스냅샷·상태머신(진입/컨펌/개장전/청산)·paper L1·백테스트 하네스·자가학습 DB.

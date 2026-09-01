@@ -147,8 +147,16 @@ def overnight_sigma(candles: list, atr_eff: float, entry: float,
             for i in range(1, len(seg)) if seg[i - 1].close and seg[i].open]
     if len(gaps) < 8:
         return None
-    mg = sum(gaps) / len(gaps)
-    gap_sd = (sum((g - mg) ** 2 for g in gaps) / len(gaps)) ** 0.5 * 100.0   # %
+    # 갭 σ = EWMA(λ=0.94, RiskMetrics) — 2026-09-01 measure-first 교체(구: 등가중 std).
+    # 6년(1,499갭·2022 하락장 포함) walk-forward 측정: roll60 대비 QLIKE 유의 개선
+    # (DM t=4.9/4.7 — KOSPI/KOSDAQ 양 시장·양 반기 전부), 1σ 커버리지 66~73%(목표 68.3%).
+    # 변동성 군집 반응이 빨라 급변 직후 타점 폭이 현실을 따라간다. `exp_vol_forecast.py`.
+    lam = 0.94
+    k0 = min(10, len(gaps))
+    var = sum(g * g for g in gaps[:k0]) / k0          # 시드: 초기 갭 분산(zero-mean 관례)
+    for g in gaps[k0:]:
+        var = lam * var + (1 - lam) * g * g
+    gap_sd = max(var, 0.0) ** 0.5 * 100.0             # %
     atr_pct = atr_eff / entry * 100.0
     if atr_pct <= 0:
         return None

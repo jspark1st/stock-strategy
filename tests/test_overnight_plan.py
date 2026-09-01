@@ -94,3 +94,22 @@ def test_hts_sell_none_without_levels():
     assert execution.hts_sell_settings("X", "long", None, {}) is None
     assert execution.hts_sell_settings("X", "long", 100.0,
                                        {"stop": None, "target": None}) is None
+
+
+def test_overnight_sigma_gap_uses_ewma_recency():
+    """2026-09-01 measure-first: 갭 σ 가 EWMA(λ=0.94) — 같은 갭 집합이라도 급변이
+    '최근'이면 σ 가 커야 한다(등가중 std 면 순서 무관 동일 → 회귀로 구분)."""
+    def series(spike_late: bool):
+        gaps = [0.001] * 50 + [0.02] * 5 if spike_late else [0.02] * 5 + [0.001] * 50
+        cs, close = [], 1000.0
+        for i, g in enumerate(gaps):
+            o = close * (1 + g)
+            nc = o
+            cs.append(Candle(date=f"2026{i:04d}", open=round(o, 4), high=round(o * 1.001, 4),
+                             low=round(o * 0.999, 4), close=round(nc, 4), volume=1000))
+            close = nc
+        return cs
+    late = atr.overnight_sigma(series(True), atr_eff=30.0, entry=1000.0)
+    early = atr.overnight_sigma(series(False), atr_eff=30.0, entry=1000.0)
+    assert late and early
+    assert late["gap_pct"] > early["gap_pct"] * 1.5   # 최근 급변이 뚜렷이 더 크게 반영
