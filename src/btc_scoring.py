@@ -187,14 +187,20 @@ def score_deriv(funding_now: float | None, funding_avg: float | None,
     if extreme and oi_up:
         gates.append("과열 군중(극단 펀딩 + OI 증가) — 신규 진입 차단")
     # 펀딩 기본율 문맥 — Binance USD-M 기본 펀딩률은 0.01%/8h. 부호만 +라고 '롱 과열'이
-    # 아니다(외부 비평 2026-09-01: 0.0098%를 롱군집 근거로 쓴 오독). 기본율 ±0.005%p 안이면
-    # 사실상 중립. **점수 산식은 불변** — 라벨·서술만 정직하게.
-    fund_neutral = fund is not None and -0.00005 < fund < 0.00015
+    # 아니다(외부 비평 2026-09-01: 0.0098%를 롱군집 근거로 쓴 오독). **점수 산식은 불변**.
+    # 밴드(같은 날 감사 수정 — 초판의 하한 부호 오류 정정): 기본율 0.01%/8h 기준
+    #   f ≥ +0.015%      → 기본율 상회(롱 우위 방향)
+    #   +0.005% ≤ f < +0.015% → 기본율 수준=중립
+    #   0 ≤ f < +0.005%  → 기본율 하회(+부호여도 롱군집 근거 아님)
+    #   f < 0            → 음(숏 우위) — 음수 펀딩은 그 자체로 정보라 '중립' 표기 금지
+    # Q1/Q3(펀딩+) 라벨 격하는 '기본율 상회 미만 전부'(< +0.015%) — +부호가 군집 근거가 못 됨.
+    fund_demote = fund is not None and fund < 0.00015
     if fund is None:
         ftxt = "—"
     else:
-        fctx = ("기본율 0.01% 수준=중립" if fund_neutral else
-                "기본율 상회" if fund > 0 else "음(숏 우위)")
+        fctx = ("기본율 상회" if fund >= 0.00015 else
+                "기본율 0.01% 수준=중립" if fund >= 0.00005 else
+                "기본율 하회" if fund >= 0 else "음(숏 우위)")
         ftxt = f"{fund*100:.4f}%·{fctx}"
     otxt = f"{oi_chg*100:+.1f}%" if oi_chg is not None else "—"
     o30 = f" · 30일비 {oi_chg_30d*100:+.1f}%" if oi_chg_30d is not None else ""
@@ -204,17 +210,17 @@ def score_deriv(funding_now: float | None, funding_avg: float | None,
     q_def = {"Q1": "OI↑·펀딩+", "Q2": "OI↑·펀딩−", "Q3": "OI↓·펀딩+", "Q4": "OI↓·펀딩−"}.get(q, "")
     # 'Q1' 숫자 라벨은 가격×OI 사분면으로 오독된다(자가비평 8라운드) → 해석 라벨로 교체.
     q_label = {"Q1": "레버리지 롱군집", "Q2": "숏군집·OI↑", "Q3": "롱청산", "Q4": "숏청산"}.get(q, "")
-    if fund_neutral and q in ("Q1", "Q3"):
-        # 펀딩이 기본율 수준이면 '+부호'가 군집 판정의 근거가 못 된다 → 판정 불가로 격하.
-        q_label = {"Q1": "OI↑·펀딩 중립", "Q3": "OI↓·펀딩 중립"}[q]
-        q_def = "기본율 수준 — 군집 판정 불가"
+    if fund_demote and q in ("Q1", "Q3"):
+        # 펀딩이 기본율 상회 미만이면 '+부호'가 군집 판정의 근거가 못 된다 → 판정 불가로 격하.
+        q_label = {"Q1": "OI↑·펀딩 중립~하회", "Q3": "OI↓·펀딩 중립~하회"}[q]
+        q_def = "기본율 상회 아님 — 군집 판정 불가"
     qtxt = f"{q_label}({q_def})" if q_def else q
     # OI 단위는 **BTC(기초자산)** — Binance USD-M openInterest 는 계약수가 아니라 BTC 수량이다.
     observed = (f"펀딩 {ftxt}(8h) · OI {axis} {otxt}{o30 if axis == '세션' else ''} · {qtxt}"
                 f" · Binance USD-M · OI 단위 BTC(fapi raw · ×마크=명목가)")
     comment = {"Q1": "롱 군집", "Q2": "숏 군집", "Q3": "롱 청산", "Q4": "숏 청산"}.get(q, "파생 중립")
-    if fund_neutral and q in ("Q1", "Q3"):
-        comment = "파생 중립(펀딩 기본율 수준)"
+    if fund_demote and q in ("Q1", "Q3"):
+        comment = "파생 중립(펀딩 기본율 상회 아님)"
     if extreme:
         comment += " · 극단 역행"
     return _sub("deriv", s, observed, comment), q, gates

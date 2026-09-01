@@ -258,6 +258,9 @@ def build_hero(r: dict) -> str:
         elif p_up is not None and n_acc < 40:
             calib = (f'<div class="hero-note">방향 확률은 참고용'
                      f'{_info("신뢰구간 없는 점추정이고, 검증 표본(n&lt;40)이 부족해 성적·보정은 참고만 하세요." + _hz)}</div>')
+        elif p_up is not None:
+            # 표본이 쌓여도 판정 지평 정의는 히어로에 남긴다(감사 2026-09-01 — n≥40 에서 소실 방지).
+            calib = f'<div class="hero-note">확률 판정 기준{_info(_hz.strip())}</div>'
     else:
         _d, _caution = [], ""
         if raw is not None and p_up is not None and abs(raw - p_up) > 1e-9:
@@ -1897,7 +1900,7 @@ def build_btc_scalp_view() -> str:
       </div>
       <div class="note muted" id="scalp-stale" hidden>⏱ 판정이 60초를 넘었습니다 — 스캘핑 지평에선 낡은 정보입니다. 다시 누르세요.</div>
     </div>
-    <div class="card" id="scalp-tfs-card" hidden><h2>시간축 분해{_info("각 시간축의 투표(−6~+6)와 근거. 짧은 축(1m·5m·15m)이 판정의 75%, 1h·4h 는 레짐 필터(역행 시 관망 강제)입니다.")}</h2><div class="tiles" id="scalp-tfs"></div></div>
+    <div class="card" id="scalp-tfs-card" hidden><h2>시간축 분해{_info("각 시간축의 투표(−6~+6)와 근거. 짧은 축(1m·5m·15m)이 판정의 75%, 1h·4h 는 가중 25%를 지면서 역행 시 관망을 강제하는 레짐 필터입니다.")}</h2><div class="tiles" id="scalp-tfs"></div></div>
     <div class="card" id="scalp-cost-card" hidden><h2>비용 현실 체크</h2><div class="tiles" id="scalp-cost"></div>
       <div class="note muted">5분 기대변동(ATR)이 왕복비용을 못 덮으면 판정이 맞아도 손해다.</div></div>
     <div class="card"><h2>판정 성적(측정)</h2>{meas_html}</div>
@@ -1946,7 +1949,7 @@ def build_btc_scalp_view() -> str:
           var dip=100*sP/sT,din=100*sN/sT;dx.push(100*Math.abs(dip-din)/Math.max(dip+din,1e-9));}
         if(dx.length<p)return null;
         var ax=0;for(i=0;i<p;i++)ax+=dx[i];ax/=p;
-        for(i=p;i<dx.length;i++)ax=(ax*(p-1)+dx[i])/p;return ax;}
+        for(i=p;i<dx.length;i++)ax=(ax*(p-1)+dx[i])/p;return isFinite(ax)?ax:null;}
       function stDir(h,l,c,p,m){p=p||10;m=m||3;var n=c.length;if(n<p+3)return 0;
         var tr=trArr(h,l,c),a=0,i;for(i=0;i<p;i++)a+=tr[i];a/=p;var atrs=[a];
         for(i=p;i<tr.length;i++){a=(a*(p-1)+tr[i])/p;atrs.push(a);}
@@ -1965,8 +1968,8 @@ def build_btc_scalp_view() -> str:
         if(mc.hist>0){v+=1+(mc.hist>mc.prev?0.5:0);why.push('MACD+');}
         else{v-=1+(mc.hist<mc.prev?0.5:0);why.push('MACD−');}
         var r=rsiLast(c);
-        if(r!=null){if(r>=55)v+=1;else if(r<=45)v-=1;why.push('RSI '+r.toFixed(0));}
-        var st=stDir(k.h,k.l,c);v+=st*1.5;why.push(st>0?'ST↑':'ST↓');
+        if(r!=null){if(r>=55)v+=1;else if(r<=45)v-=1;why.push('RSI '+r.toFixed(1));}
+        var st=stDir(k.h,k.l,c);v+=st*1.5;if(st!==0)why.push(st>0?'ST↑':'ST↓');
         return {v:v,why:why,adx:adxLast(k.h,k.l,c),px:px};}
       function getK(iv){
         var urls=['https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval='+iv+'&limit=160',
@@ -1975,6 +1978,7 @@ def build_btc_scalp_view() -> str:
           if(i>=urls.length)return Promise.resolve(null);
           return fetch(urls[i],{cache:'no-store'}).then(function(r){
             if(!r.ok)throw 0;return r.json();}).then(function(j){
+            if(!j||j.length<40)throw 0;   /* 짧은 응답은 실패로 취급(빈 배열 TypeError 방지) */
             return {src:i===0?'USD-M 선물':'현물(폴백)',
               h:j.map(function(x){return +x[2];}),l:j.map(function(x){return +x[3];}),
               c:j.map(function(x){return +x[4];})};
@@ -2003,7 +2007,8 @@ def build_btc_scalp_view() -> str:
           var votes=ks.map(tfVote),vd=verdictOf(votes),px=votes[1].px;
           lastTs=Date.now();
           var t=new Date(),hh=('0'+t.getHours()).slice(-2)+':'+('0'+t.getMinutes()).slice(-2)+':'+('0'+t.getSeconds()).slice(-2);
-          meta.textContent=hh+' 판정 · BTCUSDT '+px.toLocaleString(undefined,{maximumFractionDigits:1})+' · '+ks[0].src+' · 성적은 아래 측정 카드';
+          var srcs=[];for(var i=0;i<5;i++)if(srcs.indexOf(ks[i].src)<0)srcs.push(ks[i].src);
+          meta.textContent=hh+' 판정 · BTCUSDT '+px.toLocaleString(undefined,{maximumFractionDigits:1})+' · '+(srcs.length>1?'선물·현물 혼합':srcs[0])+' · 성적은 아래 측정 카드';
           box.hidden=false;staleEl.hidden=true;box.style.opacity='1';
           arrowEl.textContent=ARW[vd.lab];arrowEl.style.color=COL[vd.lab];
           labEl.textContent=vd.lab;labEl.style.color=COL[vd.lab];
@@ -2015,7 +2020,7 @@ def build_btc_scalp_view() -> str:
               (v.v>0?'+':'')+v.v.toFixed(1)+'</div><div class="tile-sub">'+v.why.join(' · ')+'</div></div>';}
           tfsCard.hidden=false;tfsEl.innerHTML=html;
           var a5m=atrLast(ks[1].h,ks[1].l,ks[1].c);
-          if(a5m!=null&&px){var ap=a5m/px*100,warn=ap<0.12;
+          if(a5m!=null&&px){var ap=a5m/px*100,warn=ap<0.10;
             costEl.innerHTML='<div class="tile"><div class="tile-lbl">5분 기대변동(ATR14)</div><div class="tile-val"'+
               (warn?' style="color:var(--caution)"':'')+'>'+ap.toFixed(3)+'%</div><div class="tile-sub">'+
               (warn?'왕복비용 이하 — 지금은 먹을 게 없다':'비용 대비 여유 있음')+'</div></div>'+
@@ -2027,7 +2032,7 @@ def build_btc_scalp_view() -> str:
           li.textContent=hh+' · '+px.toLocaleString(undefined,{maximumFractionDigits:1})+' · '+vd.lab+' (S '+vd.S.toFixed(2)+')';
           logEl.insertBefore(li,logEl.firstChild);
           while(logEl.children.length>20)logEl.removeChild(logEl.lastChild);
-        });}
+        }).catch(function(){btn.disabled=false;meta.textContent='계산 오류 — 다시 눌러 주세요';});}
       btn.addEventListener('click',run);
       setInterval(function(){
         if(lastTs&&Date.now()-lastTs>60000&&!box.hidden){staleEl.hidden=false;box.style.opacity='.45';}
@@ -2103,9 +2108,10 @@ def _quad_label(q: str | None, funding: float | None = None) -> str:
 
     펀딩이 기본율(0.01%/8h) ±0.005%p 안이면 '+부호'가 군집 근거가 못 된다(외부 비평
     2026-09-01) → Q1/Q3 라벨을 '판정 불가'로 격하. 스코어링 쿼드런트 자체는 불변."""
-    if (funding is not None and -0.00005 < funding < 0.00015 and q in ("Q1", "Q3")):
-        return {"Q1": "OI↑·펀딩 중립(군집 판정 불가)",
-                "Q3": "OI↓·펀딩 중립(군집 판정 불가)"}[q]
+    if funding is not None and funding < 0.00015 and q in ("Q1", "Q3"):
+        # 기본율(0.01%/8h) 상회 미만이면 +부호가 군집 근거가 못 된다(하한 부호 정정 2026-09-01).
+        return {"Q1": "OI↑·펀딩 중립~하회(군집 판정 불가)",
+                "Q3": "OI↓·펀딩 중립~하회(군집 판정 불가)"}[q]
     return _QUAD_LABEL.get(q or "", q or "—")
 
 
@@ -2496,7 +2502,7 @@ def _reissue_badge(r: dict) -> str:
     if abs(as_min - slot_min) < 45:
         return ""
     return (f'<span class="slot-empty">재발행 {m.group(1)}:{m.group(2)}'
-            f'{_info("정규 슬롯 발행 후 데이터·분류 정정으로 다시 발행된 회차입니다. 데이터 기준시각은 재발행 시각이며, 채점 지평도 그 시각 기준으로 봐야 합니다.")}</span>')
+            f'{_info("정규 슬롯 시각과 데이터 기준시각이 45분 이상 어긋난 회차입니다 — 대개 정정 재발행이고, 드물게 지연 발행입니다. 데이터 기준시각은 표기 시각이며 채점 지평도 그 기준으로 봐야 합니다.")}</span>')
 
 
 def _btc_size_card(r: dict, blocked: bool) -> str:
@@ -3308,6 +3314,7 @@ TEMPLATE = r"""<!doctype html>
     color:#fff;background:linear-gradient(115deg,color-mix(in srgb,var(--accent) 85%,#000),var(--accent));
     box-shadow:0 6px 18px color-mix(in srgb,var(--accent) 30%,transparent)}
   .scalp-btn:hover{filter:brightness(1.1)} .scalp-btn:disabled{opacity:.55;cursor:wait}
+  .scalp-verdict[hidden]{display:none}
   .scalp-verdict{display:flex;align-items:center;gap:18px;margin-top:18px;
     padding:16px 18px;border:1px solid var(--border);border-radius:12px;background:var(--surface2)}
   .scalp-arrow{font-size:3rem;line-height:1}

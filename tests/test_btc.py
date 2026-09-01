@@ -1001,7 +1001,7 @@ def test_deriv_funding_baseline_neutral_demotes_quadrant_label():
     assert "기본율 0.01% 수준=중립" in sub["observed"]
     assert "군집 판정 불가" in sub["observed"]
     assert "레버리지 롱군집" not in sub["observed"]
-    assert "파생 중립(펀딩 기본율 수준)" in sub["comment"]
+    assert "파생 중립(펀딩 기본율 상회 아님)" in sub["comment"]   # 감사 정정판 문구
     # 기본율을 뚜렷이 상회하면 기존 라벨 유지
     sub2, q2, _ = score_deriv(0.0003, 0.0003, 105, 100, 0.01)
     assert q2 == "Q1" and "OI↑·펀딩+" in sub2["observed"]
@@ -1121,3 +1121,54 @@ def test_btc_scalp_measurement_card_renders_numbers(tmp_path, monkeypatch):
     assert "47.0%" in h and "49.0%" in h             # 측정 카드
     assert "-0.095%" in h or "-0.09" in h            # 비용 후 음수 노출
     assert "동전 수준" in h                           # 버튼 아래 요약도 정직
+
+
+def test_deriv_funding_band_lower_bound_fixed():
+    """감사 정정: 하한 부호 — 0<f<0.005% 는 '기본율 하회'(중립 아님), f<0 은 '음(숏 우위)'
+    이고 어느 쪽도 '중립' 문구·롱군집 라벨과 공존하지 않는다."""
+    from src.btc_scoring import score_deriv
+    sub, q, _ = score_deriv(0.00002, 0.00002, 105, 100, 0.01)     # +0.002% · OI↑ → Q1
+    assert q == "Q1"
+    assert "기본율 하회" in sub["observed"]
+    assert "중립" not in sub["observed"].split("·")[0]             # 펀딩 조각에 '중립' 없음
+    assert "군집 판정 불가" in sub["observed"]
+    assert "레버리지 롱군집" not in sub["observed"]
+    sub2, q2, _ = score_deriv(-0.00004, -0.00004, 105, 100, 0.01)  # 음수 · OI↑ → Q2
+    assert q2 == "Q2"
+    assert "음(숏 우위)" in sub2["observed"]
+    assert "기본율 0.01% 수준=중립" not in sub2["observed"]        # 모순 표기 제거
+    assert "숏군집" in sub2["observed"]                            # 음수 펀딩은 정보 — 라벨 유지
+
+
+def test_render_quad_label_demotes_below_baseline():
+    import render_report as rr
+    assert "판정 불가" in rr._quad_label("Q1", 0.00002)   # 기본율 하회 양수도 격하
+    assert "판정 불가" in rr._quad_label("Q1", 0.000098)
+    assert rr._quad_label("Q1", 0.0003) == "레버리지 롱군집"
+    assert rr._quad_label("Q1", None) == "레버리지 롱군집"
+
+
+def test_news_counted_follows_display_order():
+    """감사 정정: 표(counted)는 표시 정렬(최신 우선) 기준 — 위쪽 항목에 '상한 초과' pill 이
+    붙는 역전 표시 방지."""
+    from datetime import datetime, timezone, timedelta
+    kst = timezone(timedelta(hours=9))
+
+    def mat(title, hour):
+        return news_mod.Material(title=title, url=f"https://x/{title}", tag="악재",
+                                 published_kst=datetime(2026, 9, 1, hour, 0, tzinfo=kst),
+                                 fresh=True)
+    mats = [mat("oldest bearish alpha", 1), mat("older bearish bravo", 2),
+            mat("newer bearish charlie", 3), mat("newest bearish delta", 4)]
+    order = {"악재": 0, "호재": 1, "중립": 2}
+    mats.sort(key=lambda m: (not m.scored, not m.fresh, order.get(m.tag, 3),
+                             -(m.published_kst.timestamp() if m.published_kst else 0)))
+    news_mod._mark_votes(mats)
+    assert [m.counted for m in mats] == [True, True, True, False]  # 최신 3건 반영
+    assert "상한 초과" in mats[-1].excluded                        # 가장 오래된 것이 제외
+
+
+def test_scalp_verdict_hidden_css_guard():
+    """감사 정정: .scalp-verdict{display:flex} 가 [hidden] 을 무력화하던 것 — 가드 CSS 존재."""
+    import render_report as rr
+    assert ".scalp-verdict[hidden]{display:none}" in rr.TEMPLATE

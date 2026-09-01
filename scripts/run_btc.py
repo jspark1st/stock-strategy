@@ -243,6 +243,9 @@ def build_report(now: datetime, env: dict, conn, dry_run: bool, manual: bool,
     rates = [f["rate"] for f in funds[-3:] if f.get("rate") is not None]
     if rates:
         funding_avg = sum(rates) / len(rates)
+    # 유효 펀딩 — 스코어링(score_deriv)과 동일한 now→avg 폴백. 표시·LLM·gate_obs 가
+    # 스코어링과 다른 소스를 보면 격하 라벨이 카드마다 갈린다(2026-09-01 감사 발견).
+    fund_eff = funding_now if funding_now is not None else funding_avg
 
     oi = snap.get("oi")
     oi_hist = snap.get("oi_hist") or []
@@ -319,12 +322,13 @@ def build_report(now: datetime, env: dict, conn, dry_run: bool, manual: bool,
         "verdict": scored.get("verdict"), "quadrant": scored.get("quadrant"),
         "gate": scored.get("gate"), "atr": atr, "binance_size": sz,
         "warnings": scored.get("warnings"), "subscores": scored.get("subscores"),
-        # 기본율 문맥 포함 — Binance USD-M 기본 펀딩률 0.01%/8h. ±0.005%p 안이면 중립
-        # (외부 비평 2026-09-01: '펀딩+' 부호만으로 롱군집 서술 금지의 근거를 팩트로 제공).
-        "funding_txt": ((f"{funding_now*100:.4f}%(8h·"
-                         + ("기본율 0.01% 수준=중립" if -0.00005 < funding_now < 0.00015
-                            else "기본율 상회" if funding_now > 0 else "음(숏 우위)") + ")")
-                        if funding_now is not None else "—"),
+        # 유효 펀딩(fund_eff = now→avg 폴백, 스코어링과 동일 소스) + 기본율 밴드
+        # (btc_scoring.score_deriv 와 동일 — 2026-09-01 감사 정정판).
+        "funding_txt": ((f"{fund_eff*100:.4f}%(8h·"
+                         + ("기본율 상회" if fund_eff >= 0.00015 else
+                            "기본율 0.01% 수준=중립" if fund_eff >= 0.00005 else
+                            "기본율 하회" if fund_eff >= 0 else "음(숏 우위)") + ")")
+                        if fund_eff is not None else "—"),
         "oi_txt": (f"{oi:,.0f}" if oi else "—"),
         # OI 는 BTC(기초자산) 단위 — 명목가 = OI(BTC) × 마크(USD). raw·명목가 분리 표기용.
         "oi_notional_txt": (f"${oi*mark/1e9:.1f}B" if (oi and mark) else None),
@@ -430,7 +434,7 @@ def build_report(now: datetime, env: dict, conn, dry_run: bool, manual: bool,
     rep["_gate_obs"] = {
         "tech_vote": _votes.get("tech"), "deriv_vote": _votes.get("deriv"),
         "flow_vote": _votes.get("flow"), "env_vote": _votes.get("env"),
-        "news_vote": _votes.get("news"), "funding": funding_now, "oi_raw": oi,
+        "news_vote": _votes.get("news"), "funding": fund_eff, "oi_raw": oi,
         "oi_notional": (oi * mark) if (oi and mark) else None,
         "top_ls": ls_t.get("long_short"), "global_ls": ls_g.get("long_short"),
         "majority_ratio": (_c.get("majority_n") / _c["directional"]) if _c.get("directional") else None,

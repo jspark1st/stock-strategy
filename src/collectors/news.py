@@ -311,13 +311,15 @@ def market_materials(as_of: str, api_key: str | None = None, queries: list[str] 
     finally:
         if own:
             c.close()
-    # 점수에는 '당일 발행 + 재료(시황 아님)'만 반영 — 가격/수급 이중 계상 차단.
-    scored_mats = [m for m in mats if m.scored]
-    good, bad = _mark_votes(scored_mats)
-    # 정렬: 점수반영 재료 → 당일 시황 → 과거. 그 안에서 악재→호재→중립, 최신순
+    # 정렬: 점수반영 재료 → 당일 시황 → 과거. 그 안에서 악재→호재→중립, 최신순.
+    # **정렬 후 마킹** — 표(counted)가 화면 상단(최신) 항목에 배정되게(감사 2026-09-01:
+    # 수집 순서 마킹이면 위쪽 항목에 '상한 초과' pill 이 붙는 역전 표시가 났다). 카운트 수치는 동일.
     order = {"악재": 0, "호재": 1, "중립": 2}
     mats.sort(key=lambda m: (not m.scored, not m.fresh, order.get(m.tag, 3),
                              -(m.published_kst.timestamp() if m.published_kst else 0)))
+    # 점수에는 '당일 발행 + 재료(시황 아님)'만 반영 — 가격/수급 이중 계상 차단.
+    scored_mats = [m for m in mats if m.scored]
+    good, bad = _mark_votes(scored_mats)
     return MaterialsAssessment(as_of=as_of, materials=mats, good_count=good, bad_count=bad,
                                capital_raise_titles=cr_titles)
 
@@ -540,15 +542,16 @@ def btc_materials(as_of: str, api_key: str | None = None, hours: int = 48,
     finally:
         if own:
             c.close()
+    # 정렬 후 마킹 — 표시 상단(최신) 항목이 counted 가 되게(주식 경로와 동일 규율).
+    order = {"악재": 0, "호재": 1, "중립": 2}
+    mats.sort(key=lambda m: (not m.scored, not m.fresh, order.get(m.tag, 3),
+                             -(m.published_kst.timestamp() if m.published_kst else 0)))
     scored_all = [m for m in mats if m.scored]
-    kept = _dedup_events(scored_all)
+    kept = _dedup_events(scored_all)          # 표시 순서 기준 디둡 — 최신 쪽이 남는다
     for m in scored_all:                      # 디둡으로 빠진 항목을 사유와 함께 마킹
         if m not in kept:
             m.excluded = "중복(동일 사건)"
     good, bad = _mark_votes(kept)
-    order = {"악재": 0, "호재": 1, "중립": 2}
-    mats.sort(key=lambda m: (not m.scored, not m.fresh, order.get(m.tag, 3),
-                             -(m.published_kst.timestamp() if m.published_kst else 0)))
     return MaterialsAssessment(as_of=as_of, materials=mats, good_count=good, bad_count=bad,
                                window_label=f"{hours}시간 내")
 

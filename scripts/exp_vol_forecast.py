@@ -125,7 +125,6 @@ def evaluate(name: str, gaps: list[float], fc: dict[str, list[float]]) -> None:
     half = (WARMUP + n) // 2
     print(f"\n== {name} (평가 {n - WARMUP}관측 · 워밍업 {WARMUP})")
     print(f"{'후보':<14}{'구간':<5}{'QLIKE':>9}{'MAE(bp)':>9}{'cov1σ':>8}{'cov2σ':>8}")
-    base_q = {}
     for k, sig in fc.items():
         for part, lo, hi in (("전반", WARMUP, half), ("후반", half, n)):
             ql = mae = 0.0
@@ -143,10 +142,31 @@ def evaluate(name: str, gaps: list[float], fc: dict[str, list[float]]) -> None:
             if not m:
                 continue
             print(f"{k:<14}{part:<5}{ql/m:>9.4f}{mae/m*1e4:>9.1f}{c1/m*100:>7.1f}%{c2/m*100:>7.1f}%")
-            if k == "A roll60":
-                base_q[part] = ql / m
-            elif part in base_q and ql / m < base_q[part]:
-                pass                                 # 표에서 직접 비교
+    # Diebold-Mariano(QLIKE 손실차) vs 현행 A — Newey-West(HAC, lag 5) 보정 t.
+    # 2026-09-01 감사: 커밋에 인용된 t=4.9/4.7 은 iid 버전이었다 — 재현성 위해 둘 다 하네스에 둔다.
+    for k, sig in fc.items():
+        if k == "A roll60":
+            continue
+        d = []
+        for t in range(WARMUP, n):
+            sa, sb = fc["A roll60"][t], sig[t]
+            if not sa or not sb or sa <= 0 or sb <= 0:
+                continue
+            r2 = gaps[t] ** 2
+            d.append((r2 / (sa * sa) + 2 * math.log(sa)) - (r2 / (sb * sb) + 2 * math.log(sb)))
+        if len(d) < 50:
+            continue
+        mu = sum(d) / len(d)
+        var = sum((x - mu) ** 2 for x in d) / len(d)
+        lag = 5
+        for j in range(1, lag + 1):
+            g = sum((d[i] - mu) * (d[i - j] - mu) for i in range(j, len(d))) / len(d)
+            var += 2 * (1 - j / (lag + 1)) * g
+        if var <= 0:
+            continue
+        t_iid = mu / (statistics.stdev(d) / math.sqrt(len(d)))
+        t_nw = mu / math.sqrt(var / len(d))
+        print(f"  DM vs A · {k}: 평균손실차 {mu:+.4f} · t(iid) {t_iid:.2f} · t(NW lag5) {t_nw:.2f}")
 
 
 def main() -> int:
