@@ -1753,7 +1753,7 @@ def _copy_widget(r: dict) -> str:
     return (f'<div class="view-actions">'
             f'<button class="copy-btn" type="button" onclick="__copyReport(this)">'
             f'📋 전체 복사</button>'
-            f'<span class="copy-hint">LLM에 붙여넣어 이어서 질문</span>'
+            f'{_info("리포트 전문이 마크다운으로 복사됩니다. AI 챗봇에 붙여넣어 이어서 질문할 수 있습니다.")}'
             f'<textarea class="copy-src" hidden aria-hidden="true">{esc(txt)}</textarea>'
             f'</div>')
 
@@ -2214,7 +2214,7 @@ def _btc_slot_picker(r: dict, date: str, items: list | None = None) -> str:
             f'{date_html}'
             f'<div class="slot-regs">{"".join(chips)}</div>'
             f'{man_html}'
-            f'<span class="slot-hint">정규 하루 2회(09:30·22:00 KST) · 수동은 목록</span>'
+            f'{_info("정규 발행은 하루 2회(09:30·22:00 KST) 칩, 수동 발행분은 수동 목록에서 선택합니다.")}'
             f'</div>')
 
 
@@ -2980,8 +2980,7 @@ TEMPLATE = r"""<!doctype html>
     border-radius:8px;padding:6px 14px;font-size:.82rem;font-weight:600;min-height:36px;
     display:inline-flex;align-items:center;text-decoration:none}
   .slot-chip.active{background:color-mix(in srgb,var(--accent) 20%,transparent);color:var(--accent);border-color:var(--accent)}
-  .slot-empty,.slot-hint{font-size:.74rem;color:var(--muted)}
-  .slot-hint{margin-left:auto}
+  .slot-empty{font-size:.74rem;color:var(--muted)}
 
   /* 전체 복사 버튼 — 보고서 텍스트를 클립보드로(LLM 이어붙이기용) */
   .view-actions{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap}
@@ -2992,7 +2991,6 @@ TEMPLATE = r"""<!doctype html>
   .copy-btn:hover{background:color-mix(in srgb,var(--accent) 24%,transparent)}
   .copy-btn.copied{border-color:var(--good);color:var(--good);
     background:color-mix(in srgb,var(--good) 16%,transparent)}
-  .copy-hint{font-size:.74rem;color:var(--muted)}
 
   /* 리포트 자가비평 */
   .rv-list{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:10px}

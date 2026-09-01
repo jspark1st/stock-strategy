@@ -294,8 +294,7 @@
     border-radius:8px;padding:6px 14px;font-size:.82rem;font-weight:600;min-height:36px;
     display:inline-flex;align-items:center;text-decoration:none}
   .slot-chip.active{background:color-mix(in srgb,var(--accent) 20%,transparent);color:var(--accent);border-color:var(--accent)}
-  .slot-empty,.slot-hint{font-size:.74rem;color:var(--muted)}
-  .slot-hint{margin-left:auto}
+  .slot-empty{font-size:.74rem;color:var(--muted)}
 
   /* 전체 복사 버튼 — 보고서 텍스트를 클립보드로(LLM 이어붙이기용) */
   .view-actions{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap}
@@ -306,7 +305,6 @@
   .copy-btn:hover{background:color-mix(in srgb,var(--accent) 24%,transparent)}
   .copy-btn.copied{border-color:var(--good);color:var(--good);
     background:color-mix(in srgb,var(--good) 16%,transparent)}
-  .copy-hint{font-size:.74rem;color:var(--muted)}
 
   /* 리포트 자가비평 */
   .rv-list{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:10px}
@@ -413,7 +411,7 @@
       <div class="stage-strip"><div class="stage-steps"><span class="stage-step stage-on">① 결정</span><span class="stage-sep">›</span><span class="stage-step ">② 컨펌</span><span class="stage-sep">›</span><span class="stage-step ">③ 재평가</span></div><div class="stage-note">지금 <b>① 결정</b> · 종가베팅 주문 판단 · 다음 갱신 16:30 KST 확정</div><div class="stage-note">상태 <b>PRE_CLOSE_DECISION</b> · 허용 데이터: 장중 지수·수급·폭(잠정, 15:00) · 허용 액션: 종가베팅 진입/차단 판정 · 자동주문 차단</div></div>
       <div class="muted">KOSPI 6,840.39 (<span style='color:var(--up)'>+0.30%</span>) · 원달러 1,370.4</div>
       <div class="basis"><span class="basis-k">기준시각</span> 2026-09-01 15:00 KST · <span class="basis-k">상태</span> <b style="color:var(--neutral)">장 종료 전 스냅샷 · 종가 아님</b> · <span class="basis-k">지수 출처</span> 네이버 지수 일봉(장중 갱신) · <span class="basis-k">원달러</span> 1,370.40 <span style="color:var(--up)">+0.07%</span> <span class="basis-note">(원화 약세)</span> · <span class="basis-note">모든 시각 KST(한국 표준시)</span></div>
-      <div class="view-actions"><button class="copy-btn" type="button" onclick="__copyReport(this)">📋 전체 복사</button><span class="copy-hint">LLM에 붙여넣어 이어서 질문</span><textarea class="copy-src" hidden aria-hidden="true"># 장 마감 전·후 분석 · 코스피 · 2026-09-01
+      <div class="view-actions"><button class="copy-btn" type="button" onclick="__copyReport(this)">📋 전체 복사</button><button class="info" type="button" aria-label="설명 보기">i<span class="info-pop">리포트 전문이 마크다운으로 복사됩니다. AI 챗봇에 붙여넣어 이어서 질문할 수 있습니다.</span></button><textarea class="copy-src" hidden aria-hidden="true"># 장 마감 전·후 분석 · 코스피 · 2026-09-01
 - 상태: 장중 잠정(마감 전 스냅샷) · 기준시각 2026-09-01 15:00 KST(모든 시각 KST)
 
 코스피는 장중 스냅샷 기준 6840.39(+0.30%)로 소폭 반등했으나, 총점 45.3점(약세 등급)에 외국인·기관·개인 전 주체 동반 매도가 겹치며 질적으로는 취약한 하루였다. 종가 강도(74.4)와 기술·퀀트(73.9)는 양호했지만 투자주체 수급 점수가 2.9에 그쳐 상승분을 신뢰하기 어려운 구간이다.
@@ -707,7 +705,7 @@
       <div class="stage-strip"><div class="stage-steps"><span class="stage-step stage-on">① 결정</span><span class="stage-sep">›</span><span class="stage-step ">② 컨펌</span><span class="stage-sep">›</span><span class="stage-step ">③ 재평가</span></div><div class="stage-note">지금 <b>① 결정</b> · 종가베팅 주문 판단 · 다음 갱신 16:30 KST 확정</div><div class="stage-note">상태 <b>PRE_CLOSE_DECISION</b> · 허용 데이터: 장중 지수·수급·폭(잠정, 15:00) · 허용 액션: 종가베팅 진입/차단 판정 · 자동주문 차단</div></div>
       <div class="muted">KOSDAQ 822.93 (<span style='color:var(--down)'>-1.36%</span>) · 원달러 1,370.4</div>
       <div class="basis"><span class="basis-k">기준시각</span> 2026-09-01 15:00 KST · <span class="basis-k">상태</span> <b style="color:var(--neutral)">장 종료 전 스냅샷 · 종가 아님</b> · <span class="basis-k">지수 출처</span> 네이버 지수 일봉(장중 갱신) · <span class="basis-k">원달러</span> 1,370.40 <span style="color:var(--up)">+0.07%</span> <span class="basis-note">(원화 약세)</span> · <span class="basis-note">모든 시각 KST(한국 표준시)</span></div>
-      <div class="view-actions"><button class="copy-btn" type="button" onclick="__copyReport(this)">📋 전체 복사</button><span class="copy-hint">LLM에 붙여넣어 이어서 질문</span><textarea class="copy-src" hidden aria-hidden="true"># 장 마감 전·후 분석 · 코스닥 · 2026-09-01
+      <div class="view-actions"><button class="copy-btn" type="button" onclick="__copyReport(this)">📋 전체 복사</button><button class="info" type="button" aria-label="설명 보기">i<span class="info-pop">리포트 전문이 마크다운으로 복사됩니다. AI 챗봇에 붙여넣어 이어서 질문할 수 있습니다.</span></button><textarea class="copy-src" hidden aria-hidden="true"># 장 마감 전·후 분석 · 코스닥 · 2026-09-01
 - 상태: 장중 잠정(마감 전 스냅샷) · 기준시각 2026-09-01 15:00 KST(모든 시각 KST)
 
 코스닥은 822.93(-1.36%, 장 종료 전 스냅샷)으로 밀리며 외국인·기관 동반 매도가 겹친 위험 장세였다. 종가 강도(30.3)와 수급(18.4) 점수가 크게 훼손된 반면 개인(4,374억) 홀로 매수를 받아내는 취약한 구조였다.
@@ -997,7 +995,7 @@
       <div class="stage-strip"><div class="stage-steps"><span class="stage-step ">① 결정</span><span class="stage-sep">›</span><span class="stage-step ">② 컨펌</span><span class="stage-sep">›</span><span class="stage-step stage-on">③ 재평가</span></div><div class="stage-note">지금 <b>③ 재평가</b> · 간밤 반영·방향 결정 · 다음 갱신 장중 15:00 KST 결정</div><div class="stage-note">상태 <b>PREOPEN</b> · 허용 데이터: 전일 확정치·미국장·금리·유가·환율 · 허용 액션: 관심 시나리오·개장 대응(유지/축소/청산) 결정만 · 자동주문 차단</div></div>
       <div class="muted">KOSPI 6,820.02 (<span style='color:var(--up)'>+0.46%</span>) · 원달러 1,369.5</div>
       <div class="basis"><span class="basis-k">기준시각</span> 2026-09-01 08:00 KST · <span class="basis-k">수치 앵커</span> 2026-08-31 마감 · <span class="basis-note">모든 시각 KST(한국 표준시)</span></div>
-      <div class="view-actions"><button class="copy-btn" type="button" onclick="__copyReport(this)">📋 전체 복사</button><span class="copy-hint">LLM에 붙여넣어 이어서 질문</span><textarea class="copy-src" hidden aria-hidden="true"># 개장전 분석 · 코스피 · 2026-09-01
+      <div class="view-actions"><button class="copy-btn" type="button" onclick="__copyReport(this)">📋 전체 복사</button><button class="info" type="button" aria-label="설명 보기">i<span class="info-pop">리포트 전문이 마크다운으로 복사됩니다. AI 챗봇에 붙여넣어 이어서 질문할 수 있습니다.</span></button><textarea class="copy-src" hidden aria-hidden="true"># 개장전 분석 · 코스피 · 2026-09-01
 - 상태: 개장전 재검토 · 기준시각 2026-09-01 08:00 KST(모든 시각 KST)
 
 간밤 미국 3대 지수는 동반 약세(다우 -0.70%·S&amp;P500 -0.33%·나스닥 -0.12%)였으나 필라델피아반도체는 +0.57% 상승했고, 원달러는 1369.5원으로 원화 강세(-0.83%)를 보였다(간밤 확인). 전일 코스피는 6820.02(+0.46%)로 마감했으나 총점 49.5(약세 등급), 수급 점수 10.0으로 외국인·기관 동반 대규모 순매도가 확인됐다.
@@ -1139,7 +1137,7 @@
       <div class="stage-strip"><div class="stage-steps"><span class="stage-step ">① 결정</span><span class="stage-sep">›</span><span class="stage-step ">② 컨펌</span><span class="stage-sep">›</span><span class="stage-step stage-on">③ 재평가</span></div><div class="stage-note">지금 <b>③ 재평가</b> · 간밤 반영·방향 결정 · 다음 갱신 장중 15:00 KST 결정</div><div class="stage-note">상태 <b>PREOPEN</b> · 허용 데이터: 전일 확정치·미국장·금리·유가·환율 · 허용 액션: 관심 시나리오·개장 대응(유지/축소/청산) 결정만 · 자동주문 차단</div></div>
       <div class="muted">KOSDAQ 834.29 (<span style='color:var(--down)'>-0.49%</span>) · 원달러 1,369.5</div>
       <div class="basis"><span class="basis-k">기준시각</span> 2026-09-01 08:00 KST · <span class="basis-k">수치 앵커</span> 2026-08-31 마감 · <span class="basis-note">모든 시각 KST(한국 표준시)</span></div>
-      <div class="view-actions"><button class="copy-btn" type="button" onclick="__copyReport(this)">📋 전체 복사</button><span class="copy-hint">LLM에 붙여넣어 이어서 질문</span><textarea class="copy-src" hidden aria-hidden="true"># 개장전 분석 · 코스닥 · 2026-09-01
+      <div class="view-actions"><button class="copy-btn" type="button" onclick="__copyReport(this)">📋 전체 복사</button><button class="info" type="button" aria-label="설명 보기">i<span class="info-pop">리포트 전문이 마크다운으로 복사됩니다. AI 챗봇에 붙여넣어 이어서 질문할 수 있습니다.</span></button><textarea class="copy-src" hidden aria-hidden="true"># 개장전 분석 · 코스닥 · 2026-09-01
 - 상태: 개장전 재검토 · 기준시각 2026-09-01 08:00 KST(모든 시각 KST)
 
 코스닥은 전일 -0.49%로 마감하며 총점 58.5점 중립 등급을 확정했고, 간밤 미국 증시는 다우·S&amp;P500·나스닥 약세 속 나스닥100·필라델피아반도체는 상승하는 혼조 흐름을 보였다. 원달러는 1369.5원으로 원화 강세 흐름이 이어져 외국인 수급 개선 기대와 지수 부담이 동시에 상존하는 상황이다.
@@ -1290,11 +1288,11 @@
     <div class="view-head">
       <div class="view-title">BTCUSDT <span class="view-sub">· 비트코인 선물</span> <span class="badge badge-info">세션 스냅샷</span></div>
       <div class="dt-chip"><span class="dt-date">📅 2026-09-01 · 9월 1일 (화)</span><span class="dt-time">🕐 09:30 KST 기준</span></div>
-      <div class="slot-pick"><div class="btc-datewrap"><label class="slot-lab">날짜 <select class="slot-sel btc-datesel" onchange="if(this.value) location=this.value"><option value="/#btc-perp" selected>2026-09-01</option><option value="/archive/btc/2026-08-31-2200.html#btc-perp">2026-08-31</option><option value="/archive/btc/2026-08-30-2200.html#btc-perp">2026-08-30</option><option value="/archive/btc/2026-08-29-2200.html#btc-perp">2026-08-29</option><option value="/archive/btc/2026-08-28-2200.html#btc-perp">2026-08-28</option><option value="/archive/btc/2026-08-27-2200.html#btc-perp">2026-08-27</option><option value="/archive/btc/2026-08-26-2200.html#btc-perp">2026-08-26</option><option value="/archive/btc/2026-08-25-2200.html#btc-perp">2026-08-25</option><option value="/archive/btc/2026-08-24-2200.html#btc-perp">2026-08-24</option><option value="/archive/btc/2026-08-23-2200.html#btc-perp">2026-08-23</option><option value="/archive/btc/2026-08-22-2200.html#btc-perp">2026-08-22</option><option value="/archive/btc/2026-08-21-2200.html#btc-perp">2026-08-21</option></select></label></div><div class="slot-regs"><a class="slot-chip active" href="/#btc-perp">09:30</a></div><span class="slot-hint">정규 하루 2회(09:30·22:00 KST) · 수동은 목록</span></div>
+      <div class="slot-pick"><div class="btc-datewrap"><label class="slot-lab">날짜 <select class="slot-sel btc-datesel" onchange="if(this.value) location=this.value"><option value="/#btc-perp" selected>2026-09-01</option><option value="/archive/btc/2026-08-31-2200.html#btc-perp">2026-08-31</option><option value="/archive/btc/2026-08-30-2200.html#btc-perp">2026-08-30</option><option value="/archive/btc/2026-08-29-2200.html#btc-perp">2026-08-29</option><option value="/archive/btc/2026-08-28-2200.html#btc-perp">2026-08-28</option><option value="/archive/btc/2026-08-27-2200.html#btc-perp">2026-08-27</option><option value="/archive/btc/2026-08-26-2200.html#btc-perp">2026-08-26</option><option value="/archive/btc/2026-08-25-2200.html#btc-perp">2026-08-25</option><option value="/archive/btc/2026-08-24-2200.html#btc-perp">2026-08-24</option><option value="/archive/btc/2026-08-23-2200.html#btc-perp">2026-08-23</option><option value="/archive/btc/2026-08-22-2200.html#btc-perp">2026-08-22</option><option value="/archive/btc/2026-08-21-2200.html#btc-perp">2026-08-21</option></select></label></div><div class="slot-regs"><a class="slot-chip active" href="/#btc-perp">09:30</a></div><button class="info" type="button" aria-label="설명 보기">i<span class="info-pop">정규 발행은 하루 2회(09:30·22:00 KST) 칩, 수동 발행분은 수동 목록에서 선택합니다.</span></button></div>
       <div class="basis"><span class="basis-k">기준</span> 2026-09-01 13:40 KST · 마크 78,704.0 (<span style="color:var(--up)">+0.20%</span>)
         · 나스닥 마감 -0.12% · 실시간 아님
         <span class="basis-note">· 모든 시각 KST(한국 표준시)</span></div>
-      <div class="view-actions"><button class="copy-btn" type="button" onclick="__copyReport(this)">📋 전체 복사</button><span class="copy-hint">LLM에 붙여넣어 이어서 질문</span><textarea class="copy-src" hidden aria-hidden="true"># BTCUSDT 무기한 선물 · 2026-09-01 0930
+      <div class="view-actions"><button class="copy-btn" type="button" onclick="__copyReport(this)">📋 전체 복사</button><button class="info" type="button" aria-label="설명 보기">i<span class="info-pop">리포트 전문이 마크다운으로 복사됩니다. AI 챗봇에 붙여넣어 이어서 질문할 수 있습니다.</span></button><textarea class="copy-src" hidden aria-hidden="true"># BTCUSDT 무기한 선물 · 2026-09-01 0930
 - 상태: 마감 확정 · 기준시각 2026-09-01 13:40 KST(모든 시각 KST)
 
 BTCUSDT는 마크가격 78,703.96 부근 박스권에서 총점 55.2(중립 등급)·세션확률 LONG 62%로 방향 편향은 있으나, 기술·기본 팩터 괴리와 확신도 Low로 수렴 게이트가 작동했다. 레버리지 롱군집(OI↑·펀딩+) 상태가 확인되어 청산 변동성 리스크가 남아있다.
