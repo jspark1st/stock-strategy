@@ -461,7 +461,8 @@ def score_btc(h4: dict, h1: dict | None, funding_now, funding_avg, oi, oi_prev,
               nasdaq_chg, news_good, news_bad, fng, community_bias,
               mark: float, core_ok: bool, event_lock: bool, calib: dict | None,
               missing_force: list[str] | None = None,
-              oi_chg_session: float | None = None) -> dict:
+              oi_chg_session: float | None = None,
+              sns_na: bool = True) -> dict:
     warnings: list[str] = []
     gates: list[str] = []
     subs: dict[str, dict] = {}
@@ -493,11 +494,15 @@ def score_btc(h4: dict, h1: dict | None, funding_now, funding_avg, oi, oi_prev,
         missing.append("news")
     else:
         subs["news"] = score_news(news_good or 0, news_bad or 0)
-    sn = score_sns(fng, community_bias)
-    if sn:
-        subs["sns"] = sn
-    else:
-        missing.append("sns")
+    # SNS(Fear&Greed) 점수 제외 — 7년·2549일·다레짐 측정에서 AUC 0.491(CI 0.5 포함/미만)로
+    # 방향 판별력 0. 검증 안 된 팩터에 가중을 주지 않는다(vol_tilt 철회·주식 news_na 와 동일).
+    # F&G 는 화면 overlay 로만 표시(_btc_sns_card·pos 카드). 재현: scripts/exp_btc_sns.py.
+    if not sns_na:
+        sn = score_sns(fng, community_bias)
+        if sn:
+            subs["sns"] = sn
+        else:
+            missing.append("sns")
 
     if event_lock:
         gates.append("대형 이벤트 락(FOMC/CPI 전후) — 신규 진입 차단")
@@ -545,7 +550,9 @@ def score_btc(h4: dict, h1: dict | None, funding_now, funding_avg, oi, oi_prev,
         if clip_bound:
             warnings.append(f"확률 클립 발동 ({PROB_CLIP_LO:.0%}–{PROB_CLIP_HI:.0%})")
 
-    completeness = round(sum(WEIGHTS[k] for k in present), 2)
+    # sns_na 면 SNS 가중(0.08)을 완전성 분모에서도 빼 나머지 5팩터가 다 있으면 100%.
+    uni_total = sum(v for k, v in WEIGHTS.items() if not (sns_na and k == "sns")) or 1.0
+    completeness = round(sum(WEIGHTS[k] for k in present) / uni_total, 2)
     if missing:
         warnings.insert(0, f"부분 데이터(결측: {', '.join(missing)}) — 가중치 재배분")
 

@@ -830,3 +830,20 @@ def test_deriv_quadrant_definition_and_oi_unit():
     assert q == "Q1"
     assert "OI↑·펀딩+" in sub["observed"]
     assert "OI 단위 계약(BTC)" in sub["observed"]
+
+
+def test_sns_excluded_from_score_fng_display_only():
+    """2026-09-01 측정(n=2549·AUC 0.491): SNS(F&G) 판별력 0 → 점수 제외(sns_na).
+    F&G 를 바꿔도 총점·확률 불변, subscore 에 sns 없음, F&G 는 화면 overlay 로만."""
+    h4 = {"close": 100000, "ema9": 101000, "ema21": 99000, "ema50": 98000,
+          "macd_hist": 10, "rsi": 56, "adx": 20, "st_dir": 1}
+    base = (h4, {"atr": 500}, 0.0001, 0.0001, 100, 99, 1.0, 1.0, 1.0, 0.0, False,
+            0.5, 1, 1)  # ...news_good=1, news_bad=1
+    tail = (None, 100000, True, False, None)  # community_bias, mark, core_ok, event_lock, calib
+    fear = btc_scoring.score_btc(*base, 15, *tail)   # 극단 공포
+    greed = btc_scoring.score_btc(*base, 85, *tail)  # 극단 탐욕
+    assert fear["total"] == greed["total"]           # F&G 가 점수를 안 움직인다
+    assert fear["p_long"] == greed["p_long"]
+    assert "sns" not in {s["key"] for s in fear["subscores"]}
+    assert "sns" not in (fear.get("missing_keys") or [])   # 결측이 아니라 정책 제외
+    assert fear["data_completeness"] == 1.0           # 5팩터 다 있으면 100%
