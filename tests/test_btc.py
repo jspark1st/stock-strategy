@@ -778,3 +778,29 @@ def test_btc_copytext_consistent_with_gate():
     # 재개조건은 실제 차단사유에서 — LLM 의 '일치도 60%' 서술은 안 나온다
     assert "수렴 게이트(괴리·확신도 Low)" in md
     assert "일치도가 60% 이상으로 회복" not in md
+
+
+def test_tech_comment_uses_edge_not_alignment_and_flags_1h():
+    """자가비평: 'EMA21 하회인데 강세 정렬' 모순 → '정렬'(EMA 정배열 암시) 대신 '우위'(점수),
+    그리고 4H 우위여도 1H 약화를 숨기지 않는다."""
+    from src.btc_scoring import score_tech
+    # 4H 점수 강세 우위(EMA21 하회지만 MACD+·ST↑로 순 60대) + 1H 약세(rsi 46)
+    h4 = {"close": 100000, "ema9": 99000, "ema21": 101000, "ema50": 98000,
+          "macd_hist": 5, "rsi": 50, "adx": 18, "st_dir": 1}
+    t = score_tech(h4, {"rsi": 46})
+    assert "정렬" not in t["comment"]          # EMA 정배열 암시 표현 제거
+    assert "강세 우위" in t["comment"] or "중립" in t["comment"]
+    if t["score"] >= 55:
+        assert "1H 약화" in t["comment"]        # 1H 역행 숨기지 않음
+
+
+def test_btc_hero_leads_with_direction_band_not_grade():
+    """자가비평: hero '약세' 가 숏 신호로 오독됨 → BTC 는 방향 밴드를 앞세우고
+    게이트 등급은 '내부 게이트 밴드'로 부기(grade_of 불변, 표시만)."""
+    import render_report as rr
+    r = {"report_type": "btc_perp", "total": 50.4, "grade": "약세",
+         "p_long": 0.509, "p_short": 0.491, "verdict": "NO_TRADE"}
+    h = rr.build_hero(r)
+    assert "방향 중립" in h                      # 50.4 → 방향밴드 중립을 앞세움
+    assert "내부 게이트 밴드 약세" in h          # 등급은 부기(방향 판정 아님)
+    assert "방향 판정 아님" in h

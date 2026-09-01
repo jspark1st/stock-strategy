@@ -110,11 +110,18 @@ def score_tech(h4: dict, h1: dict | None = None) -> dict | None:
     observed = f"4H {px:,.1f} · " + " · ".join(parts) if parts else f"4H {px:,.1f}"
     if h1 and h1.get("rsi") is not None:
         observed += f" · 1H RSI {h1['rsi']:.0f}"
-    # 코멘트는 **점수 방향**과 국면을 함께 말한다. 예전엔 국면(ADX)만 반영해
-    # 76점(강세 정렬)인데 코멘트가 '횡보' 로 나와 수치와 서술이 어긋났다(자가비평 재발).
-    lean = "강세 정렬" if s >= 55 else ("약세 정렬" if s <= 45 else "중립")
+    # 코멘트는 **점수 방향(정렬 아님)** 과 국면을 함께 말한다. '정렬' 은 EMA 정배열을
+    # 암시해 'EMA21 하회인데 강세 정렬' 모순을 만들었다(자가비평 지적) → '우위'(점수 기준)로.
+    lean = "강세 우위" if s >= 55 else ("약세 우위" if s <= 45 else "중립")
     regime = "추세" if trending else "비추세(횡보)"
     comment = f"{lean} · {regime}"
+    # 하위 시간축(1H) 역행은 숨기지 않는다 — 4H 점수 우위가 1H 약화를 가리지 않게.
+    h1_rsi = (h1 or {}).get("rsi")
+    if h1_rsi is not None:
+        if s >= 55 and h1_rsi < 48:
+            comment += " · 1H 약화"
+        elif s <= 45 and h1_rsi > 52:
+            comment += " · 1H 반등"
     return _sub("tech", s, observed, comment)
 
 

@@ -284,11 +284,21 @@ def build_hero(r: dict) -> str:
             lead = f'<b>{_caution}</b> ' if _caution else "방향 확률은 참고용 점추정입니다. "
             cls = "hero-note hero-caution" if _caution else "hero-note"
             calib = f'<div class="{cls}">{lead}{_info(" ".join(_d))}</div>'
+    # BTC 는 등급('약세' 등)이 방향 판정으로 오독된다(자가비평). 방향 밴드(midpoint 50 기준)를
+    # 앞세우고, 게이트 결합 등급은 '내부 게이트 밴드'로 부기 — grade_of 로직은 불변, 표시만.
+    if btc and total is not None:
+        _band = _btc_direction_band(total)
+        _bcol = ("var(--up)" if "강세" in _band else
+                 "var(--down)" if "약세" in _band else "var(--neutral)")
+        grade_html = (f'<div class="grade" style="color:{_bcol}">방향 {esc(_band)}</div>'
+                      f'<div class="lbl muted">내부 게이트 밴드 {grade} · 방향 판정 아님</div>')
+    else:
+        grade_html = f'<div class="grade" style="color:{grade_color(r.get("grade",""))}">{grade}</div>'
     return f"""
     <div class="stat">
       <div class="big" style="color:var(--accent)">{total_txt}</div>
       <div class="lbl">{total_lbl}</div>
-      <div class="grade" style="color:{grade_color(r.get('grade',''))}">{grade}</div>
+      {grade_html}
     </div>
     {_donut(p_up, 'var(--up)', up_lbl)}
     {_donut(p_down, 'var(--down)', down_lbl)}
