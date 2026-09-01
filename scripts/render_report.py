@@ -1977,9 +1977,11 @@ def _btc_conv_card(r: dict) -> str:
     # Medium=다수결 비율 ≥67%, 그 외(괴리 포함·다수결<67%)=Low.
     why = []
     if longs and shorts:
-        why.append("반대 팩터 존재(괴리)")
-    if ag is not None and ag < 0.67 and directional:
-        why.append(f"다수결 {ag*100:.1f}%<67%")
+        why.append("반대 팩터 존재(High 불가)")
+    # 저장 agreement 는 round(_,2)=0.67 이라 <0.67 을 못 탄다 → 정밀 비율(다수결_n/방향)로 판정.
+    mr = (c.get("majority_n") / directional) if directional else None
+    if mr is not None and mr < 0.67:
+        why.append(f"다수결 {mr*100:.1f}%<67%(Medium 미달)")
     reason_note = (f'<div class="note muted">확신도 {esc(conf)} 사유: {" · ".join(why)}</div>'
                    if conf != "High" and why else "")
     conv_info = _info(
