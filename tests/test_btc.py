@@ -893,3 +893,19 @@ def test_btc_gate_forward_log(tmp_path):
     s1 = [r for r in rows if r["slot"] == "0930"][0]
     assert s1["graded"] == 1 and abs(s1["r_m2m"] - 1.0) < 1e-6
     assert s1["blocked"] == 1          # 차단 세션도 R 을 남긴다(counterfactual)
+
+
+def test_sns_card_excludes_community_topics():
+    """SNS 점수 제외(sns_na) 후 표시 카드도 무관 커뮤니티 3기사(CZ·XRP·프리세일)를
+    나열하지 않고 F&G 만 '역추세 과열 참고·점수 미반영'으로 남긴다(자가비평 반영)."""
+    import render_report as rr
+    r = {"report_type": "btc_perp", "fng": 69,
+         "sns": {"n": 3, "topics": [
+             {"tag": "호재", "title": "CZ Says Rising X Follower Count..."},
+             {"tag": "호재", "title": "Altcoin XRP Expected to Climb..."},
+             {"tag": "중립", "title": "Apeing Presale Countdown Next 100x..."}]}}
+    h = rr._btc_sns_card(r)
+    assert "점수 미반영" in h and "역추세 과열 참고" in h
+    assert "CZ" not in h and "XRP" not in h and "Presale" not in h  # 노이즈 기사 미노출
+    # F&G 없으면 카드 자체 생략
+    assert rr._btc_sns_card({"report_type": "btc_perp", "fng": None}) == ""

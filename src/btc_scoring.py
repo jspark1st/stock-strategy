@@ -541,7 +541,7 @@ def score_btc(h4: dict, h1: dict | None, funding_now, funding_avg, oi, oi_prev,
     if min(bull_w, bear_w) > 0.05 and p is not None:
         shrink = 0.20 * disagree
         p = 0.5 + (p - 0.5) * (1 - shrink)
-        warnings.append(f"신호 일치도 {agreement:.0%} — 방향 확신 완화")
+        warnings.append(f"가중 일치도 {agreement:.0%} — 방향 확신 완화")
 
     clip_bound = False
     if p is not None:

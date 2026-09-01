@@ -1510,13 +1510,11 @@ def build_report_text(r: dict) -> str:
                 L.append(f"- {tf}: 종가 {fmt(d.get('close'))} · RSI {fmt(d.get('rsi'),0)}"
                          f" · MACD {signed(d.get('macd_hist'),0)} · EMA21 {fmt(d.get('ema21'))}"
                          f" · ST{st} · ATR {fmt(d.get('atr_pct'),2)}%")
-        sns = r.get("sns") or {}
-        if sns.get("n"):
-            L.append(f"\n## SNS 심리\n- 표본 {sns.get('n')} · 호재 {sns.get('pos')} 악재 {sns.get('neg')}"
-                     + (f" · 편향 {sns.get('bias')}" if sns.get("bias") else ""))
-            for t in (sns.get("topics") or [])[:5]:
-                if isinstance(t, dict) and t.get("title"):
-                    L.append(f"  · [{t.get('tag','')}] {t['title']}")
+        # SNS 는 점수 제외(sns_na). 커뮤니티 토픽은 나열하지 않고 F&G 만 참고로 남긴다.
+        if btc and r.get("fng") is not None:
+            L.append(f"\n## SNS·심리 (점수 미반영·참고)\n- Fear&Greed {r.get('fng')} — 역추세 과열 "
+                     f"참고만. 방향 점수·수렴 제외(7년 측정 판별력 0). 커뮤니티 표본"
+                     f" {(r.get('sns') or {}).get('n') or 0}건은 BTC 직접 수급 아님 → 제외.")
     # 수급
     fl = r.get("flows") or {}
     if fl and not btc:
@@ -1990,36 +1988,25 @@ def _btc_conv_card(r: dict) -> str:
 
 
 def _btc_sns_card(r: dict) -> str:
-    sns = r.get("sns") or {}
-    topics = sns.get("topics") or []
-    if not topics and r.get("fng") is None:
+    # SNS 는 방향 점수에서 제외됨(sns_na, 7년·2549일 측정 AUC 0.491=판별력 0). 커뮤니티 토픽
+    # (CZ 팔로워·알트 프리세일 등)은 BTC 직접 수급이 아니라 노이즈라 나열하지 않는다 —
+    # Fear&Greed 만 '역추세 과열 참고'로 남기고 점수·수렴엔 넣지 않는다(자가비평 반영).
+    fng = r.get("fng")
+    if fng is None:
         return ""
-    rows = ""
-    tag_col = {"호재": "var(--up)", "악재": "var(--down)"}
-    for t in topics[:8]:
-        tag = t.get("tag", "중립")
-        col = tag_col.get(tag, "var(--muted)")
-        title, url = esc(t.get("title", "")), t.get("url", "")
-        body = (f'<a href="{esc(url)}" target="_blank" rel="noreferrer">{title}</a>'
-                if url else title)
-        # 재료 카드와 같은 규율: 극성에 안 들어간 항목은 이유를 붙여 표시만 한다.
-        why = ("" if t.get("counted", True) else
-               f' <span class="badge badge-warn">제외 · {esc(t.get("reason") or "")}</span>')
-        rows += (f'<li><span class="mtag" style="background:{col}">{esc(tag)}</span>'
-                 f'<span class="mtime">{esc(t.get("hhmm",""))}</span> {body}{why}</li>')
-    ul = f'<ul class="mat-ul">{rows}</ul>' if rows else '<p class="muted">커뮤니티 토픽 없음</p>'
-    bias = sns.get("bias")
-    sns_info = _info("가격을 다시 설명하거나 BTC와 무관한 항목은 극성 집계에서 제외합니다"
-                     "(차트·펀딩과 이중 계상을 막기 위해).")
+    n = (r.get("sns") or {}).get("n") or 0
+    mood = ("극단탐욕" if fng >= 76 else "탐욕" if fng >= 56 else
+            "중립" if fng >= 45 else "공포" if fng >= 25 else "극단공포")
+    sns_info = _info("SNS 심리는 방향 점수에서 제외했습니다(7년·2549일 측정에서 판별력 0). "
+                     "Fear&Greed 만 역추세 과열 참고로 표시하며 점수·수렴에는 넣지 않습니다. "
+                     "커뮤니티 표본은 BTC 직접 수급이 아니라 나열하지 않습니다.")
     return f"""
     <div class="card">
-      <h2>SNS 토픽 <span class="pill pill-ghost">참고 · 극단 역행 · 뉴스 점수와 분리</span>{sns_info}</h2>
+      <h2>SNS·심리 <span class="pill pill-ghost">점수 미반영 · 참고</span>{sns_info}</h2>
       <div class="tiles">
-        {_tile("Fear&Greed", str(r.get("fng") if r.get("fng") is not None else "—"))}
-        {_tile("커뮤니티 극성", f"{bias:+.2f}" if bias is not None else "결측")}
-        {_tile("극성 집계", f"{sns.get('pos',0)}호/{sns.get('neg',0)}악 · {sns.get('counted',0)}/{sns.get('n',0)}건")}
+        {_tile("Fear&Greed", f"{fng} · {mood}", sub="역추세 과열 참고")}
+        {_tile("커뮤니티 표본", f"{n}건", sub="BTC 직접 수급 아님 · 제외")}
       </div>
-      {ul}
     </div>"""
 
 
