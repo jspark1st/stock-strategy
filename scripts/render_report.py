@@ -1972,16 +1972,29 @@ def _btc_conv_card(r: dict) -> str:
     if sa is not None:
         metrics.append(f'가중 일치도 <b>{sa*100:.0f}%</b> (확률 수축용)')
     met_html = '<div class="note muted">' + " · ".join(metrics) + "</div>"
+    # 확신도 규칙을 화면에 노출 — '왜 Low인가'를 재현 가능하게(자가비평: 게이트 블랙박스화 방지).
+    # 규칙은 build_convergence SoT 그대로(재설계 아님): High=방향팩터 ≥3 전부 동일,
+    # Medium=다수결 비율 ≥67%, 그 외(괴리 포함·다수결<67%)=Low.
+    why = []
+    if longs and shorts:
+        why.append("반대 팩터 존재(괴리)")
+    if ag is not None and ag < 0.67 and directional:
+        why.append(f"다수결 {ag*100:.1f}%<67%")
+    reason_note = (f'<div class="note muted">확신도 {esc(conf)} 사유: {" · ".join(why)}</div>'
+                   if conf != "High" and why else "")
     conv_info = _info(
         "세 숫자는 분모가 다릅니다. 관점 다수결=방향을 낸 팩터, "
         f"코어 정렬=기술·파생·체결이 후보 방향과 같은 개수(필요 {need}), "
-        "가중 일치도=확률 수축용. 괴리가 나면 차트·규제를 심리보다 우선합니다.")
+        "가중 일치도=확률 수축용. 괴리가 나면 차트·규제를 심리보다 우선합니다. "
+        "확신도 규칙: 방향 팩터 ≥3개가 전부 같은 방향=High · 다수결 비율 ≥67%=Medium · "
+        "그 외(반대 팩터 존재=괴리, 또는 다수결<67%)=Low.")
     return f"""
     <div class="card">
       <h2>수렴 / 괴리 <span class="pill pill-ghost">{kind} · 확신도 {conf}</span>{conv_info}</h2>
       <p class="headline">{esc(c.get("sentence") or "")}</p>
       {pri_html}
       {met_html}
+      {reason_note}
       <div class="conf-row" style="margin-top:10px">{chips}</div>
       <table class="cd-table"><thead><tr><th>관점</th><th>신호</th></tr></thead><tbody>{rows}</tbody></table>
     </div>"""

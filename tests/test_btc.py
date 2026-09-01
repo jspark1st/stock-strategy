@@ -909,3 +909,22 @@ def test_sns_card_excludes_community_topics():
     assert "CZ" not in h and "XRP" not in h and "Presale" not in h  # 노이즈 기사 미노출
     # F&G 없으면 카드 자체 생략
     assert rr._btc_sns_card({"report_type": "btc_perp", "fng": None}) == ""
+
+
+def test_conv_card_exposes_confidence_reason():
+    """자가비평(게이트 블랙박스화 방지): '왜 Low인가'를 화면에 노출 —
+    괴리(반대 팩터)·다수결<67% 사유 + 확신도 규칙(High/Medium/Low)."""
+    import render_report as rr
+    r = {"report_type": "btc_perp", "verdict": "NO_TRADE",
+         "core_aligned": 2, "core_needed": 2, "core_side": "Long",
+         "signal_agreement": 0.63, "p_long": 0.62,
+         "gate": {"new_entry_blocked": True},
+         "convergence": {"conviction": "Low", "kind": "괴리", "majority": "Long",
+                         "majority_n": 2, "directional": 3, "longs": 2, "shorts": 1,
+                         "agreement": 0.667, "sentence": "괴리. 확신도 Low.",
+                         "items": [], "pillars": []}}
+    h = rr._btc_conv_card(r)
+    assert "확신도 Low 사유" in h
+    assert "괴리" in h                       # 반대 팩터 존재
+    assert "다수결" in h and "<67%" in h      # 66.7% < 67% 노출
+    assert "확신도 규칙" in h                 # 규칙 자체도 ⓘ 에 노출

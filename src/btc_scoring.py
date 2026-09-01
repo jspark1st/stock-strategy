@@ -180,7 +180,7 @@ def score_deriv(funding_now: float | None, funding_avg: float | None,
     qtxt = f"{q}({q_def})" if q_def else q
     # OI 단위는 **BTC(기초자산)** — Binance USD-M openInterest 는 계약수가 아니라 BTC 수량이다.
     observed = (f"펀딩 {ftxt}(8h) · OI {axis} {otxt}{o30 if axis == '세션' else ''} · {qtxt}"
-                f" · Binance USD-M · OI 단위 BTC")
+                f" · Binance USD-M · OI 단위 BTC(fapi raw · ×마크=명목가)")
     comment = {"Q1": "롱 군집", "Q2": "숏 군집", "Q3": "롱 청산", "Q4": "숏 청산"}.get(q, "파생 중립")
     if extreme:
         comment += " · 극단 역행"
