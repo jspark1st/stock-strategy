@@ -372,9 +372,9 @@ def build_convergence(subs: list[dict]) -> dict:
         conviction = "Low"
 
     if majority is None:
-        maj_txt = f"관점 다수결 동점 {agree:.0%} ({longs}L / {shorts}S)"
+        maj_txt = f"방향성 다수결 동점 {agree:.0%} ({longs}L / {shorts}S)"
     else:
-        maj_txt = f"관점 다수결 {majority} {majority_n}/{directional}"
+        maj_txt = f"방향성 다수결 {majority} {majority_n}/{directional}"
 
     conflict = bool(longs and shorts)
     pillar_conflict = sns_present and chart != "Flat" and psych != "Flat" and chart != psych
@@ -392,7 +392,7 @@ def build_convergence(subs: list[dict]) -> dict:
         kind = "수렴"
         priority = None
         sentence = (f"수렴. 확신도 {conviction}. {trio}. "
-                    f"관점 다수결 — 방향 팩터 {directional}개가 모두 {majority}.")
+                    f"방향성 다수결 — 방향 팩터 {directional}개가 모두 {majority}.")
     return {
         "items": items,
         "pillars": pillars,

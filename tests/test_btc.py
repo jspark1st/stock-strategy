@@ -530,7 +530,7 @@ def test_convergence_majority_is_not_call_agreement():
     assert c["majority_n"] == 2
     assert c["longs"] == 1 and c["shorts"] == 2
     assert c["agreement"] == round(2 / 3, 2)
-    assert "관점 다수결 Short 2/3" in c["sentence"]
+    assert "방향성 다수결 Short 2/3" in c["sentence"]
     assert "일치 67%" not in (c["sentence"] or "")
 
 
@@ -630,7 +630,7 @@ def test_btc_conv_card_labels_majority_and_call():
         "signal_agreement": 0.41,
         "core_aligned": 1, "core_needed": 2, "core_side": "Long",
         "convergence": {
-            "sentence": "괴리. 관점 다수결 Short 2/3.",
+            "sentence": "괴리. 방향성 다수결 Short 2/3.",
             "kind": "괴리", "conviction": "Low",
             "items": [{"label": "기술", "side": "Long"}],
             "pillars": [],
@@ -638,7 +638,7 @@ def test_btc_conv_card_labels_majority_and_call():
             "majority": "Short", "majority_n": 2, "agreement": 0.67,
         },
     })
-    assert "관점 다수결" in html and "Short" in html
+    assert "방향성 다수결" in html and "Short" in html
     assert "추천 Long과 같은 쪽" in html
     assert "1/3" in html
     assert "코어 정렬" in html and "필요 2" in html

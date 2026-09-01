@@ -1885,7 +1885,9 @@ def render_btc_view(r: dict, date: str) -> str:
              f'<div class="concl-gate">다음 세션 <b>{nxt}</b> · 펀딩·OI 국면 {esc(_quad_label(r.get("quadrant")))}'
              f'{" · 게이트 차단" if blocked else ""}'
              f' · 등급배수 {esc(str((r.get("gate") or {}).get("position_scale", "—")))}'
-             f' <span class="muted">(계좌 위험·확신 배수 아님)</span></div></div></div>')
+             f' <span class="muted">'
+             f'{"(신규 주문 차단 · 명목 노출 0)" if blocked else "(계좌 위험·확신 배수 아님)"}'
+             f'</span></div></div></div>')
     targets = ""
     atr = r.get("atr") or {}
     p = atr.get("primary") or {}
@@ -1969,13 +1971,16 @@ def _btc_conv_card(r: dict) -> str:
     longs, shorts = c.get("longs", 0), c.get("shorts", 0)
     directional = c.get("directional") or ((longs or 0) + (shorts or 0))
     maj = c.get("majority")
+    # '기술적 다수결' 로 오독되지 않게 '방향성 다수결' + Flat 개수까지 명시(자가비평).
+    flat = max(0, len(c.get("items") or []) - directional)
+    _cnt = f'{longs}L / {shorts}S / {flat}Flat'
     if directional and maj:
-        metrics.append(f'관점 다수결 <b>{esc(maj)} {c.get("majority_n") or max(longs, shorts)}/{directional}</b>'
-                       f' ({longs}L / {shorts}S · 방향 낸 팩터)')
+        metrics.append(f'방향성 다수결 <b>{esc(maj)} {c.get("majority_n") or max(longs, shorts)}/{directional}</b>'
+                       f' ({_cnt})')
     elif directional and longs == shorts and longs:
-        metrics.append(f'관점 다수결 동점 <b>{(ag or 0.5)*100:.0f}%</b> ({longs}L / {shorts}S · 방향 낸 팩터)')
+        metrics.append(f'방향성 다수결 동점 <b>{(ag or 0.5)*100:.0f}%</b> ({_cnt})')
     elif ag is not None:
-        metrics.append(f'관점 다수결 {ag*100:.0f}% ({longs}L / {shorts}S)')
+        metrics.append(f'방향성 다수결 {ag*100:.0f}% ({_cnt})')
     else:
         metrics.append("방향 팩터 없음 — 다수결 산출 불가")
     call = {"LONG": "Long", "SHORT": "Short"}.get(r.get("verdict") or "")
@@ -2004,7 +2009,7 @@ def _btc_conv_card(r: dict) -> str:
     reason_note = (f'<div class="note muted">확신도 {esc(conf)} 사유: {" · ".join(why)}</div>'
                    if conf != "High" and why else "")
     conv_info = _info(
-        "세 숫자는 분모가 다릅니다. 관점 다수결=방향을 낸 팩터, "
+        "세 숫자는 분모가 다릅니다. 방향성 다수결=방향을 낸 팩터, "
         f"코어 정렬=기술·파생·체결이 후보 방향과 같은 개수(필요 {need}), "
         "가중 일치도=확률 수축용. 괴리가 나면 차트·규제를 심리보다 우선합니다. "
         "확신도 규칙: 방향 팩터 ≥3개가 전부 같은 방향=High · 다수결 비율 ≥67%=Medium · "
