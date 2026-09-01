@@ -586,13 +586,14 @@ def main() -> int:
     ensure_lwc_vendor()
     if not dry_run:
         update_manifest(rep["trade_date"], slot, rep)  # 렌더보다 먼저 — 슬롯 칩이 읽는다
-    html = render(bundle)
+    html = render(bundle)                      # 소유자용 — '리포트 비평'(자가비평) 포함
     out_html = OUT / f"report_btc_{rep['trade_date']}_{slot}.html"
     out_html.write_text(html, encoding="utf-8")
     if not dry_run:
         PUB.mkdir(exist_ok=True)
-        (PUB / "index.html").write_text(html, encoding="utf-8")
-        arch_html = render(bundle, lwc_src="/vendor/lightweight-charts.js")
+        pub_html = render(bundle, public=True)  # 공개 배포본 — 비평 메뉴·데이터 제외
+        (PUB / "index.html").write_text(pub_html, encoding="utf-8")
+        arch_html = render(bundle, lwc_src="/vendor/lightweight-charts.js", public=True)
         write_archive_html(arch_html, rep["trade_date"], slot)
         prune_archive(90)
     print(f"✓ BTC 리포트 {out_html} ({out_html.stat().st_size:,} bytes) "

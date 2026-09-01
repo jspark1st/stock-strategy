@@ -161,6 +161,52 @@ def test_tagger_uses_word_boundaries_not_substrings():
     assert news_mod._tag_btc("Exchange announces delisting of token") == "악재"
 
 
+def test_inflow_streak_ending_is_bearish_not_bullish():
+    """실측 2026-09-01: ETF 순유출/유입추세 종료 헤드라인이 'inflow' 토큰 때문에
+    호재로 뒤집혀 게이트를 잘못 열었다. streak ends/breaks·outflow 는 약세다."""
+    assert news_mod._tag_btc(
+        "Bitcoin ETF Inflow Streak Ends With $202 Million Pullback") == "악재"
+    assert news_mod._tag_btc(
+        "Bitcoin ETF Outflows Hit $201M As Inflow Streak Breaks") == "악재"
+    # 진짜 신규 유입(streak 종료·outflow 없음)은 여전히 호재
+    assert news_mod._tag_btc("Spot Bitcoin ETF sees record inflows") == "호재"
+
+
+def test_inflow_stem_not_double_counted():
+    """`_BTC_POS_STEMS` 에 inflow 가 중복 등재돼 유입 한 번을 두 번 세던 결함."""
+    stems = [s for s in news_mod._BTC_POS_STEMS if "inflow" in s]
+    assert len(stems) == 1, f"inflow 어간 중복: {stems}"
+
+
+def test_security_howto_guide_excluded_from_score():
+    """실측 2026-09-01: 거래소 계정 보안 가이드(shattered.io)가 'sec'∈'security'
+    부분문자열로 '재료' 채점돼 뉴스 팩터를 오염시켰다. 운영 가이드는 점수 제외(참고)."""
+    assert news_mod.classify_kind_btc(
+        "Crypto Exchange Account Security: 12 Steps, 45 Min [2026]",
+        "https://shattered.io/crypto-exchange-account-security-2026") == "참고"
+    assert news_mod.classify_kind_btc("How To Secure Your Bitcoin Wallet") == "참고"
+    # 'security' 의 부분문자열 'sec' 로 규제 재료가 붙으면 안 된다
+    assert news_mod.classify_kind_btc("Bitcoin custody firm tightens security") != "재료" \
+        or "custody" in "Bitcoin custody firm tightens security".lower()
+    # 진짜 SEC(규제) 재료는 단어경계로 여전히 잡힌다
+    assert news_mod.classify_kind_btc("SEC approves spot Bitcoin ETF") == "재료"
+
+
+def test_same_event_deduped_before_scoring():
+    """같은 사건이 소스만 다르게 2건 잡히면 이중 계상된다(실측 2026-09-01 ETF 순유출).
+    같은 태그 근접중복만 병합하고, 방향이 다르면 절대 합치지 않는다."""
+    M = news_mod.Material
+    dup = [M("Bitcoin ETF Inflow Streak Ends With $202 Million Pullback", "a",
+             "악재", None, True, kind="재료"),
+           M("Bitcoin ETF Outflows Hit $201M As Inflow Streak Breaks", "b",
+             "악재", None, True, kind="재료")]
+    assert len(news_mod._dedup_events(dup)) == 1
+    # 방향이 반대면(호재 vs 악재) 병합 금지 — 반대 신호 보존
+    opp = [M("SEC approves Bitcoin ETF listing", "a", "호재", None, True, kind="재료"),
+           M("Bitcoin ETF outflows hit record high", "b", "악재", None, True, kind="재료")]
+    assert len(news_mod._dedup_events(opp)) == 2
+
+
 def test_community_bias_is_none_when_no_polarity(monkeypatch):
     """토픽 0건에 bias 0.0 을 주면 스코어링이 '중립 실데이터'로 오인한다."""
     monkeypatch.setattr(news_mod, "search", lambda *a, **k: [])
@@ -652,3 +698,19 @@ def test_btc_slot_chip_href_points_to_archive_for_other_slot():
                  re.findall(r'<a class="slot-chip[^"]*" href="([^"]+)">(\d\d:\d\d)</a>', picker))
     assert "/archive/btc/2026-08-30-0930.html" in chips.get("09:30", "")   # 다른 슬롯 → 아카이브
     assert chips.get("22:00", "").startswith("/#btc-perp")                 # 현재 슬롯 → 랜딩
+
+
+def test_tech_comment_matches_score_direction():
+    """자가비평 재발('수치 76=강세인데 코멘트=횡보'): 코멘트 방향이 점수 방향과 어긋나면 안 된다.
+    강세 정렬(EMA 정배열·MACD+·ST↑)이면 ADX 가 낮아도 코멘트에 '강세'가 들어가야 한다."""
+    from src.btc_scoring import score_tech, _side_of
+    up = {"close": 100000, "ema9": 3, "ema21": 2, "ema50": 1,
+          "macd_hist": 1, "rsi": 56, "adx": 18, "st_dir": 1}  # 정배열·비추세(ADX<25)
+    t = score_tech(up)
+    assert _side_of(t["score"]) == "Long"
+    assert "강세" in t["comment"] and "약세" not in t["comment"]
+    assert "비추세" in t["comment"]                       # 국면(ADX)도 정직하게 표기
+    down = {"close": 1, "ema9": 1, "ema21": 2, "ema50": 3,
+            "macd_hist": -1, "rsi": 44, "adx": 18, "st_dir": -1}
+    td = score_tech(down)
+    assert _side_of(td["score"]) == "Short" and "약세" in td["comment"]

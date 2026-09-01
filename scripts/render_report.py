@@ -40,11 +40,18 @@ NAV_ITEM_ORDER = (LABEL_CLOSE, LABEL_PREOPEN)
 ASSET_ORDER = ("주식", "가상화폐", "종합 리포트", "진단")
 ASSET_OF = {"코스피": "주식", "코스닥": "주식", "비트코인 선물": "가상화폐", "진단": "진단"}
 MARKET_LABEL = {"비트코인 선물": "BTC 선물", "진단": "리포트 비평"}   # 사이드바 시장 표기
-FUTURE_MARKETS = (                                   # (자산, 시장 라벨, 배지) — 예정 자리
-    ("가상화폐", "ETH 선물", "예정"),
-    ("종합 리포트", "종합 리포트", "예정"),
+FUTURE_MARKETS = (                          # (자산, 시장 라벨, 배지, 준비중 뷰 id)
+    ("가상화폐", "ETH 선물", "준비중", "soon-eth"),
+    ("종합 리포트", "종합 리포트", "준비중", "soon-composite"),
 )
-HORIZONS = (("단기", True), ("중기", False), ("장기", False))   # 지평 탭 — 단기만 활성(L5+ 예정)
+# 지평 탭 — 단기만 실제 리포트. 나머지는 클릭하면 '준비중' 페이지로.
+HORIZONS = (("단기", True, None), ("중기", False, "soon-mid"), ("장기", False, "soon-long"))
+COMING_SOON = (                             # (뷰 id, 제목) — '준비중' 안내 페이지
+    ("soon-mid", "중기 리포트"),
+    ("soon-long", "장기 리포트"),
+    ("soon-eth", "ETH 선물"),
+    ("soon-composite", "종합 리포트"),
+)
 DEFAULT_PLACEHOLDERS = [
     {"id": "kospi-preopen", "group": "코스피", "label": LABEL_PREOPEN, "note": "08:00 KST 갱신"},
     {"id": "kosdaq-preopen", "group": "코스닥", "label": LABEL_PREOPEN, "note": "08:00 KST 갱신"},
@@ -1686,15 +1693,13 @@ def _all_findings(r: dict) -> list[dict]:
     return (rv.get("rules") or []) + (rv.get("llm") or [])
 
 
-def build_review_card(r: dict) -> str:
-    """뷰 안 '리포트 자가비평' 카드 — 그 리포트의 규칙+LLM 발견."""
-    allf = _all_findings(r)
-    if not allf:
-        return ""
-    return (f'<div class="card"><h2>리포트 자가비평 '
-            f'<span class="pill pill-ghost">{len(allf)}건</span>'
-            f'{_info("규칙 기반(결정론) 점검 + Gemini 비평입니다. 자동 반영이 아니라, 개선 백로그로 누적해 보고서를 점진적으로 강화합니다.")}</h2>'
-            f'<ul class="rv-list">{_review_items_html(allf)}</ul></div>')
+def build_coming_soon_view(label: str) -> str:
+    """'준비중' 안내 페이지 — 미래 트랙(중기·장기·ETH·종합) 클릭 시 도달."""
+    return (f'<div class="empty">'
+            f'<div class="empty-icon">🚧</div>'
+            f'<h2 class="empty-title">{esc(label)}</h2>'
+            f'<p class="muted">준비 중입니다. 곧 제공될 예정입니다.</p>'
+            f'</div>')
 
 
 def build_review_view(bundle: dict) -> str:
@@ -1814,7 +1819,6 @@ def render_btc_view(r: dict, date: str) -> str:
     {build_materials(r)}
     {build_accuracy(r)}
     {build_paper(r)}
-    {build_review_card(r)}
     {build_reopen(r)}"""
 
 
@@ -2124,7 +2128,6 @@ def render_report_view(r: dict, date: str) -> str:
     {build_materials(r)}
     {build_accuracy(r)}
     {build_paper(r)}
-    {build_review_card(r)}
     {build_reopen(r)}"""
 
 
@@ -2295,9 +2298,9 @@ def build_sidebar(items: list[dict]) -> str:
                 f'<a class="{cls}" data-target="{esc(primary["id"])}" data-views="{esc(member_ids)}" '
                 f'href="#{esc(primary["id"])}" aria-label="{esc(mlabel)} {esc(asset)}">'
                 f'<span>{esc(mlabel)}</span>{_nav_badge(primary)}</a>')
-        for (_, flabel, note) in futures:               # 예정 자리(비활성)
-            out.append(f'<span class="nav-item ph" aria-disabled="true">'
-                       f'<span>{esc(flabel)}</span><span class="nav-badge">{esc(note)}</span></span>')
+        for (_, flabel, note, sid) in futures:          # 준비중 자리(클릭 → 안내 페이지)
+            out.append(f'<a class="nav-item ph" data-target="{esc(sid)}" href="#{esc(sid)}">'
+                       f'<span>{esc(flabel)}</span><span class="nav-badge">{esc(note)}</span></a>')
         out.append("</div>")
     return "".join(out)
 
@@ -2308,8 +2311,9 @@ def _view_tabs(market: str, cur_vid: str, market_views: dict) -> str:
     hashchange 로 뷰 전환(기존 핸들러 재사용). 활성 표시는 뷰마다 서버렌더돼 있어 JS 불필요."""
     hz = "".join(
         (f'<span class="vtab active">{esc(name)}</span>' if act
-         else f'<span class="vtab vtab-off" aria-disabled="true">{esc(name)}·예정</span>')
-        for (name, act) in HORIZONS)
+         else f'<a class="vtab vtab-off" data-target="{esc(sid)}" href="#{esc(sid)}">'
+              f'{esc(name)}·준비중</a>')
+        for (name, act, sid) in HORIZONS)
     rows = f'<div class="vtabs"><span class="vtabs-lbl">지평</span>{hz}</div>'
     phases = market_views.get(market) or {}
     if market != "비트코인 선물" and phases:
@@ -2352,7 +2356,10 @@ def _chart_payload(r: dict) -> dict:
     return {"name": idx.get("name", ""), "charts": charts}
 
 
-def render(data: dict, lwc_src: str | None = None) -> str:
+def render(data: dict, lwc_src: str | None = None, public: bool = False) -> str:
+    """public=True 는 **공개 배포본**(구독자용) — '리포트 비평'(자가비평) 메뉴·데이터를
+    통째로 뺀다. 비평은 소유자만 보는 private 산출(out/report_*.html)에만 실린다.
+    public=False(기본) = 소유자용 전체 렌더."""
     bundle = normalize_bundle(data)
     date = str(bundle.get("trade_date", ""))
 
@@ -2389,10 +2396,15 @@ def render(data: dict, lwc_src: str | None = None) -> str:
         tabs = _view_tabs(g, vid, market_views) if len(market_views.get(g, {})) > 1 else ""
         views.append((vid, tabs + render_placeholder_view(p)))
 
-    # 리포트 비평 뷰 — 메뉴 하나. 전 시장 비평 + 교차 점검 + 누적 개선 백로그.
-    n_rev = sum(len(_all_findings(r)) for r in bundle["reports"]) + \
-        len(bundle.get("review_cross") or [])
-    if bundle["reports"]:
+    # 미래 트랙(중기·장기·ETH·종합) '준비중' 페이지 — 사이드바/지평탭에서 클릭해 도달.
+    for sid, slabel in COMING_SOON:
+        views.append((sid, build_coming_soon_view(slabel)))
+
+    # 리포트 비평(자가비평) — **소유자 전용**. 공개본(public)에는 메뉴·데이터를 넣지 않는다.
+    # 구독 상품으로 팔 때 비평은 나만 본다: 공개 HTML 에 비평 텍스트 자체가 실리지 않게 한다.
+    if not public and bundle["reports"]:
+        n_rev = sum(len(_all_findings(r)) for r in bundle["reports"]) + \
+            len(bundle.get("review_cross") or [])
         items.append({"id": "report-review", "label": "리포트 비평", "group": "진단",
                       "ph": False, "badge": (f"{n_rev}건" if n_rev else "—")})
         views.append(("report-review", build_review_view(bundle)))

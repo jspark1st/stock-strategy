@@ -881,14 +881,15 @@ def main() -> int:
             json.dumps(snap, ensure_ascii=False, indent=2), encoding="utf-8")
 
     out_path = out_dir / f"report_{trade_date}.html"
-    html = render(bundle)
+    html = render(bundle)                      # 소유자용 — '리포트 비평'(자가비평) 포함
     out_path.write_text(html, encoding="utf-8")
     if not dry_run:
         pub = ROOT / "public"
         pub.mkdir(exist_ok=True)
-        (pub / "index.html").write_text(html, encoding="utf-8")
+        pub_html = render(bundle, public=True)  # 공개 배포본 — 비평 메뉴·데이터 제외
+        (pub / "index.html").write_text(pub_html, encoding="utf-8")
         try:
-            _archive_stock_day(html, trade_date)
+            _archive_stock_day(pub_html, trade_date)
         except Exception as e:  # noqa — 아카이브 실패가 배포를 막지 않게
             print(f"⚠ 대시보드 아카이브 실패({type(e).__name__}) — 스킵")
     bundle_name = f"bundle_{trade_date}.dryrun.json" if dry_run else f"bundle_{trade_date}.json"

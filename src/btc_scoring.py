@@ -110,7 +110,11 @@ def score_tech(h4: dict, h1: dict | None = None) -> dict | None:
     observed = f"4H {px:,.1f} · " + " · ".join(parts) if parts else f"4H {px:,.1f}"
     if h1 and h1.get("rsi") is not None:
         observed += f" · 1H RSI {h1['rsi']:.0f}"
-    comment = "추세 우세" if trending else "횡보·모멘텀"
+    # 코멘트는 **점수 방향**과 국면을 함께 말한다. 예전엔 국면(ADX)만 반영해
+    # 76점(강세 정렬)인데 코멘트가 '횡보' 로 나와 수치와 서술이 어긋났다(자가비평 재발).
+    lean = "강세 정렬" if s >= 55 else ("약세 정렬" if s <= 45 else "중립")
+    regime = "추세" if trending else "비추세(횡보)"
+    comment = f"{lean} · {regime}"
     return _sub("tech", s, observed, comment)
 
 

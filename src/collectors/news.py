@@ -321,7 +321,7 @@ _BTC_POS_STEMS = [
     r"rall(?:y|ies|ied)", r"surg\w*", r"breakout", r"accumulat\w*",
     r"treasur\w*", r"reserve\w*", r"institutional\s+demand", r"rate\s+cut\w*",
     r"dovish", r"easing", r"upgrade\w*", r"partnership\w*", r"settle[sd]?",
-    r"dismiss\w*", r"legali[sz]\w*", r"halving", r"clarity", r"inflow",
+    r"dismiss\w*", r"legali[sz]\w*", r"halving", r"clarity",
 ]
 _BTC_NEG_STEMS = [
     r"outflow\w*", r"hack\w*", r"exploit\w*", r"breach\w*", r"stolen",
@@ -337,6 +337,19 @@ _BTC_POS_RE = [re.compile(rf"\b{s}\b", re.I) for s in _BTC_POS_STEMS]
 _BTC_NEG_RE = [re.compile(rf"\b{s}\b", re.I) for s in _BTC_NEG_STEMS]
 
 
+# 자금 흐름 반전형 헤드라인. "ETF Inflow **Streak Ends**"·"Outflows Hit $201M As
+# Inflow Streak **Breaks**" 는 'inflow' 라는 단어를 포함하지만 **약세**다(유입이 끊겼다).
+# 그대로 두면 inflow 가 호재로 잡혀 순유출 뉴스가 호재로 뒤집힌다(실측 2026-09-01 결함).
+_OUTFLOW_RE = re.compile(r"\boutflow", re.I)
+_FLOW_REVERSAL_RE = re.compile(
+    r"streak\s+(?:end|break|snap|halt|stall|reverse|stop)\w*", re.I)
+
+
+def _flow_bearish(text: str) -> bool:
+    """유입 추세 종료·순유출 서술인가(inflow 토큰이 실제로는 약세)."""
+    return bool(_OUTFLOW_RE.search(text) or _FLOW_REVERSAL_RE.search(text))
+
+
 def _tag_btc(title: str, content: str = "") -> str:
     """BTC 재료 호재/악재 — 영문 + 한국어 순(net) 판정. 제목 우선, 중립일 때만 본문."""
     def _count(text: str) -> tuple[int, int]:
@@ -344,6 +357,10 @@ def _tag_btc(title: str, content: str = "") -> str:
                + sum(1 for k in _POS if k in text))
         neg = (sum(1 for rx in _BTC_NEG_RE if rx.search(text))
                + sum(1 for k in _NEG if k in text))
+        # 유입추세 종료/순유출이면 'inflow' 호재 크레딧을 회수하고 약세로 고정.
+        if _flow_bearish(text) and re.search(r"\binflow", text, re.I):
+            pos = max(0, pos - 1)
+            neg = max(neg, 1)
         return pos, neg
 
     pos, neg = _count(title)
@@ -375,8 +392,59 @@ _PRICE_TALK_RE = re.compile(
     r"weekly\s+gain|price\s+target|chart\s+(?:pattern|signal)|death\s+cross|"
     r"golden\s+cross|overbought|oversold)", re.I)
 _BTC_SPECIFIC_RE = re.compile(r"\b(?:bitcoin|btc)\b|비트코인", re.I)
-_MATERIAL_KEYS = ("etf", "sec", "hack", "fed", "fomc", "cpi", "regulation",
-                  "lawsuit", "custody", "해킹", "규제", "현물 etf")
+# 재료 키워드. 영문 약어는 **단어경계**로 매칭한다 — 부분문자열이면 "sec" 가
+# "Se**c**urity"·"pro**sec**ute", "fed" 가 "**fed**eral" 아닌 곳까지 걸려 오분류된다
+# (실측 2026-09-01: 보안 가이드가 "sec"∈"security" 로 '재료' 채점됨). 한국어는 그대로.
+_MATERIAL_WORD_RE = re.compile(
+    r"\b(?:etf|sec|hack\w*|fed|fomc|cpi|regulat\w*|lawsuit|custody|spot\s+etf)\b",
+    re.I)
+_MATERIAL_KO = ("해킹", "규제", "현물 etf")
+
+# 운영·보안·입문 가이드(계정 보안·2FA·API 키·N단계 튜토리얼)는 가격 방향 재료가
+# 아니다 — 화면엔 보이되 점수 제외(참고). 실측 2026-09-01: shattered.io 보안 글이
+# 악재로 채점돼 뉴스 팩터를 오염시켰다.
+_BTC_HOWTO_RE = re.compile(
+    r"(?:account\s+security|\bhow\s+to\b|best\s+practices|"
+    r"\b\d+\s+steps?\b|step[-\s]by[-\s]step|"
+    r"beginner'?s?\s+guide|ultimate\s+guide|complete\s+guide|"
+    r"\btutorial\b|\bchecklist\b|\b2fa\b|api\s+key|whitelist\w*|"
+    r"cold\s+storage|secure\s+your|protect\s+your)", re.I)
+
+
+def _is_btc_howto(title: str) -> bool:
+    return bool(_BTC_HOWTO_RE.search(title or ""))
+
+
+# 같은 사건이 소스만 다르게 여러 건 잡히면 점수에서 이중 계상된다(실측 2026-09-01:
+# ETF 순유출 사건이 tradingview·biggo 2건으로 세어짐). **같은 태그**의 근접중복만
+# 병합한다 — 방향이 다른 기사는 절대 합치지 않아 반대 신호를 잃지 않는다.
+_EVENT_STOP = {"the", "a", "an", "as", "of", "to", "in", "on", "and", "or", "for",
+               "with", "is", "are", "hit", "hits", "amid", "after", "its", "by",
+               "million", "billion", "new", "this", "week", "day", "over", "above",
+               "below", "from", "into", "amid", "faces", "sees", "says"}
+
+
+def _salient(title: str) -> set[str]:
+    toks = re.findall(r"[a-z0-9$]+", (title or "").lower())
+    return {t for t in toks if t not in _EVENT_STOP and len(t) > 2}
+
+
+def _same_event(a: str, b: str) -> bool:
+    sa, sb = _salient(a), _salient(b)
+    if not sa or not sb:
+        return False
+    shared = len(sa & sb)
+    jac = shared / len(sa | sb)
+    return shared >= 4 or (shared >= 3 and jac >= 0.45)
+
+
+def _dedup_events(mats: list[Material]) -> list[Material]:
+    kept: list[Material] = []
+    for m in mats:
+        if any(m.tag == k.tag and _same_event(m.title, k.title) for k in kept):
+            continue
+        kept.append(m)
+    return kept
 
 
 _BTC_SKIP_HOST = ("listverse.com", "boredpanda.com", "buzzfeed.com", "ranker.com")
@@ -399,8 +467,10 @@ def classify_kind_btc(title: str, url: str = "") -> str:
     리스트형·오락 기사는 '참고' — 화면에 보이되 점수 제외."""
     if _is_btc_entertainment(title, url):
         return "참고"
+    if _is_btc_howto(title):
+        return "참고"
     t = title.lower()
-    if any(k in t for k in _MATERIAL_KEYS):
+    if _MATERIAL_WORD_RE.search(title) or any(k in t for k in _MATERIAL_KO):
         return "재료"
     if any(k in t or k in title for k in _BTC_RECAP):
         return "시황"
@@ -439,7 +509,7 @@ def btc_materials(as_of: str, api_key: str | None = None, hours: int = 48,
     finally:
         if own:
             c.close()
-    scored_mats = [m for m in mats if m.scored]
+    scored_mats = _dedup_events([m for m in mats if m.scored])
     good = min(sum(1 for m in scored_mats if m.tag == "호재"), 3)
     bad = min(sum(1 for m in scored_mats if m.tag == "악재"), 3)
     order = {"악재": 0, "호재": 1, "중립": 2}

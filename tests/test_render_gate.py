@@ -230,18 +230,20 @@ def test_sidebar_groups_by_asset_then_market():
     # 시장 아이템이 그 시장의 모든 국면 뷰를 포섭 → 어느 국면 뷰에서도 활성
     assert 'data-views="kospi-close kospi-preopen"' in html    # 장마감 먼저
     assert 'data-target="kospi-close"' in html                 # 대표=장마감
-    # BTC 는 가상화폐 섹션에 'BTC 선물'로 · 미래 자리 '예정'
+    # BTC 는 가상화폐 섹션에 'BTC 선물'로 · 미래 자리 '준비중'(클릭 → 안내 페이지)
     assert '>BTC 선물</span>' in html
-    assert 'ETH 선물' in html and '예정' in html
+    assert 'ETH 선물' in html and '준비중' in html
+    assert 'href="#soon-eth"' in html                          # 준비중 페이지로 이동 가능
 
 
 def test_view_tabs_phase_links_and_horizon():
-    # A안 뷰 상단 탭: 지평(단기 활성·중기/장기 예정) + 국면(형제 뷰 링크).
+    # A안 뷰 상단 탭: 지평(단기 활성·중기/장기 준비중) + 국면(형제 뷰 링크).
     mv = {"코스피": {"장 마감 전·후 분석": "kospi-close", "개장전 분석": "kospi-preopen"}}
     html = rr._view_tabs("코스피", "kospi-close", mv)
-    # 지평 행: 단기만 활성, 나머지 예정
+    # 지평 행: 단기만 활성, 나머지는 '준비중' 페이지로 클릭 이동
     assert 'vtab active">단기' in html
-    assert "중기·예정" in html and "장기·예정" in html
+    assert "중기·준비중" in html and "장기·준비중" in html
+    assert 'href="#soon-mid"' in html and 'href="#soon-long"' in html
     # 국면 탭이 같은 시장의 형제 뷰(개장전)를 링크 → hashchange 로 뷰 전환
     assert 'data-target="kospi-preopen"' in html and 'href="#kospi-preopen"' in html
     # 현재 국면(장마감)은 active 로 서버렌더(각 뷰가 제 탭을 들고 있어 JS 불필요)
@@ -316,3 +318,44 @@ def test_build_paper_hidden_when_no_trades():
     html = rr.build_paper({"paper": {"n": 3, "win_rate": 0.67,
                                      "avg_net_pct": 0.4, "cum_net_pct": 1.2}})
     assert "모의 성적" in html and "누적 순손익" in html and "비용 차감" in html
+
+
+def test_public_render_strips_self_critique():
+    """상품화: 자가비평('리포트 비평')은 **소유자 전용**. 공개 배포본(public=True)에는
+    메뉴도 데이터(비평 텍스트·Gemini 항목·교차점검)도 실리지 않아야 한다 — 구독자가
+    소스보기로도 못 읽는다. private(기본) 렌더에는 그대로 있다."""
+    bundle = {
+        "trade_date": "2026-09-01", "as_of": "2026-09-01 09:30",
+        "reports": [{
+            "id": "kospi-close", "label": "장 마감", "group": "코스피",
+            "total": 54.8, "grade": "약세", "p_up": 0.55, "direction": "long",
+            "reviews": {"rules": [{"category": "규칙", "title": "SECRET_RULE_FINDING",
+                                   "detail": "총점이 확률에 영향 없음"}],
+                        "llm": [{"category": "Gemini", "title": "SECRET_LLM_FINDING",
+                                 "detail": "n=9"}]},
+        }],
+        "review_cross": [{"category": "교차", "title": "SECRET_CROSS", "detail": "x"}],
+    }
+    priv = rr.render(bundle, public=False)
+    pub = rr.render(bundle, public=True)
+    # private: 소유자는 본다
+    assert "리포트 비평" in priv
+    assert "SECRET_RULE_FINDING" in priv and "SECRET_LLM_FINDING" in priv
+    # public: 메뉴도 텍스트도 절대 없다(유출 금지)
+    assert "리포트 비평" not in pub
+    for secret in ("SECRET_RULE_FINDING", "SECRET_LLM_FINDING", "SECRET_CROSS"):
+        assert secret not in pub, f"공개본에 비평 유출: {secret}"
+    assert 'data-view="report-review"' not in pub
+
+
+def test_coming_soon_pages_reachable_in_both_renders():
+    """미래 트랙(중기·장기·ETH·종합)은 회색 비활성이 아니라 클릭하면 '준비중' 페이지."""
+    bundle = {"trade_date": "2026-09-01", "as_of": "2026-09-01 09:30",
+              "reports": [{"id": "kospi-close", "label": "장 마감", "group": "코스피",
+                           "total": 54.8, "grade": "약세", "p_up": 0.55, "direction": "long"}]}
+    for pub in (rr.render(bundle, public=False), rr.render(bundle, public=True)):
+        for sid in ("soon-mid", "soon-long", "soon-eth", "soon-composite"):
+            assert f'data-view="{sid}"' in pub          # 섹션 존재 → 도달 가능
+        assert "준비 중입니다" in pub
+        assert "·예정" not in pub                          # 옛 '예정' 표기 제거
+        assert 'aria-disabled="true"><span>ETH' not in pub  # 비활성 자리 아님
