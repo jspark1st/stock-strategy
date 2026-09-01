@@ -728,8 +728,12 @@ def btc_facts_block(ctx: dict) -> str:
     lines.append(f"[결론] {ctx.get('verdict')}")
     if ctx.get("quadrant"):
         _oin = f" (≈{ctx.get('oi_notional_txt')} 명목가)" if ctx.get("oi_notional_txt") else ""
-        lines.append(f"[펀딩·OI 국면] {ctx.get('quadrant')}(펀딩×OI, 가격축 아님) · 펀딩 "
-                     f"{ctx.get('funding_txt')} · OI {ctx.get('oi_txt')} BTC{_oin}")
+        # 서술 라벨로 넘긴다 — 'Q1' 숫자를 주면 LLM 이 'Q1 국면' 으로 써서 가격×OI 사분면 오독(자가비평).
+        _QL = {"Q1": "레버리지 롱군집(OI↑·펀딩+)", "Q2": "숏군집(OI↑·펀딩−)",
+               "Q3": "롱청산(OI↓·펀딩+)", "Q4": "숏청산(OI↓·펀딩−)"}
+        _qs = _QL.get(ctx.get("quadrant"), ctx.get("quadrant"))
+        lines.append(f"[펀딩·OI 상태] {_qs} — 가격축 아님·방향 확정 아님(레버리지·청산 리스크) · 펀딩 "
+                     f"{ctx.get('funding_txt')} · OI {ctx.get('oi_txt')} BTC{_oin}(백분위 없음 — '고점' 표현 금지)")
     if ctx.get("ls_txt"):
         lines.append(f"[LS비율] {ctx.get('ls_txt')} — 글로벌=계정수, 탑=탑트레이더 포지션. 섞지 마라.")
     if ctx.get("mtf_txt"):
@@ -797,6 +801,8 @@ _BTC_CLAUDE_SYS = (
     "⑥ reopen_review·trigger 는 [차단사유]가 해소되는지로만 쓴다. [차단사유]에 없는 임계"
     "('일치도 60% 회복' 등)를 지어내거나, 이미 통과한 조건을 재개 기준으로 넣지 마라. "
     "재개는 차단사유가 **모두(AND)** 해소될 때만이다 — '하나라도 해소되면' 처럼 OR 로 쓰지 마라. "
+    "⑦ 펀딩·OI 상태는 **서술로만** 쓰고 'Q1'~'Q4' 사분면 번호를 쓰지 마라(가격×OI 사분면 오독). "
+    "OI 를 '고점' 이라 쓰지 마라 — 백분위 데이터가 없다. '증가/감소' 로만 서술한다. "
     "수동·긴급 시황이면 정규 세션 브리핑 톤 금지. '오늘은 우호 구간'류 금지. "
     "출력은 JSON 하나만:\n"
     '{"character": str(2~3문장 헤드라인),'
