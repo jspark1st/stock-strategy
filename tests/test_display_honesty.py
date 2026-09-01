@@ -171,6 +171,8 @@ def test_report_text_widened_sections():
                           hypotheses=[{"claim": "수급 완충 부족", "basis": "수급 2.0",
                                        "counter": "개인 순매수 역전"}],
                           reopen_review=["야간선물 방향 확인"])
+    # 2026-09-01: 차단이면 타점 자체가 비공개라, 전체 섹션 검증은 진입 허용 상태로.
+    r["entry"] = {"allow": True, "direction": "long"}
     t = rr.build_report_text(r)
     for must in ("컨펌 변화", "팩터 기여도", "단기(1~3일)", "마감 60m 분석",
                  "검증 가설", "재개장 체크리스트", "데이터 계보"):
@@ -474,3 +476,19 @@ def test_calendar_keeps_self_healing_manifest_fetch():
     html = rr.render({"trade_date": "2026-08-28", "reports": [], "placeholders": []})
     assert "/archive/stock/manifest.json" in html
     assert "cache:'no-store'" in html
+
+
+def test_report_text_blocked_hides_prices():
+    """차단이면 복사텍스트도 타점·ETF 가격 **비공개**(카드와 정합, 2026-09-01) —
+    '참고' 주석만 붙이고 가격을 남기던 갭(외부 비평 실측) 회귀 고정."""
+    r = dict(_full_report(),
+             entry={"allow": False, "direction": "long", "blocked_reasons": ["방향 확률 임계"]},
+             atr={"primary": {"label": "오버나이트", "entry": 6840.4, "stop": 6608.6,
+                              "target": 7031.4, "rr": 1.0}, "variants": []},
+             order_card={"instrument": "KODEX 200", "shcode": "069500",
+                         "etf_levels": {"entry": 107615.0, "stop": 103689.1, "target": 111540.9}})
+    t = rr.build_report_text(r)
+    assert "비공개(진입 게이트 차단)" in t
+    assert "6,840" not in t and "107,615" not in t     # 지수·ETF 실행 가격 미노출
+    assert "방향 확률 임계" in t                        # 차단 사유는 노출
+    assert "다음 재평가" in t

@@ -942,7 +942,12 @@ def build_bars(r: dict) -> str:
         </div>
         <div class="bar-obs">{esc(s.get('observed',''))} · <span class="muted">{esc(s.get('comment',''))}</span></div>
       </div>""")
-    return f'<div class="card"><h2>항목별 점수</h2>{"".join(rows)}</div>'
+    # 15:00 장중 잠정이면 '종가 강도' 등 마감 어휘가 시점과 어긋나 보인다(외부 비평) —
+    # 팩터명(SoT)은 유지하되 카드 차원에서 '마감 전 추정'임을 명시한다.
+    intraday_note = ('<div class="note muted">15:00 장중 잠정 — 종가 강도·거래대금 등 '
+                     '마감 어휘 지표는 <b>마감 전 추정치</b>이며 16:30 확정 회차에서 재계산됩니다.</div>'
+                     if r.get('intraday_snapshot') else '')
+    return f'<div class="card"><h2>항목별 점수</h2>{"".join(rows)}{intraday_note}</div>'
 
 
 VCOL = {"up": "var(--up)", "down": "var(--down)", "neutral": "var(--neutral)"}
@@ -968,7 +973,7 @@ def build_intraday(r: dict) -> str:
     ])
     return f"""
   <div class="card">
-    <h2>마감 1시간봉 분석 <span class="pill" style="background:{col}">{esc(iv.get('verdict'))}</span>
+    <h2>{'장중 1시간봉 분석(마감 전)' if r.get('intraday_snapshot') else '마감 1시간봉 분석'} <span class="pill" style="background:{col}">{esc(iv.get('verdict'))}</span>
       <span class="pill pill-ghost">1시간봉 · {iv.get('n_bars','')}개</span></h2>
     <div class="gauge" title="종가 위치 {cp*100:.0f}%">
       <div class="gauge-fill" style="width:{max(0,min(100,cp*100)):.0f}%;background:{col}"></div>
@@ -1058,11 +1063,15 @@ def build_risks(r: dict) -> str:
         return ""
     live_html = "".join(f'<li class="risk-live">{esc(x)}</li>' for x in live)
     sys_html = "".join(f"<li>{esc(w)}</li>" for w in sys_warn)
-    live_sec = (f'<div class="sub-h">실시간 리스크</div>'
+    # 서술 리스크(지정학·거시 등)는 **관찰용 — 점수 미반영**임을 명시한다(외부 비평:
+    # '뉴스 점수 반영 없음'과 지정학 리스크 서술이 공존하면 논리가 불명확해 보임).
+    live_sec = (f'<div class="sub-h">실시간 리스크 <span class="pill pill-ghost">관찰용 · 점수 미반영</span></div>'
                 f'<ul class="risk-ul">{live_html}</ul>' if live else "")
     sys_sec = (f'<div class="sub-h">시스템 신호</div><ul>{sys_html}</ul>'
                if sys_warn else "")
-    return f'<div class="card"><h2>주의 신호</h2>{live_sec}{sys_sec}</div>'
+    return (f'<div class="card"><h2>주의 신호'
+            f'{_info("실시간 리스크는 LLM 리서치 기반 관찰 목록으로 점수·게이트에 반영되지 않습니다. 점수에 들어가는 뉴스는 팩트체크를 통과한 당일 재료뿐이며, 현재는 상시 제외(가중 재배분) 정책입니다.")}</h2>'
+            f'{live_sec}{sys_sec}</div>')
 
 
 def build_materials(r: dict) -> str:
@@ -1578,15 +1587,24 @@ def build_report_text(r: dict) -> str:
     if ov.get("drivers"):
         drv = " · ".join(f"{d.get('name')} {signed(d.get('chg_pct'),2)}%" for d in ov["drivers"])
         L.append(f"\n## 간밤 미국장\n- 블렌드 {signed(ov.get('blend_pct'),2)}% · {drv}")
-    # ATR/오버나이트 타점
+    # ATR/오버나이트 타점 — 차단이면 **가격 자체를 비공개**(HTML 카드와 정합, 2026-09-01 결정).
+    # 복사텍스트는 다른 LLM/사람에게 그대로 전달되는 실행 표면이라 '참고' 주석만으론 부족했다
+    # (외부 비평 실측: 카드는 숨겼는데 복사본에 가격이 남아 '관망인데 매수가 노출'로 읽힘).
     atr = r.get("atr") or {}
     pr = atr.get("primary") or {}
-    if pr:
+    if pr and blocked:
+        ent = r.get("entry") or {}
+        L.append("\n## 오버나이트 타점 — 비공개(진입 게이트 차단)")
+        L.append("- 관망/현금 · 권장비중 0% · HTS 자동매도 설정 금지. "
+                 "타점·손절·목표는 진입 허용 회차에만 표기한다.")
+        if ent.get("blocked_reasons"):
+            L.append("- 차단 사유: " + ", ".join(ent["blocked_reasons"]))
+        L.append("- 다음 재평가: " + ("16:30 마감 확정" if r.get("intraday_snapshot")
+                                    else "09:00 개장 확인" if r.get("report_type") == "preopen"
+                                    else "익일 08:00 개장 전"))
+    elif pr:
         L.append("\n## 오버나이트 타점")
-        if blocked:
-            L.append("- ⚠ 진입 게이트 차단 — 관망/현금, 권장비중 0%. "
-                     "아래 가격은 참고 환산값이며 실행 지시가 아니다.")
-        elif manage:
+        if manage:
             _act = "개장 후 보유 일부 축소" if pstate == "REDUCE" else "보유 유지"
             L.append(f"- ⚠ {_act} — 신규 매수 아님. 아래 가격은 전일 진입분 관리·참고 환산값이다.")
         L.append(f"- {pr.get('label','타점')}: 진입 {fmt(pr.get('entry'))} / 손절 {fmt(pr.get('stop'))} "
@@ -1596,11 +1614,11 @@ def build_report_text(r: dict) -> str:
                      f"/ 목표 {fmt(v.get('target'))} · 손익비 {fmt(v.get('rr'))}"
                      + (" · 자격" if (v.get("qualified") and not no_new_entry) else ""))
     oc = r.get("order_card") or {}
-    if oc:
+    if oc and blocked:
+        L.append("- 상품 주문(ETF): 없음(진입 차단) — 지수↔ETF 환산가는 허용 회차에만 표기.")
+    elif oc:
         el = oc.get("etf_levels") or {}
-        if blocked:
-            L.append("- ⚠ 진입 차단 — HTS 자동매도 설정 금지. 아래는 지수↔ETF 참고 환산(실행 아님).")
-        elif manage:
+        if manage:
             L.append("- ⚠ 보유 관리(신규 매수 아님) — 아래는 지수↔ETF 참고 환산(신규 진입 지시 아님).")
         L.append(f"- 상품 주문({oc.get('instrument')}·{oc.get('shcode')}): "
                  f"진입 {fmt(el.get('entry'))} / 손절 {fmt(el.get('stop'))} / 목표 {fmt(el.get('target'))}")
