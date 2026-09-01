@@ -739,6 +739,12 @@ def btc_facts_block(ctx: dict) -> str:
         f"[게이트] 신규진입 {'차단' if g.get('new_entry_blocked') else '허용'} · "
         f"등급배수 {g.get('position_scale')} (계좌 위험·확신 배수 아님) · "
         f"NO_TRADE={bool(g.get('no_trade'))}")
+    gr = g.get("reasons") or []
+    if gr:
+        lines.append(
+            "[차단사유] " + " / ".join(gr) +
+            " — 재개 조건·트리거는 **이 사유가 해소되는지로만** 서술하라. "
+            "다른 임계(예: '일치도 60% 회복')를 지어내지 마라. 이미 통과한 조건을 재개 기준으로 쓰지 마라.")
     atr = ctx.get("atr") or {}
     p = atr.get("primary") or {}
     if p.get("entry") and not g.get("new_entry_blocked"):
@@ -767,6 +773,10 @@ def btc_facts_block(ctx: dict) -> str:
     if ctx.get("warnings"):
         lines.append("[주의] " + " / ".join((ctx.get("warnings") or [])[:4]))
     lines.append("[지평] 다음 정규 발행까지(~12h). 다일 스윙 서술 금지.")
+    lines.append(
+        "[표기규율] '등급'은 내부 게이트 밴드일 뿐 방향 판정이 아니다. 방향 편향은 "
+        "[세션확률](LONG/SHORT %)로 서술하고, 매매 여부는 [게이트]/[결론]을 따른다. "
+        "총점이 50 이상·LONG 우세면 방향을 '약세'로 결론짓지 마라(방향과 실행은 별개 축).")
     lines.append("[수치 규율] 이 블록에 없는 숫자를 만들지 마라. 리서치 수치는 (언론 집계).")
     return "\n".join(lines)
 
@@ -780,6 +790,10 @@ _BTC_CLAUDE_SYS = (
     "배수는 사용자 오버레이이지 모델 추천이 아니다. 등급배수는 계좌 위험이 아니다. "
     "RSI·Stoch 는 [MTF확정]에 있는 시간축만 써라. LS 글로벌과 탑을 한 숫자로 섞지 마라. "
     "③ 시나리오는 LONG / SHORT / FLAT. ④ 엔진 이름(Claude 등)을 본문에 쓰지 마라. "
+    "⑤ 방향과 실행은 별개 축이다. '등급'라벨(약세 등)을 방향 결론으로 쓰지 마라 — 방향은 세션확률로, "
+    "매매 여부는 게이트로 말한다. 총점 50↑·LONG 우세를 '약세'로 결론짓지 마라. "
+    "⑥ reopen_review·trigger 는 [차단사유]가 해소되는지로만 쓴다. [차단사유]에 없는 임계"
+    "('일치도 60% 회복' 등)를 지어내거나, 이미 통과한 조건을 재개 기준으로 넣지 마라. "
     "수동·긴급 시황이면 정규 세션 브리핑 톤 금지. '오늘은 우호 구간'류 금지. "
     "출력은 JSON 하나만:\n"
     '{"character": str(2~3문장 헤드라인),'

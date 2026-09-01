@@ -752,3 +752,29 @@ def test_news_filter_excludes_hack_stats_and_presale():
     # 라이브 단일 해킹은 방향 재료로 유지(참고 아님)
     assert classify_kind_btc("Major exchange hacked, $200M drained") == "재료"
     assert _tag_btc("Major exchange hacked, $200M drained") == "악재"
+
+
+def test_btc_copytext_consistent_with_gate():
+    """복사텍스트(다른 LLM 에 붙여넣는 용도)도 결정론 값과 정합해야 한다:
+    ①방향/실행 분리(약세를 방향 결론으로 쓰지 않음) ②코어 2/3 분모 명시
+    ③재개조건=gate_reasons(LLM '일치도 60%' 서술 제거)."""
+    import render_report as rr
+    r = {"report_type": "btc_perp", "trade_date": "2026-09-01", "slot": "0930",
+         "total": 54.5, "grade": "약세", "verdict": "NO_TRADE",
+         "p_long": 0.60, "p_short": 0.40, "quadrant": "Q1",
+         "core_aligned": 2, "core_needed": 2, "core_side": "Long",
+         "gate": {"new_entry_blocked": True, "position_scale": 0.0, "no_trade": True,
+                  "reasons": ["수렴 게이트(괴리·확신도 Low) — 관망"]},
+         "convergence": {"majority": "Long", "majority_n": 2, "directional": 3,
+                         "longs": 2, "shorts": 1, "agreement": 0.67,
+                         "conviction": "Low", "kind": "괴리", "items": []},
+         # LLM 이 엉뚱하게 쓴 재개 조건 — 복사텍스트가 이걸 쓰면 안 됨
+         "narrative": {"reopen_review": ["신호 일치도가 60% 이상으로 회복되는지 확인"]}}
+    md = rr.build_report_text(r)
+    # 방향/실행 분리 표기
+    assert "방향 중립-강세" in md and "실행 NO_TRADE" in md
+    # 코어 분모 명시(2/2 → 2/3)
+    assert "코어 정렬 2/3" in md
+    # 재개조건은 실제 차단사유에서 — LLM 의 '일치도 60%' 서술은 안 나온다
+    assert "수렴 게이트(괴리·확신도 Low)" in md
+    assert "일치도가 60% 이상으로 회복" not in md

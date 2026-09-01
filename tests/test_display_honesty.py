@@ -194,9 +194,11 @@ def test_report_text_btc_specific_sections():
            "sns": {"n": 1, "pos": 0, "neg": 0,
                    "topics": [{"tag": "중립", "title": "BTC 뉴스"}]}}
     t = rr.build_report_text(btc)
-    for must in ("관점 정렬", "다수결 Short", "코어 정렬 1/2", "판정 NO_TRADE",
+    for must in ("관점 정렬", "다수결 Short", "코어 정렬 1/3", "판정 NO_TRADE",
                  "포지셔닝", "멀티 타임프레임", "1H:", "SNS 심리"):
         assert must in t, must
+    # 방향/실행 분리 표기(등급을 방향 결론으로 쓰지 않음)
+    assert "방향" in t and "실행 NO_TRADE" in t
 
 
 def test_report_text_blocked_gate_annotation():

@@ -1365,8 +1365,12 @@ def build_report_text(r: dict) -> str:
         L.append("- 시장: " + " · ".join(mk))
     # 총점/확률
     if btc:
-        L.append(f"\n## 총점 {fmt(r.get('total'))} · 등급 {r.get('grade','')} "
+        _band = _btc_direction_band(r.get('total'))
+        _verd = r.get('verdict') or 'NO_TRADE'
+        L.append(f"\n## 총점 {fmt(r.get('total'))} · 방향 {_band} · 실행 {_verd} "
                  f"· 세션 LONG {pct(r.get('p_long'))} / SHORT {pct(r.get('p_short'))}")
+        L.append(f"- 방향 편향은 '방향'({_band}), 매매 여부는 '실행'({_verd})을 본다 "
+                 f"(내부 게이트 밴드 등급={r.get('grade','')} — 실행 판정과 별개 축)")
     else:
         # 복사용 평문도 히어로와 **같은 격하**를 따른다. 이 텍스트는 다른 LLM 에 붙여넣는 용도라,
         # 여기서만 '익일 상승확률'로 남으면 기저율 상수가 예측인 것처럼 그대로 전파된다.
@@ -1467,7 +1471,8 @@ def build_report_text(r: dict) -> str:
             for it in cv.get("items") or []:
                 L.append(f"  · {it.get('label')} {it.get('side')} ({fmt(it.get('score'))})")
         core = [x for x in (
-            (f"코어 정렬 {r.get('core_aligned')}/{r.get('core_needed')} ({r.get('core_side')})"
+            (f"코어 정렬 {r.get('core_aligned')}/3 (필요 {r.get('core_needed')} · "
+             f"기술·파생·체결 · {r.get('core_side')})"
              if r.get("core_needed") is not None else None),
             f"분면 {r.get('quadrant')}" if r.get("quadrant") else None,
             f"판정 {r.get('verdict')}" if r.get("verdict") else None,
@@ -1582,10 +1587,17 @@ def build_report_text(r: dict) -> str:
                     L.append(f"  · 근거: {h['basis']}")
                 if h.get("counter"):
                     L.append(f"  · 반증: {h['counter']}")
-    rev = nar.get("reopen_review")
-    if isinstance(rev, list) and rev:
-        L.append("\n## 재개장 체크리스트")
-        L.extend(f"- {x}" for x in rev[:8])
+    gate_r = (r.get("gate") or {}).get("reasons") or []
+    if btc and (blocked or r.get("verdict") == "NO_TRADE") and gate_r:
+        # BTC 재개 조건은 **실제 차단 사유(gate_reasons)** 에서 생성 — LLM 자유서술이 게이트와
+        # 드리프트해 '일치도 60% 회복' 처럼 실제 차단 조건(괴리·확신도)과 다른 걸 적던 문제 해소.
+        L.append("\n## 신규 진입을 막는 조건 (다음 발행에서 해소 시 재평가)")
+        L.extend(f"- {x}" for x in gate_r)
+    else:
+        rev = nar.get("reopen_review")
+        if isinstance(rev, list) and rev:
+            L.append("\n## 재개장 체크리스트")
+            L.extend(f"- {x}" for x in rev[:8])
     # 재료
     fc = r.get("materials_fc") or {}
     heads = fc.get("headlines") or nar.get("materials")
