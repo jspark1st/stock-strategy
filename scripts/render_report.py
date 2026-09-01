@@ -383,7 +383,11 @@ def build_confidence(r: dict) -> str:
 
 
 def build_contributions(r: dict) -> str:
-    """항목별 기여도(P1-10) — 왜 이 총점/확률인지. 중립(50) 대비 총점·하락확률 기여."""
+    """항목별 기여도(P1-10) — 왜 이 총점/확률인지. 중립(50) 대비 **총점·상승확률** 기여.
+
+    두 컬럼은 부호가 일치한다(총점을 올린 팩터는 상승확률도 올림). 예전 '하락확률 기여'
+    프레이밍은 총점기여와 역부호로 보여 버그처럼 읽혔다(외부 비평 실측). 색도 한국 관례
+    (기여+=빨강·기여−=파랑)로 부호 그대로."""
     contribs = r.get("contributions") or []
     if not contribs:
         return ""
@@ -393,13 +397,18 @@ def build_contributions(r: dict) -> str:
         rows += (f'<tr><td>{esc(c.get("label",""))}</td>'
                  f'<td style="text-align:right">{fmt(c.get("score"),1)}</td>'
                  f'<td style="text-align:right">{c.get("weight_eff",0)*100:.1f}%</td>'
-                 f'<td style="text-align:right;color:{dir_color(-tc)}">{signed(tc)}점</td>'
-                 f'<td style="text-align:right;color:{dir_color(-pp)}">{signed(pp)}%p</td></tr>')
+                 f'<td style="text-align:right;color:{dir_color(tc)}">{signed(tc)}점</td>'
+                 f'<td style="text-align:right;color:{dir_color(pp)}">{signed(pp)}%p</td></tr>')
+    # 캘리브 기울기 하한 고착이면 확률 기여(±1%p 안팎)는 기저율 상수의 잔차 — 참고 불가 명시.
+    floor_note = ("<div class=\"note muted\">⚠ 캘리브 기울기 하한 구간 — 상승확률 기여는 "
+                  "수치가 작고 참고용입니다(총점 기여를 보세요).</div>"
+                  if (r.get("calibration") or {}).get("slope_at_floor") else "")
     return (f'<div class="card"><h2>판정 기여도 <span class="pill pill-ghost">중립 50 대비</span>'
-            f'{_info("각 항목이 총점과 하락확률을 얼마나 밀었는지 보여줍니다. 하락확률 기여는 근사치입니다.")}</h2>'
+            f'{_info("각 항목이 총점과 상승확률을 얼마나 밀었는지 보여줍니다. 두 컬럼은 부호가 일치하며, 상승확률 기여는 캘리브레이션 기울기 기반 근사치입니다.")}</h2>'
             f'<table class="cd-table"><thead><tr><th>항목</th><th style="text-align:right">점수</th>'
             f'<th style="text-align:right">가중</th><th style="text-align:right">총점기여</th>'
-            f'<th style="text-align:right">하락확률기여</th></tr></thead><tbody>{rows}</tbody></table></div>')
+            f'<th style="text-align:right">상승확률기여</th></tr></thead><tbody>{rows}</tbody></table>'
+            f'{floor_note}</div>')
 
 
 def build_entry_gate(r: dict) -> str:
@@ -579,7 +588,7 @@ def build_performance(r: dict) -> str:
     wr = ""
     for w in ("20", "60", "120", "250"):
         d = wins.get(w) or {}
-        n = d.get("n", 0)
+        n = d.get("n_dir", d.get("n", 0))   # 적중률 분모(방향 낸 행)와 일치하는 표본 수 표기
         hr = f"{d['hit_rate']*100:.0f}%" if d.get("hit_rate") is not None else "—"
         br = f"{d['brier']:.3f}" if d.get("brier") is not None else "—"
         wr += (f'<tr><td>{w}일</td><td style="text-align:right">{n}</td>'
@@ -604,8 +613,9 @@ def build_performance(r: dict) -> str:
     if mfe is not None or mae is not None:
         extra += (f' · 평균 MFE {signed(mfe)}% / MAE {signed(mae)}%'
                   f' (최대 유리·불리, n={p.get("mfe_mae_n", 0)})')
-    return (f'<div class="card"><h2>모델 검증 성과 {status}'
-            f'{_info("과거 예측이 실제로 얼마나 맞았는지입니다. 적중률=맞힌 비율, Brier=확률 오차(낮을수록 정확), AUC=방향 구분력(0.5=동전던지기·1.0=완벽). 표본이 부족하면 수치는 참고용입니다.")}</h2>'
+    return (f'<div class="card"><h2>모델 검증 성과 '
+            f'<span class="pill pill-ghost">종가→종가 라벨·보조</span> {status}'
+            f'{_info("과거 예측이 실제로 얼마나 맞았는지입니다. 적중률=맞힌 비율(분모는 방향을 낸 행만), Brier=확률 오차(낮을수록 정확), AUC=방향 구분력(0.5=동전던지기·1.0=완벽). ⚠ 이 카드는 종가→종가 라벨 지평입니다 — 실거래(종가→익일 시가) 적중률은 위 자가학습 정확도 타일을 보세요. 표본이 부족하면 수치는 참고용입니다.")}</h2>'
             f'<table class="cd-table"><thead><tr><th>기간</th><th style="text-align:right">표본</th>'
             f'<th style="text-align:right">적중률</th><th style="text-align:right">Brier</th>'
             f'</tr></thead><tbody>{wr}</tbody></table>{cal}'
@@ -945,7 +955,9 @@ def build_flows(r: dict) -> str:
     prov = r.get("provisional", False)
     prov_badge = '<span class="badge badge-warn">잠정</span>' if prov else ""
     items = [("외국인", flows.get("foreign_net")), ("기관", flows.get("inst_net")),
-             ("개인", flows.get("retail_net")), ("프로그램", flows.get("program_net"))]
+             ("개인", flows.get("retail_net")), ("프로그램", flows.get("program_net")),
+             # 기타법인 — 표시 전용(점수 미반영). 3주체 동반 매도일의 반대편 매수 주체.
+             ("기타법인(참고)", flows.get("etc_corp_net"))]
     max_abs = max([abs(v) for _, v in items if v is not None] + [1])
     rows = []
     for label, v in items:
@@ -1466,7 +1478,8 @@ def build_report_text(r: dict) -> str:
         L.append("\n## 팩터 기여도(총점 · 확률)")
         for c in contribs:
             L.append(f"- {c.get('label')}: 총점 {signed(c.get('total_contrib'),1)}"
-                     f" · 확률 {signed(c.get('p_up_contrib_pp'),1)}%p (유효가중 {pct(c.get('weight_eff'))})")
+                     f" · 상승확률 기여 {signed(c.get('p_up_contrib_pp'),1)}%p"
+                     f" (유효가중 {pct(c.get('weight_eff'))})")
     # BTC 전용: 관점 정렬 · 코어 · 포지셔닝 · MTF · 심리
     if btc:
         cv = r.get("convergence") or {}

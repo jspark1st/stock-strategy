@@ -587,10 +587,15 @@ def performance(conn: sqlite3.Connection, market: str, report_type: str = "close
         rs = rows[:w]
         n = len(rs)
         if n == 0:
-            return {"n": 0, "hit_rate": None, "brier": None}
-        hits = sum(r["correct"] for r in rs if r["correct"] is not None)
+            return {"n": 0, "n_dir": 0, "hit_rate": None, "brier": None}
+        # 적중률 분모는 **방향을 낸 행(correct 존재)만** — p_up=None(데이터부족) 채점행이
+        # 분모에 섞이면 적중률이 부당하게 낮아진다. accuracy() 와 동일 규율(재발 방지).
+        dir_rows = [r for r in rs if r["correct"] is not None]
+        n_dir = len(dir_rows)
+        hits = sum(r["correct"] for r in dir_rows)
         briers = [r["brier"] for r in rs if r["brier"] is not None]
-        return {"n": n, "hit_rate": round(hits / n, 3),
+        return {"n": n, "n_dir": n_dir,
+                "hit_rate": round(hits / n_dir, 3) if n_dir else None,
                 "brier": round(sum(briers) / len(briers), 4) if briers else None}
 
     # calibration bins: p_up 구간별 실제 상승빈도(70% 예측이 실제 70%인가)

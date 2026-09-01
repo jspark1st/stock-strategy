@@ -474,6 +474,11 @@ def build_report(cfg: dict, ls, client, conn, env, session_of: dict,
     tilt = calibration.vol_tilt(calibration.load_vol_tilt(CALIB_BOOTSTRAP, market), vr)
     result = score_close(inputs, calib=calib_obj, direction_tilt=tilt)
     rep = result.to_report_dict(sources=sources)
+    # 기타법인 순매수 — **표시 전용(점수 미반영)**. 3주체(외·기·개) 동반 순매도인데 지수가
+    # 오른 날의 반대편 매수 주체를 보여준다(항등식상 3주체 합만큼 기타법인+). 자가비평:
+    # 이게 없으면 '환율·기술 요인 의존' 같은 과잉 인과 서술로 흐른다.
+    if fl is not None and isinstance(rep.get("flows"), dict):
+        rep["flows"]["etc_corp_net"] = fl.etc_corp_net
     rep["id"] = cfg["id"]
     rep["group"] = cfg["label"]          # 코스피 / 코스닥
     rep["label"] = LABEL_CLOSE            # '장 마감 전·후 분석'(15:00 잠정·16:30 확정 공용)

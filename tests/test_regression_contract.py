@@ -82,3 +82,13 @@ def test_lifecycle_states_resolve():
     assert strategy.resolve_lifecycle(1500, "close", True)["state"] == "PRE_CLOSE_DECISION"
     assert strategy.resolve_lifecycle(1630, "close", False)["state"] == "CLOSE_RECONCILIATION"
     assert strategy.resolve_lifecycle(1000, "close", True)["state"] == "INTRADAY_MONITOR"
+
+
+def test_contribution_prob_sign_matches_total_sign():
+    """상승확률 기여는 총점 기여와 **부호 일치** — 예전 -tc·slope(하락 부호)는
+    '수급 -10.5점인데 확률 +1.3%p' 로 화면에서 역부호로 읽혔다(외부 비평 실측). 회귀 고정."""
+    r = score_close(_golden_inputs())
+    for c in r.contributions:
+        tc, pp = c["total_contrib"], c["p_up_contrib_pp"]
+        if abs(tc) > 0.05 and abs(pp) > 0.05:   # 반올림 0 근처는 제외
+            assert (tc > 0) == (pp > 0), f"{c['label']}: 총점 {tc} vs 확률 {pp} 부호 불일치"

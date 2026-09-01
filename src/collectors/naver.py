@@ -403,8 +403,10 @@ def usdkrw(client: httpx.Client | None = None) -> dict | None:
         r.raise_for_status()
         d = (r.json() or {}).get("exchangeInfo") or {}
         price = float(str(d.get("closePrice", "")).replace(",", ""))
+        # 변화율은 필드 부재 시 **None**(결측) — "0"(보합)으로 채우면 overnight_tilt 의
+        # `is not None` 결측 가드가 무력화돼 환율 틸트가 오염된다(_num_opt 계약과 일관).
         return {"price": price,
-                "chg_pct": float(str(d.get("fluctuationsRatio", "0")).replace(",", "")),
+                "chg_pct": _num_opt(d.get("fluctuationsRatio")),
                 "as_of": d.get("localTradedAt", "")}
     except Exception:  # noqa — 표시용 보조 지표. 실패해도 점수엔 영향 없음
         return None

@@ -296,7 +296,10 @@ def score_close(inputs: CloseInputs, calib: dict | None = None,
         # 결측으로 두면 항상 부분데이터 상태가 되어, 다른 항목 하나만 더 빠져도
         # 총점이 통째로 미산출된다(과도한 취약성) — 논리·운영 양쪽에서 잘못.
         excluded.append("call")
-        warnings.append("리포트 시점(장 종료 전)에 마감 동시호가 미발생 — 항목 제외, 가중치 재배분")
+        # 16:30 확정 회차에도 이 경고가 나간다(동시호가 수집기 자체가 없음) — '장 종료 전
+        # 미발생' 이라고 쓰면 확정본에선 거짓말이 된다(자가비평 지적). 시점 무관 문구로.
+        warnings.append("마감 동시호가 미반영(장중엔 미발생·마감 후엔 확정치 수집기 없음) "
+                        "— 항목 제외, 가중치 재배분")
     else:
         missing.append("call")
 
@@ -442,7 +445,10 @@ def score_close(inputs: CloseInputs, calib: dict | None = None,
         contributions.append({
             "key": k, "label": subs[k].label, "score": round(subs[k].score, 1),
             "weight_eff": round(eff[k], 3), "total_contrib": round(tc, 1),
-            "p_up_contrib_pp": round(-tc * slope * 100, 1),  # 하락기여 부호로: 총점↓ → 상승확률↓
+            # **상승확률 기여** — 총점기여와 부호 일치(총점을 올린 팩터는 상승확률도 올림).
+            # 예전 -tc·slope(하락 부호)는 '수급 -10.5점인데 확률 +1.3%p' 처럼 화면에서
+            # 역부호로 읽혀 버그처럼 보였다(외부 비평 실측 지적).
+            "p_up_contrib_pp": round(tc * slope * 100, 1),
         })
     contributions.sort(key=lambda c: abs(c["total_contrib"]), reverse=True)
 

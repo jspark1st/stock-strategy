@@ -303,3 +303,18 @@ def test_migration_adds_new_column(tmp_path):
     conn = store.connect(path)
     cols = {r[1] for r in conn.execute("PRAGMA table_info(daily)")}
     assert "p_up_raw" in cols
+
+
+def test_performance_hit_rate_excludes_ungradeable_rows():
+    """performance() 창별 적중률도 accuracy() 와 동일 규율 — p_up=None(correct=None) 채점행은
+    분모(방향 낸 행)에서 제외. 감사 발견(store.performance()._win() 미이관) 회귀 고정."""
+    conn = _db()
+    store.record_prediction(conn, {"id": "kospi-close", "trade_date": "2026-08-14",
+                                   "p_up": 0.7, "atr": {"direction": "long"}}, "t")
+    store.record_prediction(conn, {"id": "kospi-close", "trade_date": "2026-08-17",
+                                   "p_up": None, "atr": {"direction": "watch"}}, "t")
+    store.grade_with_candles(conn, "KOSPI", "close", _candles(), "t")
+    perf = store.performance(conn, "KOSPI", "close")
+    w20 = perf["windows"]["20"]
+    assert w20["n"] == 2 and w20["n_dir"] == 1     # 채점 2건, 방향 낸 1건
+    assert w20["hit_rate"] == 1.0                   # 1/1 적중 (2로 나눠 0.5 아님)
