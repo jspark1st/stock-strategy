@@ -321,6 +321,8 @@ def build_report(now: datetime, env: dict, conn, dry_run: bool, manual: bool,
         "warnings": scored.get("warnings"), "subscores": scored.get("subscores"),
         "funding_txt": (f"{funding_now*100:.4f}%" if funding_now is not None else "—"),
         "oi_txt": (f"{oi:,.0f}" if oi else "—"),
+        # OI 는 BTC(기초자산) 단위 — 명목가 = OI(BTC) × 마크(USD). raw·명목가 분리 표기용.
+        "oi_notional_txt": (f"${oi*mark/1e9:.1f}B" if (oi and mark) else None),
         "ls_txt": _ls_facts(ls_g, ls_t),
         "mtf_txt": _mtf_facts(h1s, h4s, d1s),
         "nasdaq_txt": nasdaq_txt,

@@ -178,8 +178,9 @@ def score_deriv(funding_now: float | None, funding_avg: float | None,
     # 'Q1=가격↑×OI↑' 로 오독했다(자가비평) → 명시. OI 단위는 계약(BTC, USD 명목가 아님).
     q_def = {"Q1": "OI↑·펀딩+", "Q2": "OI↑·펀딩−", "Q3": "OI↓·펀딩+", "Q4": "OI↓·펀딩−"}.get(q, "")
     qtxt = f"{q}({q_def})" if q_def else q
+    # OI 단위는 **BTC(기초자산)** — Binance USD-M openInterest 는 계약수가 아니라 BTC 수량이다.
     observed = (f"펀딩 {ftxt}(8h) · OI {axis} {otxt}{o30 if axis == '세션' else ''} · {qtxt}"
-                f" · Binance USD-M · OI 단위 계약(BTC)")
+                f" · Binance USD-M · OI 단위 BTC")
     comment = {"Q1": "롱 군집", "Q2": "숏 군집", "Q3": "롱 청산", "Q4": "숏 청산"}.get(q, "파생 중립")
     if extreme:
         comment += " · 극단 역행"

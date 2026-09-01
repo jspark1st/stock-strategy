@@ -829,7 +829,7 @@ def test_deriv_quadrant_definition_and_oi_unit():
     sub, q, _ = score_deriv(0.0002, 0.0002, 105, 100, 0.01)  # 펀딩+ · OI↑ → Q1
     assert q == "Q1"
     assert "OI↑·펀딩+" in sub["observed"]
-    assert "OI 단위 계약(BTC)" in sub["observed"]
+    assert "OI 단위 BTC" in sub["observed"]
 
 
 def test_sns_excluded_from_score_fng_display_only():

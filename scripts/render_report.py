@@ -1997,9 +1997,10 @@ def _btc_sns_card(r: dict) -> str:
     n = (r.get("sns") or {}).get("n") or 0
     mood = ("극단탐욕" if fng >= 76 else "탐욕" if fng >= 56 else
             "중립" if fng >= 45 else "공포" if fng >= 25 else "극단공포")
-    sns_info = _info("SNS 심리는 방향 점수에서 제외했습니다(7년·2549일 측정에서 판별력 0). "
-                     "Fear&Greed 만 역추세 과열 참고로 표시하며 점수·수렴에는 넣지 않습니다. "
-                     "커뮤니티 표본은 BTC 직접 수급이 아니라 나열하지 않습니다.")
+    sns_info = _info("SNS 심리는 방향 점수에서 제외했습니다 — 7년·n=2549일 측정에서 다음날 방향 "
+                     "AUC 0.491(95%CI 0.469–0.514)로 판별력이 검증되지 않음. Fear&Greed 만 역추세 "
+                     "과열 참고로 표시하며 점수·수렴에는 넣지 않습니다. 커뮤니티 표본은 BTC 직접 "
+                     "수급이 아니라 나열하지 않습니다.")
     return f"""
     <div class="card">
       <h2>SNS·심리 <span class="pill pill-ghost">점수 미반영 · 참고</span>{sns_info}</h2>
