@@ -195,6 +195,8 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--days", type=int, default=60)
     ap.add_argument("--write", action="store_true")
+    ap.add_argument("--horizon-bars", type=int, default=3,
+                    help="채점 지평(5m 봉 개수) — 3=15분(기본), 1=5분")
     args = ap.parse_args()
 
     with httpx.Client(timeout=20) as cl:
@@ -204,8 +206,8 @@ def main() -> int:
 
     k5 = data["5m"]
     win = 160
-    step = 3                       # 15분 간격 — 지평 비중첩
-    horizon = 3                    # 5m 봉 3개 = 15분
+    horizon = max(1, args.horizon_bars)   # 5m 봉 개수(3=15분, 1=5분)
+    step = horizon                        # 지평 비중첩 스텝
     stats = {v: {"n": 0, "hit": 0, "net": 0.0, "absret": 0.0} for v in ("상방", "하방", "관망")}
     # 각 TF 의 closeTime 배열(정렬돼 있음)로 't 시점까지 마감된 마지막 인덱스'를 포인터로 추적
     ptr = {iv: 0 for iv in ("15m", "1h", "4h")}
@@ -254,7 +256,7 @@ def main() -> int:
         by[v] = d
     out = {"as_of": datetime.now(KST).strftime("%Y-%m-%d %H:%M KST"),
            "days": args.days, "bars": len(k5), "samples": n_eval,
-           "horizon": "15m", "cost_taker": COST_TAKER,
+           "horizon": f"{horizon*5}m", "cost_taker": COST_TAKER,
            "note": "1m 제외 근사 · 5m 봉마감 판정 · 15분 스텝(비중첩)",
            "by_verdict": by}
     print(json.dumps(out, ensure_ascii=False, indent=2))
