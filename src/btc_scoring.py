@@ -116,12 +116,28 @@ def score_tech(h4: dict, h1: dict | None = None) -> dict | None:
     regime = "추세" if trending else "비추세(횡보)"
     comment = f"{lean} · {regime}"
     # 하위 시간축(1H) 역행은 숨기지 않는다 — 4H 점수 우위가 1H 약화를 가리지 않게.
+    # RSI 만으로는 좁다(외부 비평 2026-09-01: 1H RSI 55 인데 MACD−·ST 하락 전환이 미표기)
+    # → MACD 히스토그램 부호·슈퍼트렌드 방향도 감지. 표시 전용 — 점수 s 는 불변.
     h1_rsi = (h1 or {}).get("rsi")
-    if h1_rsi is not None:
-        if s >= 55 and h1_rsi < 48:
-            comment += " · 1H 약화"
-        elif s <= 45 and h1_rsi > 52:
-            comment += " · 1H 반등"
+    h1_mh = (h1 or {}).get("macd_hist")
+    h1_st = (h1 or {}).get("st_dir")
+    h1_flags = []
+    if h1_mh is not None:
+        h1_flags.append("1H MACD−" if h1_mh < 0 else "1H MACD+")
+    if h1_st in (1, -1):
+        h1_flags.append("1H ST↑" if h1_st == 1 else "1H ST↓")
+    h1_weak = (h1_mh is not None and h1_mh < 0) or h1_st == -1
+    h1_strong = (h1_mh is not None and h1_mh > 0) or h1_st == 1
+    if s >= 55 and ((h1_rsi is not None and h1_rsi < 48) or h1_weak):
+        comment += " · 1H 약화"
+        neg = [f for f in h1_flags if "−" in f or "↓" in f]
+        if neg:
+            observed += " · " + " · ".join(neg)
+    elif s <= 45 and ((h1_rsi is not None and h1_rsi > 52) or h1_strong):
+        comment += " · 1H 반등"
+        pos_f = [f for f in h1_flags if "+" in f or "↑" in f]
+        if pos_f:
+            observed += " · " + " · ".join(pos_f)
     return _sub("tech", s, observed, comment)
 
 
@@ -170,7 +186,16 @@ def score_deriv(funding_now: float | None, funding_avg: float | None,
         s += clamp(-fund * 20000, -8, 8)  # 약한 펀딩은 약한 역행
     if extreme and oi_up:
         gates.append("과열 군중(극단 펀딩 + OI 증가) — 신규 진입 차단")
-    ftxt = f"{fund*100:.4f}%" if fund is not None else "—"
+    # 펀딩 기본율 문맥 — Binance USD-M 기본 펀딩률은 0.01%/8h. 부호만 +라고 '롱 과열'이
+    # 아니다(외부 비평 2026-09-01: 0.0098%를 롱군집 근거로 쓴 오독). 기본율 ±0.005%p 안이면
+    # 사실상 중립. **점수 산식은 불변** — 라벨·서술만 정직하게.
+    fund_neutral = fund is not None and -0.00005 < fund < 0.00015
+    if fund is None:
+        ftxt = "—"
+    else:
+        fctx = ("기본율 0.01% 수준=중립" if fund_neutral else
+                "기본율 상회" if fund > 0 else "음(숏 우위)")
+        ftxt = f"{fund*100:.4f}%·{fctx}"
     otxt = f"{oi_chg*100:+.1f}%" if oi_chg is not None else "—"
     o30 = f" · 30일비 {oi_chg_30d*100:+.1f}%" if oi_chg_30d is not None else ""
     axis = "세션" if oi_chg_session is not None else "30일"
@@ -179,11 +204,17 @@ def score_deriv(funding_now: float | None, funding_avg: float | None,
     q_def = {"Q1": "OI↑·펀딩+", "Q2": "OI↑·펀딩−", "Q3": "OI↓·펀딩+", "Q4": "OI↓·펀딩−"}.get(q, "")
     # 'Q1' 숫자 라벨은 가격×OI 사분면으로 오독된다(자가비평 8라운드) → 해석 라벨로 교체.
     q_label = {"Q1": "레버리지 롱군집", "Q2": "숏군집·OI↑", "Q3": "롱청산", "Q4": "숏청산"}.get(q, "")
+    if fund_neutral and q in ("Q1", "Q3"):
+        # 펀딩이 기본율 수준이면 '+부호'가 군집 판정의 근거가 못 된다 → 판정 불가로 격하.
+        q_label = {"Q1": "OI↑·펀딩 중립", "Q3": "OI↓·펀딩 중립"}[q]
+        q_def = "기본율 수준 — 군집 판정 불가"
     qtxt = f"{q_label}({q_def})" if q_def else q
     # OI 단위는 **BTC(기초자산)** — Binance USD-M openInterest 는 계약수가 아니라 BTC 수량이다.
     observed = (f"펀딩 {ftxt}(8h) · OI {axis} {otxt}{o30 if axis == '세션' else ''} · {qtxt}"
                 f" · Binance USD-M · OI 단위 BTC(fapi raw · ×마크=명목가)")
     comment = {"Q1": "롱 군집", "Q2": "숏 군집", "Q3": "롱 청산", "Q4": "숏 청산"}.get(q, "파생 중립")
+    if fund_neutral and q in ("Q1", "Q3"):
+        comment = "파생 중립(펀딩 기본율 수준)"
     if extreme:
         comment += " · 극단 역행"
     return _sub("deriv", s, observed, comment), q, gates

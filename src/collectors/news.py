@@ -85,6 +85,8 @@ class Material:
     source: str = ""
     kind: str = "재료"              # "재료" | "시황" | "참고"(오락·리스트형 → 점수 제외)
     scope: str = "시장"             # "시장"(지수 점수 반영) | "종목"(개별 종목 이슈 → 제외)
+    counted: bool = False           # 이 재료가 실제 호재/악재 '표'로 들어갔나(BTC: 디둡·캡 후)
+    excluded: str = ""              # scored 인데 표에서 빠진 사유("중복(동일 사건)"·"상한 초과(태그당 3)")
 
     @property
     def scored(self) -> bool:
@@ -102,6 +104,7 @@ class MaterialsAssessment:
     good_count: int = 0             # fresh 재료만 집계
     bad_count: int = 0
     capital_raise_titles: list[str] = field(default_factory=list)
+    window_label: str = "당일"      # 검증 창 라벨 — 주식은 거래일 당일, BTC 는 "48시간 내"
 
     @property
     def fresh(self) -> list[Material]:
@@ -118,7 +121,7 @@ class MaterialsAssessment:
         lt = latest.strftime("%m/%d %H:%M") if latest else "—"
         d = f"{self.as_of[:4]}-{self.as_of[4:6]}-{self.as_of[6:8]}"
         drop = n_fresh - n_scored
-        return (f"팩트체크: {d} 기준 수집 {len(self.materials)}건 → 당일 검증 {n_fresh}건"
+        return (f"팩트체크: {d} 기준 수집 {len(self.materials)}건 → {self.window_label} 검증 {n_fresh}건"
                 f"(최신 {lt} KST) → 지수 점수 반영 {n_scored}건 "
                 f"(시황 중복·개별종목 이슈 {drop}건 제외)")
 
@@ -132,7 +135,8 @@ class MaterialsAssessment:
         items = []
         for m in self.fresh[:limit]:
             if m.scored:
-                reason = ""
+                # scored 여도 디둡·태그당 상한으로 표에서 빠질 수 있다(BTC) — 사유를 그대로 노출.
+                reason = m.excluded
             elif m.kind == "시황":
                 reason = "시황(가격·수급 항목과 중복)"
             elif m.kind == "참고":
@@ -140,10 +144,12 @@ class MaterialsAssessment:
             else:
                 reason = "개별종목 이슈"
             items.append({"tag": m.tag, "title": m.title, "url": m.url,
-                          "hhmm": m.hhmm(), "scored": m.scored, "reason": reason})
+                          "hhmm": m.hhmm(), "scored": m.scored,
+                          "counted": m.counted, "reason": reason})
         return {"fact_check": self.fact_check_line(),
                 "good_count": self.good_count, "bad_count": self.bad_count,
                 "scored_count": len(self.scored), "fresh_count": len(self.fresh),
+                "window_label": self.window_label,
                 "items": items}
 
     def sources(self, limit: int = 8) -> list[dict]:
@@ -162,6 +168,24 @@ class MaterialsAssessment:
             out.append({"title": f"{icon.get(m.tag, '⚪')} [{m.hhmm()}] {m.title}{mark}",
                         "url": m.url})
         return out
+
+
+def _mark_votes(scored_mats: list[Material], cap: int = 3) -> tuple[int, int]:
+    """호재/악재 표를 배정하고 각 재료에 counted/excluded 를 마킹한다.
+
+    good/bad 카운트가 **플래그에서 도출**되므로 '요약 카운트 vs 목록 표기' 불일치가
+    구조적으로 불가능하다(외부 비평 2026-09-01: 화면 악재 5 vs 반영 3 오해의 근원).
+    태그당 상한 cap(기본 3)은 뉴스 팩터 영향 한도 — 기존 min(n,3)과 동일 산식."""
+    counts = {"호재": 0, "악재": 0}
+    for m in scored_mats:
+        if m.tag not in counts or m.excluded:
+            continue
+        if counts[m.tag] < cap:
+            counts[m.tag] += 1
+            m.counted = True
+        else:
+            m.excluded = f"상한 초과(태그당 {cap})"
+    return counts["호재"], counts["악재"]
 
 
 def _tavily_key(env_path=None) -> str | None:
@@ -289,8 +313,7 @@ def market_materials(as_of: str, api_key: str | None = None, queries: list[str] 
             c.close()
     # 점수에는 '당일 발행 + 재료(시황 아님)'만 반영 — 가격/수급 이중 계상 차단.
     scored_mats = [m for m in mats if m.scored]
-    good = min(sum(1 for m in scored_mats if m.tag == "호재"), 3)
-    bad = min(sum(1 for m in scored_mats if m.tag == "악재"), 3)
+    good, bad = _mark_votes(scored_mats)
     # 정렬: 점수반영 재료 → 당일 시황 → 과거. 그 안에서 악재→호재→중립, 최신순
     order = {"악재": 0, "호재": 1, "중립": 2}
     mats.sort(key=lambda m: (not m.scored, not m.fresh, order.get(m.tag, 3),
@@ -517,13 +540,17 @@ def btc_materials(as_of: str, api_key: str | None = None, hours: int = 48,
     finally:
         if own:
             c.close()
-    scored_mats = _dedup_events([m for m in mats if m.scored])
-    good = min(sum(1 for m in scored_mats if m.tag == "호재"), 3)
-    bad = min(sum(1 for m in scored_mats if m.tag == "악재"), 3)
+    scored_all = [m for m in mats if m.scored]
+    kept = _dedup_events(scored_all)
+    for m in scored_all:                      # 디둡으로 빠진 항목을 사유와 함께 마킹
+        if m not in kept:
+            m.excluded = "중복(동일 사건)"
+    good, bad = _mark_votes(kept)
     order = {"악재": 0, "호재": 1, "중립": 2}
     mats.sort(key=lambda m: (not m.scored, not m.fresh, order.get(m.tag, 3),
                              -(m.published_kst.timestamp() if m.published_kst else 0)))
-    return MaterialsAssessment(as_of=as_of, materials=mats, good_count=good, bad_count=bad)
+    return MaterialsAssessment(as_of=as_of, materials=mats, good_count=good, bad_count=bad,
+                               window_label=f"{hours}시간 내")
 
 
 _BTC_SNS_QUERIES = [

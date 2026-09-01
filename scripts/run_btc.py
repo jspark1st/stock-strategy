@@ -319,7 +319,12 @@ def build_report(now: datetime, env: dict, conn, dry_run: bool, manual: bool,
         "verdict": scored.get("verdict"), "quadrant": scored.get("quadrant"),
         "gate": scored.get("gate"), "atr": atr, "binance_size": sz,
         "warnings": scored.get("warnings"), "subscores": scored.get("subscores"),
-        "funding_txt": (f"{funding_now*100:.4f}%" if funding_now is not None else "—"),
+        # 기본율 문맥 포함 — Binance USD-M 기본 펀딩률 0.01%/8h. ±0.005%p 안이면 중립
+        # (외부 비평 2026-09-01: '펀딩+' 부호만으로 롱군집 서술 금지의 근거를 팩트로 제공).
+        "funding_txt": ((f"{funding_now*100:.4f}%(8h·"
+                         + ("기본율 0.01% 수준=중립" if -0.00005 < funding_now < 0.00015
+                            else "기본율 상회" if funding_now > 0 else "음(숏 우위)") + ")")
+                        if funding_now is not None else "—"),
         "oi_txt": (f"{oi:,.0f}" if oi else "—"),
         # OI 는 BTC(기초자산) 단위 — 명목가 = OI(BTC) × 마크(USD). raw·명목가 분리 표기용.
         "oi_notional_txt": (f"${oi*mark/1e9:.1f}B" if (oi and mark) else None),

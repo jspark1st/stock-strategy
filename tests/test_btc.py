@@ -950,3 +950,126 @@ def test_btc_gate_log_enriched_fields_and_mfe_mae(tmp_path):
     r = store.btc_gate_rows(conn)[0]
     assert abs(r["r_m2m"] - 1.0) < 1e-6
     assert abs(r["mfe_r"] - 2.0) < 1e-6 and abs(r["mae_r"] + 1.0) < 1e-6
+
+
+# ── 2026-09-01 외부 비평 라운드15 회귀 ─────────────────────────────────────────
+
+
+def test_news_vote_marking_dedup_and_cap():
+    """표 카운트가 per-item 플래그에서 도출 — '요약 vs 목록' 불일치가 구조적으로 불가능."""
+    from datetime import datetime, timezone, timedelta
+    kst = timezone(timedelta(hours=9))
+    ts = datetime(2026, 9, 1, 9, 0, tzinfo=kst)
+
+    def mat(title, tag):
+        return news_mod.Material(title=title, url=f"https://x/{title[:8]}", tag=tag,
+                                 published_kst=ts, fresh=True)
+    dup_a = mat("Bitcoin ETF Inflow Streak Ends With $202 Million Pullback", "악재")
+    dup_b = mat("Bitcoin ETF Outflows Hit $201M As Inflow Streak Breaks", "악재")
+    extras = [mat("Fed Rate Hike Odds Jump Above Fifty Percent", "악재"),
+              mat("Exchange Reserves Climb As Whales Move Coins", "악재"),
+              mat("Miner Capitulation Deepens On Hashprice Slump", "악재")]
+    good = mat("Institutional adoption accelerates", "호재")
+    scored_all = [dup_a, dup_b, *extras, good]
+    kept = news_mod._dedup_events(scored_all)
+    for m in scored_all:
+        if m not in kept:
+            m.excluded = "중복(동일 사건)"
+    g, b = news_mod._mark_votes(kept)
+    assert (g, b) == (1, 3)
+    # 플래그 정합: counted 합 == 카운트 (발행 전 하드 체크의 본체)
+    assert sum(1 for m in scored_all if m.counted and m.tag == "악재") == b
+    assert sum(1 for m in scored_all if m.counted and m.tag == "호재") == g
+    # 디둡 탈락 1건 + 캡 초과 1건이 사유를 갖는다
+    assert sum(1 for m in scored_all if m.excluded == "중복(동일 사건)") == 1
+    assert sum(1 for m in scored_all if "상한 초과" in m.excluded) == 1
+    # to_report 가 counted/reason/window 를 노출
+    ma = news_mod.MaterialsAssessment(as_of="20260901", materials=scored_all,
+                                      good_count=g, bad_count=b, window_label="48시간 내")
+    rep = ma.to_report()
+    assert rep["window_label"] == "48시간 내"
+    excl_reasons = [it["reason"] for it in rep["items"] if it["scored"] and not it["counted"]]
+    assert any("중복" in x for x in excl_reasons)
+    assert any("상한 초과" in x for x in excl_reasons)
+
+
+def test_deriv_funding_baseline_neutral_demotes_quadrant_label():
+    """펀딩 0.0098%(8h)≈기본율 0.01% → 'Q1'이어도 '롱군집' 단정 금지(표시 격하·점수 불변)."""
+    from src.btc_scoring import score_deriv
+    sub, q, _ = score_deriv(0.000098, 0.000098, 105, 100, 0.01)   # 기본율 수준 · OI↑
+    assert q == "Q1"                                              # 스코어링 쿼드런트는 불변
+    assert "기본율 0.01% 수준=중립" in sub["observed"]
+    assert "군집 판정 불가" in sub["observed"]
+    assert "레버리지 롱군집" not in sub["observed"]
+    assert "파생 중립(펀딩 기본율 수준)" in sub["comment"]
+    # 기본율을 뚜렷이 상회하면 기존 라벨 유지
+    sub2, q2, _ = score_deriv(0.0003, 0.0003, 105, 100, 0.01)
+    assert q2 == "Q1" and "OI↑·펀딩+" in sub2["observed"]
+
+
+def test_render_quad_label_demotes_neutral_funding():
+    import render_report as rr
+    assert "판정 불가" in rr._quad_label("Q1", 0.000098)
+    assert rr._quad_label("Q1", 0.0003) == "레버리지 롱군집"
+    assert rr._quad_label("Q1", None) == "레버리지 롱군집"   # 펀딩 미상이면 기존 동작
+
+
+def test_tech_1h_weak_detected_via_macd_and_supertrend():
+    """1H RSI 55 라도 MACD−·ST 하락 전환이면 '1H 약화' — RSI 단일 트리거의 구멍(비평 ④)."""
+    h1 = {"rsi": 55, "macd_hist": -13.4, "st_dir": -1}
+    sub = btc_scoring.score_tech(dict(_TECH_UP), h1)
+    assert "1H 약화" in sub["comment"]
+    assert "1H MACD−" in sub["observed"] and "1H ST↓" in sub["observed"]
+    # 1H 가 정상이면 표기 없음
+    sub2 = btc_scoring.score_tech(dict(_TECH_UP), {"rsi": 55, "macd_hist": 5, "st_dir": 1})
+    assert "1H 약화" not in sub2["comment"]
+
+
+def test_btc_bars_show_sns_exclusion_note():
+    import render_report as rr
+    subs = [{"key": k, "label": k, "weight": w, "score": 50, "observed": "", "comment": ""}
+            for k, w in (("tech", .22), ("deriv", .28), ("flow", .15),
+                         ("env", .15), ("news", .12))]
+    html = rr.build_bars({"report_type": "btc_perp", "subscores": subs})
+    assert "SNS·심리 8%는 점수에서 제외" in html and "AUC 0.491" in html
+
+
+def test_btc_hero_note_states_grading_horizon():
+    import render_report as rr
+    r = {"report_type": "btc_perp", "total": 55.2, "grade": "중립",
+         "p_long": 0.62, "p_short": 0.38, "p_up_raw": 0.63,
+         "next_session": "22:00", "calibration": {}, "accuracy": {"n": 20}}
+    html = rr.build_hero(r)
+    assert "판정 기준" in html and "마크가격 등락 부호" in html and "22:00" in html
+
+
+def test_btc_positioning_card_has_no_fng_tile():
+    """F&G 는 SNS 카드(점수 미반영·참고) 한 곳에만 — 반영/미반영 경계 명확화(비평 ⑥)."""
+    import render_report as rr
+    html = rr._btc_pos_card({"quadrant": "Q1", "ls_global": 1.01, "ls_top": 2.12,
+                             "fng": 69, "nasdaq_txt": "나스닥 -0.1%",
+                             "_gate_obs": {"funding": 0.000098}})
+    assert "Fear&Greed" not in html
+    assert "판정 불가" in html          # 중립 펀딩 격하가 타일에도 적용
+
+
+def test_reissue_badge_on_slot_asof_mismatch():
+    import render_report as rr
+    assert "재발행 13:40" in rr._reissue_badge(
+        {"slot": "0930", "as_of": "2026-09-01 13:40 KST"})
+    assert rr._reissue_badge({"slot": "0930", "as_of": "2026-09-01 09:31 KST"}) == ""
+    assert rr._reissue_badge({"slot": "1340", "as_of": "2026-09-01 13:40 KST"}) == ""
+
+
+def test_btc_no_trade_puts_decision_card_before_hero():
+    import render_report as rr
+    r = {"report_type": "btc_perp", "total": 55.2, "grade": "중립",
+         "p_long": 0.62, "p_short": 0.38, "next_session": "22:00",
+         "gate": {"no_trade": True, "new_entry_blocked": True, "position_scale": 0.0,
+                  "reasons": ["수렴 게이트"]},
+         "verdict": "NO_TRADE", "calibration": {}, "accuracy": {"n": 20}}
+    html = rr._btc_top_cards(r, "")
+    assert html.index("판정 분해") < html.index("card hero")
+    r2 = dict(r, gate={"no_trade": False, "new_entry_blocked": False}, verdict="LONG")
+    html2 = rr._btc_top_cards(r2, "")
+    assert html2.index("card hero") < html2.index("판정 분해")

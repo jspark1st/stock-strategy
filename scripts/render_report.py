@@ -248,12 +248,16 @@ def build_hero(r: dict) -> str:
     if btc:
         learned = (r.get("calibration") or {}).get("n") or 0
         n_acc = (r.get("accuracy") or {}).get("n") or 0
+        # 판정 지평을 확률 옆에 박는다(외부 비평 2026-09-01: 지평 미정의로 Brier 산출 불가 오해)
+        # — 실제로는 store.grade_btc_pending 이 이 기준으로 채점 중. 정의 노출만 추가.
+        _hz = (f" 판정 기준: 다음 정규 슬롯({esc(str(r.get('next_session') or '09:30/22:00'))} KST) "
+               f"마크가격 등락 부호로 채점해 적중률·Brier 로 누적합니다.")
         if raw is not None and p_up is not None and abs(raw - p_up) > 1e-9 and learned < 40:
             calib = (f'<div class="hero-note">확률 조정 {raw*100:.0f}% → {p_up*100:.0f}%'
-                     f'{_info("자가학습 보정이 아니라, 신호가 엇갈릴 때 확률을 50% 쪽으로 좁힌 값입니다.")}</div>')
+                     f'{_info("자가학습 보정이 아니라, 신호가 엇갈릴 때 확률을 50% 쪽으로 좁힌 값입니다." + _hz)}</div>')
         elif p_up is not None and n_acc < 40:
             calib = (f'<div class="hero-note">방향 확률은 참고용'
-                     f'{_info("신뢰구간 없는 점추정이고, 검증 표본(n&lt;40)이 부족해 성적·보정은 참고만 하세요.")}</div>')
+                     f'{_info("신뢰구간 없는 점추정이고, 검증 표본(n&lt;40)이 부족해 성적·보정은 참고만 하세요." + _hz)}</div>')
     else:
         _d, _caution = [], ""
         if raw is not None and p_up is not None and abs(raw - p_up) > 1e-9:
@@ -947,7 +951,13 @@ def build_bars(r: dict) -> str:
     intraday_note = ('<div class="note muted">15:00 장중 잠정 — 종가 강도·거래대금 등 '
                      '마감 어휘 지표는 <b>마감 전 추정치</b>이며 16:30 확정 회차에서 재계산됩니다.</div>'
                      if r.get('intraday_snapshot') else '')
-    return f'<div class="card"><h2>항목별 점수</h2>{"".join(rows)}{intraday_note}</div>'
+    # BTC: 어떤 팩터가 왜 빠져 합이 100%가 아닌지 명시(외부 비평 2026-09-01: '사라진 8%').
+    sns_note = ''
+    if (r.get('report_type') == 'btc_perp'
+            and not any(s.get('key') == 'sns' for s in subs) and rebalanced):
+        sns_note = ('<div class="note muted">SNS·심리 8%는 점수에서 제외 — 7년 다레짐 측정에서 '
+                    '판별력 없음(AUC 0.491), 2026-09-01 은퇴. 나머지 가중치를 위와 같이 재배분.</div>')
+    return f'<div class="card"><h2>항목별 점수</h2>{"".join(rows)}{intraday_note}{sns_note}</div>'
 
 
 VCOL = {"up": "var(--up)", "down": "var(--down)", "neutral": "var(--neutral)"}
@@ -1095,16 +1105,24 @@ def build_materials(r: dict) -> str:
             tag = m.get("tag", "중립")
             col = tag_col.get(tag, "var(--muted)")
             hhmm = esc(m.get("hhmm", ""))
-            excl = ("" if m.get("scored") else
-                    f'<span class="mtag mtag-off">점수제외·{esc(m.get("reason") or "")}</span>')
+            if not m.get("scored"):
+                excl = f'<span class="mtag mtag-off">점수제외·{esc(m.get("reason") or "")}</span>'
+            elif m.get("reason"):
+                # scored 인데 표에서 빠진 항목(중복·태그당 상한) — 사유를 그대로 노출해
+                # '요약 반영수 vs 목록 태그수' 불일치 오독을 막는다(외부 비평 2026-09-01).
+                excl = f'<span class="mtag mtag-off">반영 제외·{esc(m["reason"])}</span>'
+            else:
+                excl = ""
             title, url = esc(m.get("title", "")), m.get("url", "")
             body = (f'<a href="{esc(url)}" target="_blank" rel="noreferrer">{title}</a>'
                     if url else title)
             rows += (f'<li><span class="mtag" style="background:{col}">{esc(tag)}</span>'
                      f'<span class="mtime">{hhmm}</span> {body} {excl}</li>')
-        cnt = (f'호재 {fc.get("good_count", 0)} · 악재 {fc.get("bad_count", 0)} '
-               f'(점수 반영 {fc.get("scored_count", 0)}건 / 당일 검증 {fc.get("fresh_count", 0)}건)')
-        fc_sec = (f'<div class="sub-h">점수 반영 재료 · 팩트체크</div>'
+        win = fc.get("window_label") or ("48시간 내" if r.get("report_type") == "btc_perp" else "당일")
+        cnt = (f'반영 호재 {fc.get("good_count", 0)} · 악재 {fc.get("bad_count", 0)} '
+               f'· 검증 {fc.get("fresh_count", 0)}건({esc(win)})')
+        fc_sec = (f'<div class="sub-h">점수 반영 재료 · 팩트체크'
+                  f'{_info("검증 통과 재료 중 동일 사건 중복을 제거하고 태그당 상한 3건까지만 표로 반영합니다. 반영에서 빠진 항목은 목록에 사유가 표기됩니다.")}</div>'
                   f'<div class="note muted">{esc(cnt)}</div>'
                   f'<ul class="mat-ul">{rows}</ul>')
 
@@ -1439,6 +1457,8 @@ def build_report_text(r: dict) -> str:
                  f"· 세션 LONG {pct(r.get('p_long'))} / SHORT {pct(r.get('p_short'))}")
         L.append(f"- 방향 편향은 '방향'({_band}), 매매 여부는 '실행'({_verd})을 본다 "
                  f"(내부 게이트 밴드 등급={r.get('grade','')} — 실행 판정과 별개 축)")
+        L.append(f"- 확률 판정 기준: 다음 정규 슬롯({r.get('next_session') or '09:30/22:00'} KST) "
+                 f"마크가격 등락 부호로 채점(적중률·Brier 누적)")
     else:
         # 복사용 평문도 히어로와 **같은 격하**를 따른다. 이 텍스트는 다른 LLM 에 붙여넣는 용도라,
         # 여기서만 '익일 상승확률'로 남으면 기저율 상수가 예측인 것처럼 그대로 전파된다.
@@ -1518,6 +1538,11 @@ def build_report_text(r: dict) -> str:
             wtxt = f" (가중 {w*100:.0f}%)" if isinstance(w, (int, float)) else ""
             det = " · ".join(x for x in (s.get("observed"), s.get("comment")) if x)
             L.append(f"- {lab} {fmt(s.get('score'))}{wtxt}" + (f" · {det}" if det else ""))
+        _wsum = sum(s.get("weight") or 0 for s in subs)
+        if abs(_wsum - 1.0) > 0.01:
+            L.append(f"- (기준 가중 합 {_wsum*100:.0f}% — 결측·은퇴 팩터 제외분은 재배분해 100%로 산출"
+                     + ("; SNS·심리 8%는 다레짐 AUC 0.491로 은퇴)"
+                        if btc and not any(s.get("key") == "sns" for s in subs) else ")"))
     # 팩터 기여도
     contribs = r.get("contributions") or []
     if contribs:
@@ -1545,7 +1570,8 @@ def build_report_text(r: dict) -> str:
             (f"코어 정렬 {r.get('core_aligned')}/3 (필요 {r.get('core_needed')} · "
              f"기술·파생·체결 · {_btc_candidate_label(r)})"
              if r.get("core_needed") is not None else None),
-            f"펀딩·OI 국면 {_quad_label(r.get('quadrant'))}" if r.get("quadrant") else None,
+            (f"펀딩·OI 국면 {_quad_label(r.get('quadrant'), (r.get('_gate_obs') or {}).get('funding'))}"
+             if r.get("quadrant") else None),
             f"판정 {r.get('verdict')}" if r.get("verdict") else None,
             f"다음 세션 {r.get('next_session')}" if r.get("next_session") else None,
         ) if x]
@@ -1853,8 +1879,14 @@ def _btc_direction_band(total: float | None) -> str:
 _QUAD_LABEL = {"Q1": "레버리지 롱군집", "Q2": "숏군집·OI↑", "Q3": "롱청산", "Q4": "숏청산"}
 
 
-def _quad_label(q: str | None) -> str:
-    """펀딩×OI 국면을 서술 라벨로 — 'Q1' 숫자는 가격×OI 사분면 오독을 부른다(자가비평)."""
+def _quad_label(q: str | None, funding: float | None = None) -> str:
+    """펀딩×OI 국면을 서술 라벨로 — 'Q1' 숫자는 가격×OI 사분면 오독을 부른다(자가비평).
+
+    펀딩이 기본율(0.01%/8h) ±0.005%p 안이면 '+부호'가 군집 근거가 못 된다(외부 비평
+    2026-09-01) → Q1/Q3 라벨을 '판정 불가'로 격하. 스코어링 쿼드런트 자체는 불변."""
+    if (funding is not None and -0.00005 < funding < 0.00015 and q in ("Q1", "Q3")):
+        return {"Q1": "OI↑·펀딩 중립(군집 판정 불가)",
+                "Q3": "OI↓·펀딩 중립(군집 판정 불가)"}[q]
     return _QUAD_LABEL.get(q or "", q or "—")
 
 
@@ -1950,7 +1982,8 @@ def render_btc_view(r: dict, date: str) -> str:
     concl = (f'<div class="card concl" style="border-left-color:{vcol}">'
              f'<div class="concl-badge" style="background:{vcol}">{esc(verdict)}</div>'
              f'<div class="concl-body"><div class="concl-text">{esc(nar.get("conclusion") or "")}</div>'
-             f'<div class="concl-gate">다음 세션 <b>{nxt}</b> · 펀딩·OI 국면 {esc(_quad_label(r.get("quadrant")))}'
+             f'<div class="concl-gate">다음 세션 <b>{nxt}</b> · 펀딩·OI 국면 '
+             f'{esc(_quad_label(r.get("quadrant"), (r.get("_gate_obs") or {}).get("funding")))}'
              f'{" · 게이트 차단" if blocked else ""}'
              f' · 등급배수 {esc(str((r.get("gate") or {}).get("position_scale", "—")))}'
              f' <span class="muted">'
@@ -1993,9 +2026,7 @@ def render_btc_view(r: dict, date: str) -> str:
       {_copy_widget(r)}
     </div>
     {headline_html}
-    <div class="card hero">{build_hero(r)}</div>
-    {clip}
-    {_btc_decision_card(r)}
+    {_btc_top_cards(r, clip)}
     {conv_html}
     {concl}
     {targets}
@@ -2012,6 +2043,17 @@ def render_btc_view(r: dict, date: str) -> str:
     {build_accuracy(r)}
     {build_paper(r)}
     {build_btc_reopen(r)}"""
+
+
+def _btc_top_cards(r: dict, clip: str) -> str:
+    """히어로·판정 카드 순서 — NO_TRADE 면 '왜 관망인가(판정 분해)'가 총점·확률보다 먼저다
+    (외부 비평 2026-09-01: 실행이 없는데 확률이 최상단). 실행 허용 회차는 기존 순서 유지."""
+    hero = f'<div class="card hero">{build_hero(r)}</div>'
+    dec = _btc_decision_card(r)
+    no_trade = bool((r.get("gate") or {}).get("no_trade")) or (r.get("verdict") == "NO_TRADE")
+    if no_trade:
+        return f"{dec}{hero}{clip}"
+    return f"{hero}{clip}{dec}"
 
 
 def _btc_conv_card(r: dict) -> str:
@@ -2214,8 +2256,28 @@ def _btc_slot_picker(r: dict, date: str, items: list | None = None) -> str:
             f'{date_html}'
             f'<div class="slot-regs">{"".join(chips)}</div>'
             f'{man_html}'
+            f'{_reissue_badge(r)}'
             f'{_info("정규 발행은 하루 2회(09:30·22:00 KST) 칩, 수동 발행분은 수동 목록에서 선택합니다.")}'
             f'</div>')
+
+
+def _reissue_badge(r: dict) -> str:
+    """정규 슬롯인데 as_of 가 슬롯 시각과 45분 이상 어긋나면 '재발행' 배지.
+
+    2026-09-01 09:30 슬롯을 13:40 에 정정 재발행한 회차가 '09:30 기준'으로 읽혀
+    데이터 시각과 헤더가 모순돼 보였다(외부 비평). 정정 발행 자체는 정당 — 표기만 정직하게."""
+    slot = r.get("slot") or ""
+    if slot not in ("0930", "2200"):
+        return ""
+    m = _re.search(r"(\d{2}):(\d{2})", str(r.get("as_of") or ""))
+    if not m:
+        return ""
+    as_min = int(m.group(1)) * 60 + int(m.group(2))
+    slot_min = int(slot[:2]) * 60 + int(slot[2:])
+    if abs(as_min - slot_min) < 45:
+        return ""
+    return (f'<span class="slot-empty">재발행 {m.group(1)}:{m.group(2)}'
+            f'{_info("정규 슬롯 발행 후 데이터·분류 정정으로 다시 발행된 회차입니다. 데이터 기준시각은 재발행 시각이며, 채점 지평도 그 시각 기준으로 봐야 합니다.")}</span>')
 
 
 def _btc_size_card(r: dict, blocked: bool) -> str:
@@ -2254,11 +2316,10 @@ def _btc_pos_card(r: dict) -> str:
     return (f'<div class="card"><h2>포지셔닝'
             f'{_info("출처 Binance USD-M. LS 글로벌(계정 수 비율)과 탑(상위 포지션 비율)은 정의(분모)가 다릅니다. 한 숫자로 섞어 쓰지 않습니다.")}</h2>'
             f'<div class="tiles">'
-            f'{_tile("펀딩·OI 국면", _quad_label(q), sub="펀딩×OI(가격축 아님)")}'
+            f'{_tile("펀딩·OI 국면", _quad_label(q, (r.get("_gate_obs") or {}).get("funding")), sub="펀딩×OI(가격축 아님)")}'
         f'{_price_oi_tile(r)}'
             f'{_tile("LS 글로벌", _ls(ls_g), sub="계정 수 비율")}'
             f'{_tile("LS 탑", _ls(ls_t), sub="탑 포지션 비율 · 점수에 우선")}'
-            f'{_tile("Fear&Greed", str(r.get("fng") if r.get("fng") is not None else "—"))}'
             f'{_tile("나스닥", esc(r.get("nasdaq_txt") or "—"))}'
             f'</div></div>')
 
