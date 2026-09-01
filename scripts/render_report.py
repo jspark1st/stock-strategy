@@ -1482,7 +1482,7 @@ def build_report_text(r: dict) -> str:
                 L.append(f"  · {it.get('label')} {it.get('side')} ({fmt(it.get('score'))})")
         core = [x for x in (
             (f"코어 정렬 {r.get('core_aligned')}/3 (필요 {r.get('core_needed')} · "
-             f"기술·파생·체결 · {r.get('core_side')})"
+             f"기술·파생·체결 · {_btc_candidate_label(r)})"
              if r.get("core_needed") is not None else None),
             f"분면 {r.get('quadrant')}" if r.get("quadrant") else None,
             f"판정 {r.get('verdict')}" if r.get("verdict") else None,
@@ -1782,6 +1782,22 @@ def _btc_direction_band(total: float | None) -> str:
     return "약세"
 
 
+def _btc_candidate_label(r: dict) -> str:
+    """방향 라벨 — 진입 차단/미달이면 '추천'이 아니라 '후보(확률 미달)'로 표기.
+    hero '방향 중립' 과 core '추천 Long' 이 모순돼 보이던 것 해소(자가비평). 58%는 MIN_P_EDGE."""
+    side = r.get("core_side") or ("Long" if (r.get("p_long") or 0.5) >= 0.5 else "Short")
+    blocked = bool((r.get("gate") or {}).get("new_entry_blocked") or r.get("verdict") == "NO_TRADE")
+    if not blocked:
+        return side
+    pl = r.get("p_long")
+    if pl is not None:
+        pdir = pl if side == "Long" else 1 - pl
+        if pdir < 0.58:                       # 확률 미달이면 그 사유를 명시
+            return f"후보 {side}(확률 {pdir*100:.0f}%<58%)"
+        return f"후보 {side}"                  # 확률은 충족, 다른 사유(괴리 등)로 차단
+    return f"후보 {side}(미달)"
+
+
 def _btc_decision_card(r: dict) -> str:
     """판정 분해 — 방향 점수(모델) / 리스크 오버레이 / 실행(게이트) 을 분리.
     '총점 54인데 왜 관망?' 을 즉시 이해하게 한다(등급·확률·차단을 한 라벨로 뭉치지 않음)."""
@@ -1949,15 +1965,16 @@ def _btc_conv_card(r: dict) -> str:
         metrics.append(f'추천 {call}과 같은 쪽 <b>{match}/{directional}</b>')
     ca, need = r.get("core_aligned"), r.get("core_needed") or 2
     side = r.get("core_side") or call
+    cand = _btc_candidate_label(r)
     if ca is not None:
         metrics.append(f'코어 정렬 <b>{ca}</b> (필요 {need}'
-                       f'{f" · {esc(side)} 기준" if side else ""} · 기술·파생·체결)')
+                       f'{f" · {esc(cand)} 기준" if side else ""} · 기술·파생·체결)')
     if sa is not None:
         metrics.append(f'가중 일치도 <b>{sa*100:.0f}%</b> (확률 수축용)')
     met_html = '<div class="note muted">' + " · ".join(metrics) + "</div>"
     conv_info = _info(
         "세 숫자는 분모가 다릅니다. 관점 다수결=방향을 낸 팩터, "
-        f"코어 정렬=기술·파생·체결이 추천 방향과 같은 개수(필요 {need}), "
+        f"코어 정렬=기술·파생·체결이 후보 방향과 같은 개수(필요 {need}), "
         "가중 일치도=확률 수축용. 괴리가 나면 차트·규제를 심리보다 우선합니다.")
     return f"""
     <div class="card">

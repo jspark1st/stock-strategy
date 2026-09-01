@@ -804,3 +804,29 @@ def test_btc_hero_leads_with_direction_band_not_grade():
     assert "방향 중립" in h                      # 50.4 → 방향밴드 중립을 앞세움
     assert "내부 게이트 밴드 약세" in h          # 등급은 부기(방향 판정 아님)
     assert "방향 판정 아님" in h
+
+
+def test_btc_candidate_label_when_blocked():
+    """자가비평: 방향 중립/차단인데 '추천 방향 Long' 은 모순 → '후보'로, 확률 미달이면 명시."""
+    import render_report as rr
+    # 확률 미달로 차단
+    r1 = {"core_side": "Long", "p_long": 0.51, "verdict": "NO_TRADE",
+          "gate": {"new_entry_blocked": True}}
+    assert rr._btc_candidate_label(r1) == "후보 Long(확률 51%<58%)"
+    # 확률은 충족하나 다른 사유(괴리)로 차단 → 틀린 '<58%' 문구를 붙이지 않는다
+    r2 = {"core_side": "Long", "p_long": 0.62, "verdict": "NO_TRADE",
+          "gate": {"new_entry_blocked": True}}
+    assert rr._btc_candidate_label(r2) == "후보 Long"
+    # 진입 허용이면 그냥 방향
+    r3 = {"core_side": "Long", "p_long": 0.62, "verdict": "LONG",
+          "gate": {"new_entry_blocked": False}}
+    assert rr._btc_candidate_label(r3) == "Long"
+
+
+def test_deriv_quadrant_definition_and_oi_unit():
+    """자가비평: Q1 을 '가격↑×OI↑' 로 오독 → Q 는 펀딩×OI 임을 라벨에 박고 OI 단위(계약) 표기."""
+    from src.btc_scoring import score_deriv
+    sub, q, _ = score_deriv(0.0002, 0.0002, 105, 100, 0.01)  # 펀딩+ · OI↑ → Q1
+    assert q == "Q1"
+    assert "OI↑·펀딩+" in sub["observed"]
+    assert "OI 단위 계약(BTC)" in sub["observed"]

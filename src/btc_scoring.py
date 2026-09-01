@@ -174,8 +174,12 @@ def score_deriv(funding_now: float | None, funding_avg: float | None,
     otxt = f"{oi_chg*100:+.1f}%" if oi_chg is not None else "—"
     o30 = f" · 30일비 {oi_chg_30d*100:+.1f}%" if oi_chg_30d is not None else ""
     axis = "세션" if oi_chg_session is not None else "30일"
-    observed = (f"펀딩 {ftxt}(8h) · OI {axis} {otxt}{o30 if axis == '세션' else ''} · {q}"
-                f" · Binance USD-M")
+    # 사분면 정의를 라벨에 박는다 — Q 는 **펀딩부호×OI증감**(가격축 아님). 정교한 독자도
+    # 'Q1=가격↑×OI↑' 로 오독했다(자가비평) → 명시. OI 단위는 계약(BTC, USD 명목가 아님).
+    q_def = {"Q1": "OI↑·펀딩+", "Q2": "OI↑·펀딩−", "Q3": "OI↓·펀딩+", "Q4": "OI↓·펀딩−"}.get(q, "")
+    qtxt = f"{q}({q_def})" if q_def else q
+    observed = (f"펀딩 {ftxt}(8h) · OI {axis} {otxt}{o30 if axis == '세션' else ''} · {qtxt}"
+                f" · Binance USD-M · OI 단위 계약(BTC)")
     comment = {"Q1": "롱 군집", "Q2": "숏 군집", "Q3": "롱 청산", "Q4": "숏 청산"}.get(q, "파생 중립")
     if extreme:
         comment += " · 극단 역행"
@@ -430,7 +434,7 @@ def quality_gates(p_long: float | None, direction: str, agreement: float,
         out.append("확신도 Low — 관망")
     aligned = _core_aligned(subs, direction)
     if aligned < MIN_CORE_ALIGN:
-        out.append(f"코어 정렬 {aligned} (필요 {MIN_CORE_ALIGN} · 기술·파생·체결이 추천 방향과 같음) — 관망")
+        out.append(f"코어 정렬 {aligned} (필요 {MIN_CORE_ALIGN} · 기술·파생·체결이 후보 방향과 같음) — 관망")
     rsi = (h4 or {}).get("rsi")
     if rsi is not None:
         if direction == "long" and rsi >= OVERHEAT_RSI:
