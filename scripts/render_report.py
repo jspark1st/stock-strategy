@@ -2760,6 +2760,8 @@ TEMPLATE = r"""<!doctype html>
 <link rel="icon" href="/icons/favicon-32.png?v=2" sizes="32x32" type="image/png"/>
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=2"/>
 <link rel="manifest" href="/manifest.webmanifest?v=2"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&display=swap"/>
 <title>준스탁 {{DATE}}</title>
 <script>try{var t=localStorage.getItem('theme');if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
 <style>
@@ -2799,11 +2801,16 @@ TEMPLATE = r"""<!doctype html>
     padding:18px 14px;position:sticky;top:0;height:100vh;height:100dvh;overflow-y:auto;
     display:flex;flex-direction:column;gap:6px}
   .brand{font-weight:800;font-size:1.6rem;display:flex;align-items:center;gap:10px;
-    letter-spacing:-.02em;margin-bottom:2px}
+    letter-spacing:-.02em;margin-bottom:10px}
   .brand-mark{border-radius:9px;flex:0 0 auto;box-shadow:0 2px 8px rgba(0,0,0,.4)}
   .topnav .brand-mark{border-radius:7px}
   .topnav strong{font-size:1.25rem;letter-spacing:-.02em}
-  .brand-sub{font-size:.74rem;color:var(--muted);margin-bottom:8px}
+  /* 워드마크 — 로고 색(앰버→레드) 그라디언트 타이포. 테마 토큰이라 라이트에서도 자동 적응 */
+  .brand-name{font-family:'Black Han Sans','Apple SD Gothic Neo','Malgun Gothic',sans-serif;
+    font-weight:400;letter-spacing:.02em;
+    background:linear-gradient(115deg,var(--neutral) 15%,var(--up) 75%);
+    -webkit-background-clip:text;background-clip:text;
+    color:transparent;-webkit-text-fill-color:transparent}
   .date-nav{margin:0 0 14px}
   .stock-datesel{border:1px solid var(--border);background:var(--surface2);color:var(--text);
     border-radius:8px;padding:5px 9px;font:inherit;font-size:.8rem;font-weight:600;
@@ -3131,8 +3138,7 @@ TEMPLATE = r"""<!doctype html>
 <a class="skip-link" href="#main">본문으로 건너뛰기</a>
 <div class="app">
   <aside class="sidebar" id="sidebar" aria-label="사이드바">
-    <div class="brand"><img class="brand-mark" src="/icons/favicon.svg?v=2" width="36" height="36" alt=""/>준스탁</div>
-    <div class="brand-sub">by junaitech</div>
+    <div class="brand"><img class="brand-mark" src="/icons/favicon.svg?v=2" width="36" height="36" alt=""/><span class="brand-name">준스탁</span></div>
     <div class="date-nav cal-wrap"><label class="slot-lab">📅 날짜
       <select class="stock-datesel" aria-label="날짜 선택" onchange="if(this.value) location=this.value">
         <option value="/" selected>{{DATE}}</option>
@@ -3149,7 +3155,7 @@ TEMPLATE = r"""<!doctype html>
     <div class="topnav">
       <button class="hamb" type="button" aria-label="메뉴 열기" aria-expanded="false"
         aria-controls="sidebar" onclick="window.__toggleSidebar()">☰</button>
-      <img class="brand-mark" src="/icons/favicon.svg?v=2" width="28" height="28" alt=""/><strong>준스탁</strong>
+      <img class="brand-mark" src="/icons/favicon.svg?v=2" width="28" height="28" alt=""/><strong class="brand-name">준스탁</strong>
     </div>
     {{VIEWS}}
     <p class="disc">투자 판단의 참고 자료이며 투자 권유가 아님.</p>
