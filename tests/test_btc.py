@@ -503,7 +503,7 @@ def test_core_align_label_is_count_vs_needed():
         {"tech": {"score": 70}, "deriv": {"score": 40}, "flow": {"score": 50}},
         {"rsi": 91})
     joined = " ".join(warns)
-    assert "코어 정렬 1 (필요 2" in joined
+    assert "코어 정렬 1/3 (필요 2" in joined
     assert "1/2" not in joined
 
 
@@ -847,3 +847,22 @@ def test_sns_excluded_from_score_fng_display_only():
     assert "sns" not in {s["key"] for s in fear["subscores"]}
     assert "sns" not in (fear.get("missing_keys") or [])   # 결측이 아니라 정책 제외
     assert fear["data_completeness"] == 1.0           # 5팩터 다 있으면 100%
+
+
+def test_convergence_drops_sns_pillar_when_excluded():
+    """SNS 점수 제외(sns_na) 시 수렴에 '심리(SNS)' 관점을 만들지 않는다 —
+    점수엔 빠졌는데 pillar/문장엔 '심리 Flat' 이 남던 인위적 3축 방지(자가비평)."""
+    from src.btc_scoring import build_convergence
+    # sns 없는 서브스코어(sns_na 결과와 동일 구조)
+    subs = [{"key": "tech", "label": "기술·추세", "score": 60},
+            {"key": "deriv", "label": "파생 포지셔닝", "score": 52},
+            {"key": "flow", "label": "체결·청산", "score": 58},
+            {"key": "env", "label": "시장 환경", "score": 49},
+            {"key": "news", "label": "뉴스 재료", "score": 30}]
+    conv = build_convergence(subs)
+    labels = [p["label"] for p in conv["pillars"]]
+    assert not any("심리" in x for x in labels)   # SNS 관점 없음
+    assert "심리" not in conv["sentence"]
+    # sns 가 있으면 심리 관점 유지(하위호환)
+    conv2 = build_convergence(subs + [{"key": "sns", "label": "SNS 심리", "score": 46}])
+    assert any("심리" in p["label"] for p in conv2["pillars"])

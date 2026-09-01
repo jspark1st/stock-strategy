@@ -326,17 +326,21 @@ def build_convergence(subs: list[dict]) -> dict:
     agree = (majority_n / directional) if directional else None  # 다수면 비중. 추천방향 일치가 아님.
     chart = by.get("tech") or "Flat"
     fund = _majority([by.get("news"), by.get("env"), by.get("deriv")])
+    sns_present = "sns" in by
     psych = by.get("sns") or "Flat"
-    trio = f"기술 {chart} · 기본 {fund} · 심리 {psych}"
+    # SNS 가 점수에서 제외(sns_na)면 '심리' 관점을 만들지 않는다 — 인위적 3축(심리 Flat) 방지.
+    pillars = [
+        {"label": "기술(차트)", "side": chart, "key": "tech"},
+        {"label": "기본(뉴스·환경·파생)", "side": fund, "key": "fund"},
+    ]
+    if sns_present:
+        pillars.append({"label": "심리(SNS)", "side": psych, "key": "sns"})
+    trio = f"기술 {chart} · 기본 {fund}" + (f" · 심리 {psych}" if sns_present else "")
 
     if directional == 0:
         return {
             "items": items,
-            "pillars": [
-                {"label": "기술(차트)", "side": chart, "key": "tech"},
-                {"label": "기본(뉴스·환경·파생)", "side": fund, "key": "fund"},
-                {"label": "심리(SNS)", "side": psych, "key": "sns"},
-            ],
+            "pillars": pillars,
             "conviction": "Low", "kind": "무신호", "priority": None,
             "sentence": (f"방향 신호 없음. 모든 팩터가 중립 구간(45–55). {trio}. "
                          f"수렴·괴리 판정 불가 — 확신도 Low."),
@@ -349,11 +353,7 @@ def build_convergence(subs: list[dict]) -> dict:
         side = "Long" if longs else "Short"
         return {
             "items": items,
-            "pillars": [
-                {"label": "기술(차트)", "side": chart, "key": "tech"},
-                {"label": "기본(뉴스·환경·파생)", "side": fund, "key": "fund"},
-                {"label": "심리(SNS)", "side": psych, "key": "sns"},
-            ],
+            "pillars": pillars,
             "conviction": "Low", "kind": "단일신호", "priority": None,
             "sentence": (f"단일신호({side}). 방향을 낸 팩터가 1개뿐이라 수렴·괴리 판정 "
                          f"표본이 아니다. {trio}. 확신도 Low."),
@@ -374,12 +374,17 @@ def build_convergence(subs: list[dict]) -> dict:
         maj_txt = f"관점 다수결 {majority} {majority_n}/{directional}"
 
     conflict = bool(longs and shorts)
-    pillar_conflict = chart != "Flat" and psych != "Flat" and chart != psych
+    pillar_conflict = sns_present and chart != "Flat" and psych != "Flat" and chart != psych
     if conflict or pillar_conflict:
         kind = "괴리"
-        priority = "차트·규제 > 심리"
-        sentence = (f"괴리. 확신도 {conviction}. {trio}. {maj_txt}. "
-                    f"{priority} — 심리가 앞서도 차트·규제 리스크를 후순위로 두지 않는다.")
+        # 심리(SNS) 관점이 있을 때만 '차트·규제 > 심리' 우선순위를 말한다 — 제외됐으면 무의미.
+        if sns_present:
+            priority = "차트·규제 > 심리"
+            sentence = (f"괴리. 확신도 {conviction}. {trio}. {maj_txt}. "
+                        f"{priority} — 심리가 앞서도 차트·규제 리스크를 후순위로 두지 않는다.")
+        else:
+            priority = None
+            sentence = f"괴리. 확신도 {conviction}. {trio}. {maj_txt}. 방향 팩터가 엇갈린다."
     else:
         kind = "수렴"
         priority = None
@@ -387,11 +392,7 @@ def build_convergence(subs: list[dict]) -> dict:
                     f"관점 다수결 — 방향 팩터 {directional}개가 모두 {majority}.")
     return {
         "items": items,
-        "pillars": [
-            {"label": "기술(차트)", "side": chart, "key": "tech"},
-            {"label": "기본(뉴스·환경·파생)", "side": fund, "key": "fund"},
-            {"label": "심리(SNS)", "side": psych, "key": "sns"},
-        ],
+        "pillars": pillars,
         "conviction": conviction, "kind": kind, "priority": priority,
         "sentence": sentence, "agreement": round(agree, 2),
         "directional": directional, "longs": longs, "shorts": shorts,
@@ -434,7 +435,7 @@ def quality_gates(p_long: float | None, direction: str, agreement: float,
         out.append("확신도 Low — 관망")
     aligned = _core_aligned(subs, direction)
     if aligned < MIN_CORE_ALIGN:
-        out.append(f"코어 정렬 {aligned} (필요 {MIN_CORE_ALIGN} · 기술·파생·체결이 후보 방향과 같음) — 관망")
+        out.append(f"코어 정렬 {aligned}/3 (필요 {MIN_CORE_ALIGN} · 기술·파생·체결이 후보 방향과 같음) — 관망")
     rsi = (h4 or {}).get("rsi")
     if rsi is not None:
         if direction == "long" and rsi >= OVERHEAT_RSI:

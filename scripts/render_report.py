@@ -1475,8 +1475,10 @@ def build_report_text(r: dict) -> str:
             if cv.get("sentence"):
                 L.append(f"- {cv['sentence']}")
             if cv.get("majority"):
+                # cv.agreement 는 '다수결 비율'(방향낸 팩터 중 다수 비중)이지 '일치도'가 아니다.
+                # '일치도'는 signal_agreement(가중, 게이트용) 하나만 — 같은 이름 두 값 금지(자가비평).
                 L.append(f"- 다수결 {cv.get('majority')} {cv.get('majority_n')}/{cv.get('directional')}"
-                         f" · 롱 {cv.get('longs')} 숏 {cv.get('shorts')} · 일치도 {pct(cv.get('agreement'))}"
+                         f" · 롱 {cv.get('longs')} 숏 {cv.get('shorts')} · 다수결 비율 {pct(cv.get('agreement'))}"
                          f" · 확신 {cv.get('conviction')} · {cv.get('kind')}")
             for it in cv.get("items") or []:
                 L.append(f"  · {it.get('label')} {it.get('side')} ({fmt(it.get('score'))})")
@@ -1484,7 +1486,7 @@ def build_report_text(r: dict) -> str:
             (f"코어 정렬 {r.get('core_aligned')}/3 (필요 {r.get('core_needed')} · "
              f"기술·파생·체결 · {_btc_candidate_label(r)})"
              if r.get("core_needed") is not None else None),
-            f"분면 {r.get('quadrant')}" if r.get("quadrant") else None,
+            f"펀딩·OI 국면 {r.get('quadrant')}" if r.get("quadrant") else None,
             f"판정 {r.get('verdict')}" if r.get("verdict") else None,
             f"다음 세션 {r.get('next_session')}" if r.get("next_session") else None,
         ) if x]
@@ -1863,7 +1865,7 @@ def render_btc_view(r: dict, date: str) -> str:
     concl = (f'<div class="card concl" style="border-left-color:{vcol}">'
              f'<div class="concl-badge" style="background:{vcol}">{esc(verdict)}</div>'
              f'<div class="concl-body"><div class="concl-text">{esc(nar.get("conclusion") or "")}</div>'
-             f'<div class="concl-gate">다음 세션 <b>{nxt}</b> · 사분면 {esc(str(r.get("quadrant") or "—"))}'
+             f'<div class="concl-gate">다음 세션 <b>{nxt}</b> · 펀딩·OI 국면 {esc(str(r.get("quadrant") or "—"))}'
              f'{" · 게이트 차단" if blocked else ""}'
              f' · 등급배수 {esc(str((r.get("gate") or {}).get("position_scale", "—")))}'
              f' <span class="muted">(계좌 위험·확신 배수 아님)</span></div></div></div>')
@@ -2157,7 +2159,7 @@ def _btc_pos_card(r: dict) -> str:
     return (f'<div class="card"><h2>포지셔닝'
             f'{_info("출처 Binance USD-M. LS 글로벌(계정 수 비율)과 탑(상위 포지션 비율)은 정의(분모)가 다릅니다. 한 숫자로 섞어 쓰지 않습니다.")}</h2>'
             f'<div class="tiles">'
-            f'{_tile("사분면", str(q))}'
+            f'{_tile("펀딩·OI 국면", str(q), sub="가격축 아님")}'
             f'{_tile("LS 글로벌", _ls(ls_g), sub="계정 수 비율")}'
             f'{_tile("LS 탑", _ls(ls_t), sub="탑 포지션 비율 · 점수에 우선")}'
             f'{_tile("Fear&Greed", str(r.get("fng") if r.get("fng") is not None else "—"))}'

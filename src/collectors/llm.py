@@ -727,7 +727,7 @@ def btc_facts_block(ctx: dict) -> str:
         lines.append("[세션확률] 산출 안 됨(데이터 부족·NO_TRADE)")
     lines.append(f"[결론] {ctx.get('verdict')}")
     if ctx.get("quadrant"):
-        lines.append(f"[사분면] {ctx.get('quadrant')} · 펀딩 {ctx.get('funding_txt')} · OI {ctx.get('oi_txt')}")
+        lines.append(f"[사분면] {ctx.get('quadrant')} · 펀딩 {ctx.get('funding_txt')} · OI {ctx.get('oi_txt')} 계약(BTC, USD 명목가 아님)")
     if ctx.get("ls_txt"):
         lines.append(f"[LS비율] {ctx.get('ls_txt')} — 글로벌=계정수, 탑=탑트레이더 포지션. 섞지 마라.")
     if ctx.get("mtf_txt"):
