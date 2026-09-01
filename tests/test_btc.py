@@ -1172,3 +1172,23 @@ def test_scalp_verdict_hidden_css_guard():
     """감사 정정: .scalp-verdict{display:flex} 가 [hidden] 을 무력화하던 것 — 가드 CSS 존재."""
     import render_report as rr
     assert ".scalp-verdict[hidden]{display:none}" in rr.TEMPLATE
+
+
+def test_scalp_five_band_verdict_and_honest_labels():
+    """5단계(2026-09-01): 강한 상방/하방 추가 — '강함'=쏠림 강도(확신도 아님) 명시,
+    하네스 verdict 임계(0.55) 동기화, 측정 카드 5행."""
+    import render_report as rr
+    from exp_btc_scalp import verdict
+    strong_up = {"5m": (6.0, 30.0), "15m": (6.0, 30.0), "1h": (5.0, None), "4h": (5.0, None)}
+    assert verdict(strong_up) == "강한 상방"
+    mid_up = {"5m": (2.5, 30.0), "15m": (2.5, 30.0), "1h": (1.0, None), "4h": (1.0, None)}
+    assert verdict(mid_up) == "상방"
+    strong_dn = {k: (-v[0], v[1]) for k, v in strong_up.items()}
+    assert verdict(strong_dn) == "강한 하방"
+    h = rr.build_btc_scalp_view()
+    assert "강한 상방(|S|≥0.55)" in h
+    assert "쏠림 강도이지 확신도가 아니다" in h
+    assert "'강한 상방'" in h or "강한 상방" in h
+    assert "▲▲" in h and "▼▼" in h
+    # 실측 json(5밴드)이 있으면 강 밴드 행이 측정 카드에 노출
+    assert "강한 상방" in h and "강한 하방" in h

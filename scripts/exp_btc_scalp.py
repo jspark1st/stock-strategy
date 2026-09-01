@@ -184,8 +184,14 @@ def verdict(votes: dict[str, tuple[float, float | None]]) -> str:
         return "관망"
     if (short_s > 0.25 and regime <= -3) or (short_s < -0.25 and regime >= 3):
         return "관망"
+    # 5단계(2026-09-01 확장, 뷰 JS 와 임계 동기화): '강함'은 쏠림 강도이지 확신도가 아니다 —
+    # |S| 구간별 측정에서 강 구간 적중이 오히려 낮았다(1h 45.9%).
+    if S >= 0.55:
+        return "강한 상방"
     if S >= 0.25:
         return "상방"
+    if S <= -0.55:
+        return "강한 하방"
     if S <= -0.25:
         return "하방"
     return "관망"
@@ -208,7 +214,8 @@ def main() -> int:
     win = 160
     horizon = max(1, args.horizon_bars)   # 5m 봉 개수(3=15분, 1=5분)
     step = horizon                        # 지평 비중첩 스텝
-    stats = {v: {"n": 0, "hit": 0, "net": 0.0, "absret": 0.0} for v in ("상방", "하방", "관망")}
+    stats = {v: {"n": 0, "hit": 0, "net": 0.0, "absret": 0.0}
+             for v in ("강한 상방", "상방", "하방", "강한 하방", "관망")}
     # 각 TF 의 closeTime 배열(정렬돼 있음)로 't 시점까지 마감된 마지막 인덱스'를 포인터로 추적
     ptr = {iv: 0 for iv in ("15m", "1h", "4h")}
     n_eval = 0
@@ -237,10 +244,10 @@ def main() -> int:
         st = stats[vd]
         st["n"] += 1
         st["absret"] += abs(ret)
-        if vd == "상방":
+        if vd in ("상방", "강한 상방"):
             st["hit"] += 1 if ret > 0 else 0
             st["net"] += ret - COST_TAKER
-        elif vd == "하방":
+        elif vd in ("하방", "강한 하방"):
             st["hit"] += 1 if ret < 0 else 0
             st["net"] += -ret - COST_TAKER
         n_eval += 1
@@ -250,7 +257,7 @@ def main() -> int:
         if not st["n"]:
             continue
         d = {"n": st["n"], "avg_abs_move": round(st["absret"] / st["n"], 6)}
-        if v in ("상방", "하방"):
+        if v != "관망":
             d["hit"] = round(st["hit"] / st["n"], 4)
             d["avg_net_taker"] = round(st["net"] / st["n"], 6)
         by[v] = d

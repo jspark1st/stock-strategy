@@ -1549,7 +1549,7 @@ NO_TRADE — 수렴 게이트(괴리·확신도 Low)로 신규진입 차단, 관
         <button class="scalp-btn" id="scalp-go" type="button">⚡ 지금 판정</button>
         <div class="note muted" id="scalp-meta">누르는 순간의 바이낸스 데이터로 계산합니다 · BTCUSDT</div>
       </div>
-      <div class="note muted">최근 측정(60일): 상방 적중 47.0% · 하방 49.0% · 동전 수준 · 비용 차감 후 음수 — 방향 신호가 아니라 상태 리드아웃으로만.</div>
+      <div class="note muted">최근 측정(60일): 상방 계열 적중 46.7% · 하방 계열 46.4% · 동전 수준 · 비용 차감 후 음수 — 방향 신호가 아니라 상태 리드아웃으로만.</div>
       <div class="scalp-verdict" id="scalp-verdict" hidden>
         <div class="scalp-arrow" id="scalp-arrow"></div>
         <div><div class="scalp-lab" id="scalp-lab"></div>
@@ -1560,10 +1560,10 @@ NO_TRADE — 수렴 게이트(괴리·확신도 Low)로 신규진입 차단, 관
     <div class="card" id="scalp-tfs-card" hidden><h2>시간축 분해<button class="info" type="button" aria-label="설명 보기">i<span class="info-pop">각 시간축의 투표(−6~+6)와 근거. 짧은 축(1m·5m·15m)이 판정의 75%, 1h·4h 는 가중 25%를 지면서 역행 시 관망을 강제하는 레짐 필터입니다.</span></button></h2><div class="tiles" id="scalp-tfs"></div></div>
     <div class="card" id="scalp-cost-card" hidden><h2>비용 현실 체크</h2><div class="tiles" id="scalp-cost"></div>
       <div class="note muted">5분 기대변동(ATR)이 왕복비용을 못 덮으면 판정이 맞아도 손해다.</div></div>
-    <div class="card"><h2>판정 성적(측정)</h2><div class="note muted">과거 60일 · 18,144개 5분봉 워크스루 · 판정 후 15m 방향 채점 · 테이커 왕복 0.10% 차감 · 1m 제외 근사 · 2026-09-01 19:07 KST 측정</div><div style="overflow-x:auto"><table class="cd-table"><thead><tr><th>판정</th><th>표본</th><th>방향 적중</th><th>평균 순수익</th></tr></thead><tbody><tr><td>상방</td><td>1,629</td><td>47.0%</td><td>-0.095%</td></tr><tr><td>하방</td><td>1,214</td><td>49.0%</td><td>-0.101%</td></tr><tr><td>관망</td><td>2,221</td><td>—</td><td>—</td></tr></tbody></table></div><div class="note muted">적중 ~50%·순수익 ≤0 이면 이 판정식엔 엣지가 없다는 뜻이다 — 숫자가 말하는 대로 읽는다.</div><div class="note muted">확장 측정: 판정을 <b>역방향</b>으로 쓰면 52~55%, 급변 이벤트(테이커 불균형·점화·급변) 직후 되돌림은 53~61%로 <b>방향성 자체는 재현</b>되지만, 세 계열 모두 판당 이익이 메이커 수수료(0.04%)에 못 미쳐 <b>매매 가치는 없다</b> (exp_btc_scalp / exp_btc_scalp_events · 반쪽 분할 검증). 트리플 배리어(±ATR 익절·손절·1h 제한·스파이크 슬리피지) 청산 관리로 재채점해도 42개 조합 전원 음수, 프로 도구 2차(VWAP 리버전·CVD 다이버전스·전일 고저·시간대·펀딩 극단)도 별도 기간 OOS 에서 생존 0 — 단기 되돌림은 실재하나 리테일 비용 아래에 있다. 그래서 이 도구는 방향 신호가 아니라 상태 계기판이다.</div></div>
+    <div class="card"><h2>판정 성적(측정)</h2><div class="note muted">과거 60일 · 18,144개 5분봉 워크스루 · 판정 후 15m 방향 채점 · 테이커 왕복 0.10% 차감 · 1m 제외 근사 · 2026-09-01 21:02 KST 측정</div><div style="overflow-x:auto"><table class="cd-table"><thead><tr><th>판정</th><th>표본</th><th>방향 적중</th><th>평균 순수익</th></tr></thead><tbody><tr><td>강한 상방</td><td>1,020</td><td>45.9%</td><td>-0.094%</td></tr><tr><td>상방</td><td>608</td><td>48.2%</td><td>-0.099%</td></tr><tr><td>하방</td><td>481</td><td>47.8%</td><td>-0.107%</td></tr><tr><td>강한 하방</td><td>757</td><td>45.4%</td><td>-0.100%</td></tr><tr><td>관망</td><td>2,190</td><td>—</td><td>—</td></tr></tbody></table></div><div class="note muted">적중 ~50%·순수익 ≤0 이면 이 판정식엔 엣지가 없다는 뜻이다 — 숫자가 말하는 대로 읽는다.</div><div class="note muted">확장 측정: 판정을 <b>역방향</b>으로 쓰면 52~55%, 급변 이벤트(테이커 불균형·점화·급변) 직후 되돌림은 53~61%로 <b>방향성 자체는 재현</b>되지만, 세 계열 모두 판당 이익이 메이커 수수료(0.04%)에 못 미쳐 <b>매매 가치는 없다</b> (exp_btc_scalp / exp_btc_scalp_events · 반쪽 분할 검증). 트리플 배리어(±ATR 익절·손절·1h 제한·스파이크 슬리피지) 청산 관리로 재채점해도 42개 조합 전원 음수, 프로 도구 2차(VWAP 리버전·CVD 다이버전스·전일 고저·시간대·펀딩 극단)도 별도 기간 OOS 에서 생존 0 — 단기 되돌림은 실재하나 리테일 비용 아래에 있다. 그래서 이 도구는 방향 신호가 아니라 상태 계기판이다.</div></div>
     <div class="card"><h2>이 도구는</h2><ul class="check">
       <li>기술 지표 <b>합산 리드아웃</b>이다 — EMA 정렬·MACD·RSI·슈퍼트렌드·ADX × 5개 시간축.</li>
-      <li>관망 규칙(공개): ① ADX 5m·15m 둘 다 15 미만(비추세) ② 1h·4h 가 단기 방향과 강하게 역행 ③ 합산 |S| &lt; 0.25(혼조).</li>
+      <li>판정 5단계: 강한 상방(|S|≥0.55)·상방·관망·하방·강한 하방. <b>'강함'은 쏠림 강도이지 확신도가 아니다</b> — 측정상 강 구간 적중이 오히려 낮다(1h 45.9%, 되돌림 우세). 관망 규칙(공개): ① ADX 5m·15m 둘 다 15 미만(비추세) ② 1h·4h 가 단기 방향과 강하게 역행 ③ 합산 |S| &lt; 0.25(혼조).</li>
       <li>예측 성적 <b>미검증</b> — 위 측정 카드가 유일한 성적표다. 매매 지시가 아니다.</li>
       <li>오버나이트 리포트 트랙(점수·게이트·채점)과 완전히 분리돼 있다.</li>
     </ul></div>
@@ -1649,11 +1649,14 @@ NO_TRADE — 수렴 게이트(괴리·확신도 Low)로 신규진입 차단, 관
           return {lab:'관망',why:'비추세 — ADX 5m '+a5.toFixed(0)+' · 15m '+a15.toFixed(0)+' (둘 다 15 미만) · 스캘핑 엣지 구간 아님',S:S};
         if((shortS>0.25&&regime<=-3)||(shortS<-0.25&&regime>=3))
           return {lab:'관망',why:'상위 시간축 역행 — 단기('+(shortS>0?'상방':'하방')+') vs 1h·4h 반대 · 역추세 스캘핑 위험',S:S};
+        var STRONG='쏠림 강도 표시(확신도 아님) — 강한 쏠림은 추격 진입 최악 구간(측정: 1h 적중 45.9%)';
+        if(S>=0.55)return {lab:'강한 상방',why:'합산 S '+S.toFixed(2)+' · '+STRONG,S:S};
         if(S>=0.25)return {lab:'상방',why:'합산 S '+S.toFixed(2)+' · 단기 3축 우위',S:S};
+        if(S<=-0.55)return {lab:'강한 하방',why:'합산 S '+S.toFixed(2)+' · '+STRONG,S:S};
         if(S<=-0.25)return {lab:'하방',why:'합산 S '+S.toFixed(2)+' · 단기 3축 우위',S:S};
         return {lab:'관망',why:'혼조 — 합산 S '+S.toFixed(2)+' (|S|<0.25) · 방향 합의 없음',S:S};}
-      var COL={'상방':'var(--up)','하방':'var(--down)','관망':'var(--neutral)'};
-      var ARW={'상방':'▲','하방':'▼','관망':'◆'};
+      var COL={'상방':'var(--up)','강한 상방':'var(--up)','하방':'var(--down)','강한 하방':'var(--down)','관망':'var(--neutral)'};
+      var ARW={'상방':'▲','강한 상방':'▲▲','하방':'▼','강한 하방':'▼▼','관망':'◆'};
       function run(){
         btn.disabled=true;meta.textContent='바이낸스 호출 중…';
         Promise.all(IVS.map(getK)).then(function(ks){

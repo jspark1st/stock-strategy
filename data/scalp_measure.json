@@ -1,27 +1,39 @@
 {
-  "as_of": "2026-09-01 19:07 KST",
+  "as_of": "2026-09-01 21:02 KST",
   "days": 60,
   "bars": 18144,
-  "samples": 5064,
+  "samples": 5056,
   "horizon": "15m",
   "cost_taker": 0.001,
   "note": "1m 제외 근사 · 5m 봉마감 판정 · 15분 스텝(비중첩)",
   "by_verdict": {
+    "강한 상방": {
+      "n": 1020,
+      "avg_abs_move": 0.001497,
+      "hit": 0.4588,
+      "avg_net_taker": -0.000943
+    },
     "상방": {
-      "n": 1629,
-      "avg_abs_move": 0.001315,
-      "hit": 0.4696,
-      "avg_net_taker": -0.000946
+      "n": 608,
+      "avg_abs_move": 0.001063,
+      "hit": 0.4819,
+      "avg_net_taker": -0.000991
     },
     "하방": {
-      "n": 1214,
-      "avg_abs_move": 0.001137,
-      "hit": 0.4901,
-      "avg_net_taker": -0.001006
+      "n": 481,
+      "avg_abs_move": 0.000949,
+      "hit": 0.4782,
+      "avg_net_taker": -0.001071
+    },
+    "강한 하방": {
+      "n": 757,
+      "avg_abs_move": 0.001223,
+      "hit": 0.4544,
+      "avg_net_taker": -0.001001
     },
     "관망": {
-      "n": 2221,
-      "avg_abs_move": 0.00098
+      "n": 2190,
+      "avg_abs_move": 0.00099
     }
   }
 }

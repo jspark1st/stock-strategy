@@ -1837,7 +1837,7 @@ def build_btc_scalp_view() -> str:
         meas = None
     if meas:
         rows = ""
-        for lab in ("상방", "하방", "관망"):
+        for lab in ("강한 상방", "상방", "하방", "강한 하방", "관망"):
             b = (meas.get("by_verdict") or {}).get(lab) or {}
             if not b.get("n"):
                 continue
@@ -1875,13 +1875,28 @@ def build_btc_scalp_view() -> str:
     qual_note = ""
     if meas:
         bv = meas.get("by_verdict") or {}
-        up, dn = bv.get("상방") or {}, bv.get("하방") or {}
-        if up.get("hit") is not None and dn.get("hit") is not None:
-            edge = (up.get("avg_net_taker") or 0) > 0 or (dn.get("avg_net_taker") or 0) > 0
+
+        def _agg(keys):
+            """방향 계열(강+일반) n-가중 적중·순익 합산 — 5단계 json 과 구 3단계 json 둘 다 지원."""
+            n = h = 0
+            net = 0.0
+            for k in keys:
+                b = bv.get(k) or {}
+                if b.get("hit") is None or not b.get("n"):
+                    continue
+                n += b["n"]
+                h += b["hit"] * b["n"]
+                net += (b.get("avg_net_taker") or 0) * b["n"]
+            return (n, h / n, net / n) if n else (0, None, None)
+
+        (nu, hu, netu) = _agg(("강한 상방", "상방"))
+        (nd, hd, netd) = _agg(("강한 하방", "하방"))
+        if hu is not None and hd is not None:
+            edge = (netu or 0) > 0 or (netd or 0) > 0
             tone = ("일부 판정에 비용 후 양수 기대값" if edge else
                     "동전 수준 · 비용 차감 후 음수 — 방향 신호가 아니라 상태 리드아웃으로만")
             qual_note = (f'<div class="note muted">최근 측정({meas.get("days","?")}일): '
-                         f'상방 적중 {up["hit"]*100:.1f}% · 하방 {dn["hit"]*100:.1f}% · {tone}.'
+                         f'상방 계열 적중 {hu*100:.1f}% · 하방 계열 {hd*100:.1f}% · {tone}.'
                          f'</div>')
 
     head = f"""
@@ -1906,7 +1921,7 @@ def build_btc_scalp_view() -> str:
     <div class="card"><h2>판정 성적(측정)</h2>{meas_html}</div>
     <div class="card"><h2>이 도구는</h2><ul class="check">
       <li>기술 지표 <b>합산 리드아웃</b>이다 — EMA 정렬·MACD·RSI·슈퍼트렌드·ADX × 5개 시간축.</li>
-      <li>관망 규칙(공개): ① ADX 5m·15m 둘 다 15 미만(비추세) ② 1h·4h 가 단기 방향과 강하게 역행 ③ 합산 |S| &lt; 0.25(혼조).</li>
+      <li>판정 5단계: 강한 상방(|S|≥0.55)·상방·관망·하방·강한 하방. <b>'강함'은 쏠림 강도이지 확신도가 아니다</b> — 측정상 강 구간 적중이 오히려 낮다(1h 45.9%, 되돌림 우세). 관망 규칙(공개): ① ADX 5m·15m 둘 다 15 미만(비추세) ② 1h·4h 가 단기 방향과 강하게 역행 ③ 합산 |S| &lt; 0.25(혼조).</li>
       <li>예측 성적 <b>미검증</b> — 위 측정 카드가 유일한 성적표다. 매매 지시가 아니다.</li>
       <li>오버나이트 리포트 트랙(점수·게이트·채점)과 완전히 분리돼 있다.</li>
     </ul></div>
@@ -1994,11 +2009,14 @@ def build_btc_scalp_view() -> str:
           return {lab:'관망',why:'비추세 — ADX 5m '+a5.toFixed(0)+' · 15m '+a15.toFixed(0)+' (둘 다 15 미만) · 스캘핑 엣지 구간 아님',S:S};
         if((shortS>0.25&&regime<=-3)||(shortS<-0.25&&regime>=3))
           return {lab:'관망',why:'상위 시간축 역행 — 단기('+(shortS>0?'상방':'하방')+') vs 1h·4h 반대 · 역추세 스캘핑 위험',S:S};
+        var STRONG='쏠림 강도 표시(확신도 아님) — 강한 쏠림은 추격 진입 최악 구간(측정: 1h 적중 45.9%)';
+        if(S>=0.55)return {lab:'강한 상방',why:'합산 S '+S.toFixed(2)+' · '+STRONG,S:S};
         if(S>=0.25)return {lab:'상방',why:'합산 S '+S.toFixed(2)+' · 단기 3축 우위',S:S};
+        if(S<=-0.55)return {lab:'강한 하방',why:'합산 S '+S.toFixed(2)+' · '+STRONG,S:S};
         if(S<=-0.25)return {lab:'하방',why:'합산 S '+S.toFixed(2)+' · 단기 3축 우위',S:S};
         return {lab:'관망',why:'혼조 — 합산 S '+S.toFixed(2)+' (|S|<0.25) · 방향 합의 없음',S:S};}
-      var COL={'상방':'var(--up)','하방':'var(--down)','관망':'var(--neutral)'};
-      var ARW={'상방':'▲','하방':'▼','관망':'◆'};
+      var COL={'상방':'var(--up)','강한 상방':'var(--up)','하방':'var(--down)','강한 하방':'var(--down)','관망':'var(--neutral)'};
+      var ARW={'상방':'▲','강한 상방':'▲▲','하방':'▼','강한 하방':'▼▼','관망':'◆'};
       function run(){
         btn.disabled=true;meta.textContent='바이낸스 호출 중…';
         Promise.all(IVS.map(getK)).then(function(ks){
