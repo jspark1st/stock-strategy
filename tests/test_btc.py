@@ -1073,3 +1073,51 @@ def test_btc_no_trade_puts_decision_card_before_hero():
     r2 = dict(r, gate={"no_trade": False, "new_entry_blocked": False}, verdict="LONG")
     html2 = rr._btc_top_cards(r2, "")
     assert html2.index("card hero") < html2.index("판정 분해")
+
+
+# ── 2026-09-01 BTC 스캘핑 트랙(별도 유형·클라이언트 사이드) ───────────────────
+
+
+def test_btc_scalp_view_structure_and_honesty():
+    """스캘핑 뷰: 3태 판정·관망 규칙 공개·미검증/측정 표기·바이낸스 직접 호출."""
+    import render_report as rr
+    h = rr.build_btc_scalp_view()
+    assert "지금 판정" in h and "btc" not in h[:0]
+    for k in ("상방", "하방", "관망", "fapi.binance.com", "data-api.binance.vision",
+              "ADX 5m·15m", "상위 시간축", "매매 지시가 아니다", "판정 성적(측정)"):
+        assert k in h, k
+    # 리포트 트랙과 분리 명시
+    assert "완전히 분리" in h
+
+
+def test_btc_scalp_nav_and_view_registered():
+    import render_report as rr
+    bundle = {"trade_date": "2026-09-01", "reports": [
+        {"id": "btc-perp", "group": "비트코인 선물", "label": "BTCUSDT",
+         "report_type": "btc_perp", "total": 55.0, "grade": "중립",
+         "p_long": 0.6, "p_short": 0.4, "verdict": "NO_TRADE",
+         "gate": {"no_trade": True, "new_entry_blocked": True},
+         "subscores": [], "warnings": []}]}
+    html = rr.render(bundle, public=True)
+    assert 'data-target="btc-scalp"' in html         # 사이드바 메뉴
+    assert 'data-view="btc-scalp"' in html           # 뷰 섹션(해시 라우팅 valid)
+    assert "BTC 스캘핑" in html
+
+
+def test_btc_scalp_measurement_card_renders_numbers(tmp_path, monkeypatch):
+    """data/scalp_measure.json 이 있으면 적중률·순수익이 그대로 화면에(좋든 나쁘든)."""
+    import render_report as rr
+    meas = {"as_of": "2026-09-01 19:00 KST", "days": 60, "bars": 18144,
+            "horizon": "15m", "cost_taker": 0.001,
+            "by_verdict": {"상방": {"n": 1629, "hit": 0.4696, "avg_net_taker": -0.000946},
+                           "하방": {"n": 1214, "hit": 0.4901, "avg_net_taker": -0.001006},
+                           "관망": {"n": 2221}}}
+    d = tmp_path / "data"
+    d.mkdir()
+    (d / "scalp_measure.json").write_text(
+        __import__("json").dumps(meas, ensure_ascii=False), encoding="utf-8")
+    monkeypatch.setattr(rr, "ROOT", tmp_path)
+    h = rr.build_btc_scalp_view()
+    assert "47.0%" in h and "49.0%" in h             # 측정 카드
+    assert "-0.095%" in h or "-0.09" in h            # 비용 후 음수 노출
+    assert "동전 수준" in h                           # 버튼 아래 요약도 정직

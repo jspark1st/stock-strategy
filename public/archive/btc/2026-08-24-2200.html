@@ -1693,7 +1693,7 @@ LONG — 세션확률 67%, 수렴 확신도 High, 게이트 신규진입 허용 
     var f=document.querySelector('.nav-item'); return f?f.getAttribute('data-target'):null; }
 
   document.querySelectorAll('.nav-item').forEach(function(a){
-    a.addEventListener('click', function(e){ e.preventDefault(); var id=a.getAttribute('data-target');
+    a.addEventListener('click', function(e){ var hr=a.getAttribute('href')||''; if(hr.charAt(0)==='/'){ return; } e.preventDefault(); var id=a.getAttribute('data-target');
       if(!valid(id)) return; try{ history.replaceState(null,'','#'+id); }catch(x){ location.hash=id; } activate(id);
       var mn=document.getElementById('main'); if(mn){ try{ mn.focus({preventScroll:true}); }catch(_){ } } });
   });

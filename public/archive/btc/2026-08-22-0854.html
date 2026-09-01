@@ -1686,7 +1686,7 @@ LONG (게이트 신규진입 허용, 확신도 Low·비중 0.75 제한적 진입
     var f=document.querySelector('.nav-item'); return f?f.getAttribute('data-target'):null; }
 
   document.querySelectorAll('.nav-item').forEach(function(a){
-    a.addEventListener('click', function(e){ e.preventDefault(); var id=a.getAttribute('data-target');
+    a.addEventListener('click', function(e){ var hr=a.getAttribute('href')||''; if(hr.charAt(0)==='/'){ return; } e.preventDefault(); var id=a.getAttribute('data-target');
       if(!valid(id)) return; try{ history.replaceState(null,'','#'+id); }catch(x){ location.hash=id; } activate(id);
       var mn=document.getElementById('main'); if(mn){ try{ mn.focus({preventScroll:true}); }catch(_){ } } });
   });

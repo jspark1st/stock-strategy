@@ -313,6 +313,20 @@
   .copy-btn.copied{border-color:var(--good);color:var(--good);
     background:color-mix(in srgb,var(--good) 16%,transparent)}
 
+  /* BTC 스캘핑 — 버튼 즉시 판정 도구 */
+  .scalp-top{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:6px}
+  .scalp-btn{border:1px solid var(--accent);border-radius:12px;padding:14px 26px;
+    font:inherit;font-size:1.05rem;font-weight:800;cursor:pointer;min-height:52px;
+    color:#fff;background:linear-gradient(115deg,color-mix(in srgb,var(--accent) 85%,#000),var(--accent));
+    box-shadow:0 6px 18px color-mix(in srgb,var(--accent) 30%,transparent)}
+  .scalp-btn:hover{filter:brightness(1.1)} .scalp-btn:disabled{opacity:.55;cursor:wait}
+  .scalp-verdict{display:flex;align-items:center;gap:18px;margin-top:18px;
+    padding:16px 18px;border:1px solid var(--border);border-radius:12px;background:var(--surface2)}
+  .scalp-arrow{font-size:3rem;line-height:1}
+  .scalp-lab{font-size:1.9rem;font-weight:800;line-height:1.15}
+  .scalp-sub{font-size:.86rem;color:var(--muted);margin-top:4px}
+  .nav-badge.nav-live{color:var(--accent);border:1px solid var(--accent);background:transparent}
+
   /* 리포트 자가비평 */
   .rv-list{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:10px}
   .rv-item{border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:var(--surface2)}
@@ -396,7 +410,7 @@
       <select class="stock-datesel" aria-label="날짜 선택" onchange="if(this.value) location=this.value">
         <option value="/" selected>2026-09-01</option>
       </select></label></div>
-    <nav class="nav" aria-label="리포트 목록"><div class="nav-group"><div class="nav-title">주식</div><a class="nav-item" data-target="kospi-close" data-views="kospi-close kospi-preopen" href="#kospi-close" aria-label="코스피 주식"><span>코스피</span><span class="nav-score" style="color:var(--caution)">46.8</span></a><a class="nav-item" data-target="kosdaq-close" data-views="kosdaq-close kosdaq-preopen" href="#kosdaq-close" aria-label="코스닥 주식"><span>코스닥</span><span class="nav-score" style="color:var(--caution)">35.7</span></a></div><div class="nav-group"><div class="nav-title">가상화폐</div><a class="nav-item" data-target="btc-perp" data-views="btc-perp" href="#btc-perp" aria-label="BTC 선물 가상화폐"><span>BTC 선물</span><span class="nav-score" style="color:var(--neutral)">55.2</span></a><a class="nav-item ph" data-target="soon-eth" href="#soon-eth"><span>ETH 선물</span><span class="nav-badge">준비중</span></a></div><div class="nav-group"><div class="nav-title">종합 리포트</div><a class="nav-item ph" data-target="soon-composite" href="#soon-composite"><span>종합 리포트</span><span class="nav-badge">준비중</span></a></div></nav>
+    <nav class="nav" aria-label="리포트 목록"><div class="nav-group"><div class="nav-title">주식</div><a class="nav-item" data-target="kospi-close" data-views="kospi-close kospi-preopen" href="#kospi-close" aria-label="코스피 주식"><span>코스피</span><span class="nav-score" style="color:var(--caution)">46.8</span></a><a class="nav-item" data-target="kosdaq-close" data-views="kosdaq-close kosdaq-preopen" href="#kosdaq-close" aria-label="코스닥 주식"><span>코스닥</span><span class="nav-score" style="color:var(--caution)">35.7</span></a></div><div class="nav-group"><div class="nav-title">가상화폐</div><a class="nav-item" data-target="btc-perp" data-views="btc-perp" href="#btc-perp" aria-label="BTC 선물 가상화폐"><span>BTC 선물</span><span class="nav-score" style="color:var(--neutral)">55.2</span></a><a class="nav-item" data-target="btc-scalp" href="#btc-scalp" aria-label="BTC 스캘핑 가상화폐"><span>BTC 스캘핑</span><span class="nav-badge nav-live">실시간</span></a><a class="nav-item ph" data-target="soon-eth" href="#soon-eth"><span>ETH 선물</span><span class="nav-badge">준비중</span></a></div><div class="nav-group"><div class="nav-title">종합 리포트</div><a class="nav-item ph" data-target="soon-composite" href="#soon-composite"><span>종합 리포트</span><span class="nav-badge">준비중</span></a></div></nav>
     <div class="side-foot">
       <button class="toggle" type="button" aria-pressed="false" aria-label="라이트/다크 테마 전환"
         onclick="window.__toggleTheme()">🌓 라이트 / 다크</button>
@@ -1526,7 +1540,157 @@ NO_TRADE — 수렴 게이트(괴리·확신도 Low)로 신규진입 차단, 관
       40회(약 20일)가 쌓이기 전엔 성적으로 읽지 말 것(가중치·확률 보정에도 쓰지 않는다).</p>
   </div>
     <div class="card"><h2>모의 성적 <span class="pill pill-ghost">기록 없음 · 실주문 아님</span><button class="info" type="button" aria-label="설명 보기">i<span class="info-pop">진입 게이트 통과 시 종가 가상 매수 → 익일 시가 청산(비용 차감)으로 기록을 시작합니다. 실주문이 아니라 검증용 가상 체결입니다.</span></button></h2><p class="note muted">아직 가상 체결 기록이 없습니다 — 게이트 통과 회차부터 누적됩니다.</p></div>
-    <div class="card"><h2>신규 진입을 막는 조건<button class="info" type="button" aria-label="설명 보기">i<span class="info-pop">아래는 이번 회차에서 실제로 진입을 막은 게이트 사유입니다. 다음 발행에서 이것들이 해소되면 진입을 재평가합니다. 임계는 게이트가 판정합니다.</span></button></h2><ul class="check"><li>수렴 게이트(괴리·확신도 Low) — 관망</li></ul><div class="note muted">다음 발행에서 위 사유가 모두 해소되면 신규 진입 재평가.</div></div></section><section class="view" data-view="soon-mid"><div class="empty"><div class="empty-icon">🚧</div><h2 class="empty-title">중기 리포트</h2><p class="muted">준비 중입니다. 곧 제공될 예정입니다.</p></div></section><section class="view" data-view="soon-long"><div class="empty"><div class="empty-icon">🚧</div><h2 class="empty-title">장기 리포트</h2><p class="muted">준비 중입니다. 곧 제공될 예정입니다.</p></div></section><section class="view" data-view="soon-eth"><div class="empty"><div class="empty-icon">🚧</div><h2 class="empty-title">ETH 선물</h2><p class="muted">준비 중입니다. 곧 제공될 예정입니다.</p></div></section><section class="view" data-view="soon-composite"><div class="empty"><div class="empty-icon">🚧</div><h2 class="empty-title">종합 리포트</h2><p class="muted">준비 중입니다. 곧 제공될 예정입니다.</p></div></section>
+    <div class="card"><h2>신규 진입을 막는 조건<button class="info" type="button" aria-label="설명 보기">i<span class="info-pop">아래는 이번 회차에서 실제로 진입을 막은 게이트 사유입니다. 다음 발행에서 이것들이 해소되면 진입을 재평가합니다. 임계는 게이트가 판정합니다.</span></button></h2><ul class="check"><li>수렴 게이트(괴리·확신도 Low) — 관망</li></ul><div class="note muted">다음 발행에서 위 사유가 모두 해소되면 신규 진입 재평가.</div></div></section><section class="view" data-view="soon-mid"><div class="empty"><div class="empty-icon">🚧</div><h2 class="empty-title">중기 리포트</h2><p class="muted">준비 중입니다. 곧 제공될 예정입니다.</p></div></section><section class="view" data-view="soon-long"><div class="empty"><div class="empty-icon">🚧</div><h2 class="empty-title">장기 리포트</h2><p class="muted">준비 중입니다. 곧 제공될 예정입니다.</p></div></section><section class="view" data-view="soon-eth"><div class="empty"><div class="empty-icon">🚧</div><h2 class="empty-title">ETH 선물</h2><p class="muted">준비 중입니다. 곧 제공될 예정입니다.</p></div></section><section class="view" data-view="soon-composite"><div class="empty"><div class="empty-icon">🚧</div><h2 class="empty-title">종합 리포트</h2><p class="muted">준비 중입니다. 곧 제공될 예정입니다.</p></div></section><section class="view" data-view="btc-scalp">
+    <div class="view-head"><div class="view-title">BTC 스캘핑 <span class="view-sub">· 실시간 판정 도구</span></div></div>
+    <div class="card">
+      <h2>지금 이 순간, 상방인가 하방인가<button class="info" type="button" aria-label="설명 보기">i<span class="info-pop">버튼을 누르는 순간 바이낸스에서 1분·5분·15분·1시간·4시간봉을 직접 받아 기술 지표(EMA 정렬·MACD·RSI·슈퍼트렌드·ADX)로 시간축별 투표를 합산합니다. 데이터는 브라우저가 직접 호출하며 이 사이트 서버를 거치지 않습니다.</span></button></h2>
+      <div class="scalp-top">
+        <button class="scalp-btn" id="scalp-go" type="button">⚡ 지금 판정</button>
+        <div class="note muted" id="scalp-meta">누르는 순간의 바이낸스 데이터로 계산합니다 · BTCUSDT</div>
+      </div>
+      <div class="note muted">최근 측정(60일): 상방 적중 47.0% · 하방 49.0% · 동전 수준 · 비용 차감 후 음수 — 방향 신호가 아니라 상태 리드아웃으로만.</div>
+      <div class="scalp-verdict" id="scalp-verdict" hidden>
+        <div class="scalp-arrow" id="scalp-arrow"></div>
+        <div><div class="scalp-lab" id="scalp-lab"></div>
+        <div class="scalp-sub" id="scalp-why"></div></div>
+      </div>
+      <div class="note muted" id="scalp-stale" hidden>⏱ 판정이 60초를 넘었습니다 — 스캘핑 지평에선 낡은 정보입니다. 다시 누르세요.</div>
+    </div>
+    <div class="card" id="scalp-tfs-card" hidden><h2>시간축 분해<button class="info" type="button" aria-label="설명 보기">i<span class="info-pop">각 시간축의 투표(−6~+6)와 근거. 짧은 축(1m·5m·15m)이 판정의 75%, 1h·4h 는 레짐 필터(역행 시 관망 강제)입니다.</span></button></h2><div class="tiles" id="scalp-tfs"></div></div>
+    <div class="card" id="scalp-cost-card" hidden><h2>비용 현실 체크</h2><div class="tiles" id="scalp-cost"></div>
+      <div class="note muted">5분 기대변동(ATR)이 왕복비용을 못 덮으면 판정이 맞아도 손해다.</div></div>
+    <div class="card"><h2>판정 성적(측정)</h2><div class="note muted">과거 60일 · 18,144개 5분봉 워크스루 · 판정 후 15m 방향 채점 · 테이커 왕복 0.10% 차감 · 1m 제외 근사 · 2026-09-01 19:07 KST 측정</div><div style="overflow-x:auto"><table class="cd-table"><thead><tr><th>판정</th><th>표본</th><th>방향 적중</th><th>평균 순수익</th></tr></thead><tbody><tr><td>상방</td><td>1,629</td><td>47.0%</td><td>-0.095%</td></tr><tr><td>하방</td><td>1,214</td><td>49.0%</td><td>-0.101%</td></tr><tr><td>관망</td><td>2,221</td><td>—</td><td>—</td></tr></tbody></table></div><div class="note muted">적중 ~50%·순수익 ≤0 이면 이 판정식엔 엣지가 없다는 뜻이다 — 숫자가 말하는 대로 읽는다.</div></div>
+    <div class="card"><h2>이 도구는</h2><ul class="check">
+      <li>기술 지표 <b>합산 리드아웃</b>이다 — EMA 정렬·MACD·RSI·슈퍼트렌드·ADX × 5개 시간축.</li>
+      <li>관망 규칙(공개): ① ADX 5m·15m 둘 다 15 미만(비추세) ② 1h·4h 가 단기 방향과 강하게 역행 ③ 합산 |S| &lt; 0.25(혼조).</li>
+      <li>예측 성적 <b>미검증</b> — 위 측정 카드가 유일한 성적표다. 매매 지시가 아니다.</li>
+      <li>오버나이트 리포트 트랙(점수·게이트·채점)과 완전히 분리돼 있다.</li>
+    </ul></div>
+    <div class="card" id="scalp-log-card" hidden><h2>이번 세션 판정 기록<button class="info" type="button" aria-label="설명 보기">i<span class="info-pop">이 브라우저 세션에서 누른 판정의 시각·가격·결과를 남깁니다. 새로고침하면 사라집니다. 나중에 가격과 비교해 스스로 검증해 보세요.</span></button></h2><ul id="scalp-log" class="check"></ul></div>
+    
+    <script>
+    (function(){
+      var btn=document.getElementById('scalp-go'); if(!btn) return;
+      var meta=document.getElementById('scalp-meta'), box=document.getElementById('scalp-verdict');
+      var arrowEl=document.getElementById('scalp-arrow'), labEl=document.getElementById('scalp-lab');
+      var whyEl=document.getElementById('scalp-why'), staleEl=document.getElementById('scalp-stale');
+      var tfsCard=document.getElementById('scalp-tfs-card'), tfsEl=document.getElementById('scalp-tfs');
+      var costCard=document.getElementById('scalp-cost-card'), costEl=document.getElementById('scalp-cost');
+      var logCard=document.getElementById('scalp-log-card'), logEl=document.getElementById('scalp-log');
+      var lastTs=0;
+      function emaArr(a,p){var k=2/(p+1),e=a[0],o=[e];for(var i=1;i<a.length;i++){e=a[i]*k+e*(1-k);o.push(e);}return o;}
+      function rsiLast(c,p){p=p||14;if(c.length<p+2)return null;var g=0,l=0,i,d;
+        for(i=1;i<=p;i++){d=c[i]-c[i-1];if(d>0)g+=d;else l-=d;}g/=p;l/=p;
+        for(i=p+1;i<c.length;i++){d=c[i]-c[i-1];g=(g*(p-1)+(d>0?d:0))/p;l=(l*(p-1)+(d<0?-d:0))/p;}
+        return l===0?100:100-100/(1+g/l);}
+      function macdInfo(c){var e12=emaArr(c,12),e26=emaArr(c,26),dif=[],i;
+        for(i=0;i<c.length;i++)dif.push(e12[i]-e26[i]);
+        var sig=emaArr(dif,9),n=c.length;
+        return {hist:dif[n-1]-sig[n-1],prev:dif[n-2]-sig[n-2]};}
+      function trArr(h,l,c){var o=[],i;for(i=1;i<c.length;i++)
+        o.push(Math.max(h[i]-l[i],Math.abs(h[i]-c[i-1]),Math.abs(l[i]-c[i-1])));return o;}
+      function atrLast(h,l,c,p){p=p||14;var tr=trArr(h,l,c);if(tr.length<p+1)return null;
+        var a=0,i;for(i=0;i<p;i++)a+=tr[i];a/=p;
+        for(i=p;i<tr.length;i++)a=(a*(p-1)+tr[i])/p;return a;}
+      function adxLast(h,l,c,p){p=p||14;var n=c.length;if(n<p*2+2)return null;
+        var tr=[],pd=[],nd=[],i,up,dn;
+        for(i=1;i<n;i++){up=h[i]-h[i-1];dn=l[i-1]-l[i];
+          pd.push(up>dn&&up>0?up:0);nd.push(dn>up&&dn>0?dn:0);
+          tr.push(Math.max(h[i]-l[i],Math.abs(h[i]-c[i-1]),Math.abs(l[i]-c[i-1])));}
+        var sT=0,sP=0,sN=0;for(i=0;i<p;i++){sT+=tr[i];sP+=pd[i];sN+=nd[i];}
+        var dx=[];
+        for(i=p;i<tr.length;i++){sT=sT-sT/p+tr[i];sP=sP-sP/p+pd[i];sN=sN-sN/p+nd[i];
+          var dip=100*sP/sT,din=100*sN/sT;dx.push(100*Math.abs(dip-din)/Math.max(dip+din,1e-9));}
+        if(dx.length<p)return null;
+        var ax=0;for(i=0;i<p;i++)ax+=dx[i];ax/=p;
+        for(i=p;i<dx.length;i++)ax=(ax*(p-1)+dx[i])/p;return ax;}
+      function stDir(h,l,c,p,m){p=p||10;m=m||3;var n=c.length;if(n<p+3)return 0;
+        var tr=trArr(h,l,c),a=0,i;for(i=0;i<p;i++)a+=tr[i];a/=p;var atrs=[a];
+        for(i=p;i<tr.length;i++){a=(a*(p-1)+tr[i])/p;atrs.push(a);}
+        var dir=1,pu=Infinity,pl=-Infinity;
+        for(i=p;i<n;i++){var at=atrs[i-p],mid=(h[i]+l[i])/2,bu=mid+m*at,bl=mid-m*at;
+          if(!(bu<pu||c[i-1]>pu))bu=pu; if(!(bl>pl||c[i-1]<pl))bl=pl;
+          if(dir===1){if(c[i]<bl)dir=-1;}else{if(c[i]>bu)dir=1;}
+          pu=bu;pl=bl;}
+        return dir;}
+      function tfVote(k){var c=k.c,n=c.length,px=c[n-1],v=0,why=[];
+        var e9=emaArr(c,9)[n-1],e21=emaArr(c,21)[n-1];
+        if(px>e9&&e9>e21){v+=2;why.push('EMA↑');}
+        else if(px<e9&&e9<e21){v-=2;why.push('EMA↓');}
+        else{v+=(px>e21?0.5:-0.5);why.push('EMA혼조');}
+        var mc=macdInfo(c);
+        if(mc.hist>0){v+=1+(mc.hist>mc.prev?0.5:0);why.push('MACD+');}
+        else{v-=1+(mc.hist<mc.prev?0.5:0);why.push('MACD−');}
+        var r=rsiLast(c);
+        if(r!=null){if(r>=55)v+=1;else if(r<=45)v-=1;why.push('RSI '+r.toFixed(0));}
+        var st=stDir(k.h,k.l,c);v+=st*1.5;why.push(st>0?'ST↑':'ST↓');
+        return {v:v,why:why,adx:adxLast(k.h,k.l,c),px:px};}
+      function getK(iv){
+        var urls=['https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval='+iv+'&limit=160',
+                  'https://data-api.binance.vision/api/v3/klines?symbol=BTCUSDT&interval='+iv+'&limit=160'];
+        function tryAt(i){
+          if(i>=urls.length)return Promise.resolve(null);
+          return fetch(urls[i],{cache:'no-store'}).then(function(r){
+            if(!r.ok)throw 0;return r.json();}).then(function(j){
+            return {src:i===0?'USD-M 선물':'현물(폴백)',
+              h:j.map(function(x){return +x[2];}),l:j.map(function(x){return +x[3];}),
+              c:j.map(function(x){return +x[4];})};
+          }).catch(function(){return tryAt(i+1);});}
+        return tryAt(0);}
+      var IVS=['1m','5m','15m','1h','4h'],W=[0.20,0.30,0.25,0.15,0.10];
+      function verdictOf(votes){
+        var S=0,i;for(i=0;i<5;i++)S+=W[i]*votes[i].v/6;
+        var shortS=(W[0]*votes[0].v+W[1]*votes[1].v+W[2]*votes[2].v)/(0.75*6);
+        var regime=votes[3].v+votes[4].v;
+        var a5=votes[1].adx,a15=votes[2].adx;
+        if(a5!=null&&a15!=null&&a5<15&&a15<15)
+          return {lab:'관망',why:'비추세 — ADX 5m '+a5.toFixed(0)+' · 15m '+a15.toFixed(0)+' (둘 다 15 미만) · 스캘핑 엣지 구간 아님',S:S};
+        if((shortS>0.25&&regime<=-3)||(shortS<-0.25&&regime>=3))
+          return {lab:'관망',why:'상위 시간축 역행 — 단기('+(shortS>0?'상방':'하방')+') vs 1h·4h 반대 · 역추세 스캘핑 위험',S:S};
+        if(S>=0.25)return {lab:'상방',why:'합산 S '+S.toFixed(2)+' · 단기 3축 우위',S:S};
+        if(S<=-0.25)return {lab:'하방',why:'합산 S '+S.toFixed(2)+' · 단기 3축 우위',S:S};
+        return {lab:'관망',why:'혼조 — 합산 S '+S.toFixed(2)+' (|S|<0.25) · 방향 합의 없음',S:S};}
+      var COL={'상방':'var(--up)','하방':'var(--down)','관망':'var(--neutral)'};
+      var ARW={'상방':'▲','하방':'▼','관망':'◆'};
+      function run(){
+        btn.disabled=true;meta.textContent='바이낸스 호출 중…';
+        Promise.all(IVS.map(getK)).then(function(ks){
+          btn.disabled=false;
+          for(var i=0;i<5;i++)if(!ks[i]){meta.textContent='바이낸스 응답 없음 — 네트워크 확인 후 다시 누르세요';return;}
+          var votes=ks.map(tfVote),vd=verdictOf(votes),px=votes[1].px;
+          lastTs=Date.now();
+          var t=new Date(),hh=('0'+t.getHours()).slice(-2)+':'+('0'+t.getMinutes()).slice(-2)+':'+('0'+t.getSeconds()).slice(-2);
+          meta.textContent=hh+' 판정 · BTCUSDT '+px.toLocaleString(undefined,{maximumFractionDigits:1})+' · '+ks[0].src+' · 성적은 아래 측정 카드';
+          box.hidden=false;staleEl.hidden=true;box.style.opacity='1';
+          arrowEl.textContent=ARW[vd.lab];arrowEl.style.color=COL[vd.lab];
+          labEl.textContent=vd.lab;labEl.style.color=COL[vd.lab];
+          whyEl.textContent=vd.why;
+          var html='';
+          for(var i=0;i<5;i++){var v=votes[i],c=v.v>=2?'var(--up)':(v.v<=-2?'var(--down)':'var(--neutral)');
+            html+='<div class="tile" style="border-left:3px solid '+c+'"><div class="tile-lbl">'+IVS[i]+
+              (v.adx!=null?' · ADX '+v.adx.toFixed(0):'')+'</div><div class="tile-val" style="color:'+c+'">'+
+              (v.v>0?'+':'')+v.v.toFixed(1)+'</div><div class="tile-sub">'+v.why.join(' · ')+'</div></div>';}
+          tfsCard.hidden=false;tfsEl.innerHTML=html;
+          var a5m=atrLast(ks[1].h,ks[1].l,ks[1].c);
+          if(a5m!=null&&px){var ap=a5m/px*100,warn=ap<0.12;
+            costEl.innerHTML='<div class="tile"><div class="tile-lbl">5분 기대변동(ATR14)</div><div class="tile-val"'+
+              (warn?' style="color:var(--caution)"':'')+'>'+ap.toFixed(3)+'%</div><div class="tile-sub">'+
+              (warn?'왕복비용 이하 — 지금은 먹을 게 없다':'비용 대비 여유 있음')+'</div></div>'+
+              '<div class="tile"><div class="tile-lbl">왕복비용</div><div class="tile-val">0.10% / 0.04%</div>'+
+              '<div class="tile-sub">테이커 / 메이커 (수수료+슬리피지 근사)</div></div>';
+            costCard.hidden=false;}
+          logCard.hidden=false;
+          var li=document.createElement('li');
+          li.textContent=hh+' · '+px.toLocaleString(undefined,{maximumFractionDigits:1})+' · '+vd.lab+' (S '+vd.S.toFixed(2)+')';
+          logEl.insertBefore(li,logEl.firstChild);
+          while(logEl.children.length>20)logEl.removeChild(logEl.lastChild);
+        });}
+      btn.addEventListener('click',run);
+      setInterval(function(){
+        if(lastTs&&Date.now()-lastTs>60000&&!box.hidden){staleEl.hidden=false;box.style.opacity='.45';}
+      },5000);
+    })();
+    </script></section>
     <p class="disc">투자 판단의 참고 자료이며 투자 권유가 아님.</p>
   </main>
 </div>
@@ -1647,7 +1811,10 @@ NO_TRADE — 수렴 게이트(괴리·확신도 Low)로 신규진입 차단, 관
     var f=document.querySelector('.nav-item'); return f?f.getAttribute('data-target'):null; }
 
   document.querySelectorAll('.nav-item').forEach(function(a){
-    a.addEventListener('click', function(e){ e.preventDefault(); var id=a.getAttribute('data-target');
+    a.addEventListener('click', function(e){
+      var hr=a.getAttribute('href')||'';
+      if(hr.charAt(0)==='/'){ return; } /* 절대경로 = 다른 페이지(라이브 최신 리포트)로 직행 */
+      e.preventDefault(); var id=a.getAttribute('data-target');
       if(!valid(id)) return; try{ history.replaceState(null,'','#'+id); }catch(x){ location.hash=id; } activate(id);
       var mn=document.getElementById('main'); if(mn){ try{ mn.focus({preventScroll:true}); }catch(_){ } } });
   });
