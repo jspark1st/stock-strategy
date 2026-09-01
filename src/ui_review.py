@@ -108,6 +108,29 @@ def ui_rules(html: str) -> list[dict]:
         out.append(_f("rule", "개선", "ui_empty_info", "low",
                       "설명이 빈 ⓘ 아이콘", "내용 없는 ⓘ 는 초보자에게 혼란만 준다."))
 
+    # 전역: 코스피/코스닥 포맷 동일성 — 같은 트랙이므로 **카드 구성이 항상 같아야 한다**
+    # (사용자 규칙 2026-09-01). 데이터 유무로 한쪽만 카드가 사라지면(예: paper 체결 비대칭,
+    # perf 데이터 결측) 사람이 아니라 이 규칙이 잡는다. 시장명 토큰은 정규화 후 비교.
+    vmap = dict(views)
+
+    def _card_titles(vid: str) -> list[str] | None:
+        seg = vmap.get(vid)
+        if seg is None:
+            return None
+        titles = re.findall(r"<h2>([^<]{2,60})", seg)
+        return [re.sub(r"KOSPI|KOSDAQ|코스피|코스닥", "{MK}", t).strip() for t in titles]
+
+    for a, b in (("kospi-close", "kosdaq-close"), ("kospi-preopen", "kosdaq-preopen")):
+        ta, tb = _card_titles(a), _card_titles(b)
+        if ta is not None and tb is not None and ta != tb:
+            only_a = [t for t in ta if t not in tb]
+            only_b = [t for t in tb if t not in ta]
+            out.append(_f("rule", "구조", "ui_market_format_mismatch", "med",
+                          f"코스피/코스닥 카드 구성 불일치({a.split('-')[1]})",
+                          f"{a} 에만: {only_a or '—'} · {b} 에만: {only_b or '—'} · "
+                          f"같은 트랙은 항상 같은 포맷이어야 한다(순서 포함).",
+                          evidence=f"{len(ta)} vs {len(tb)} cards"))
+
     for vid, sec in views:
         is_report = vid.endswith("-close") or vid.endswith("-preopen") or vid == "btc-perp"
         # 도달 불가(orphan) — 사이드바/탭 어디서도 참조 안 됨

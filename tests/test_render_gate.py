@@ -311,10 +311,11 @@ def test_preopen_order_card_renders_reference_table():
     assert "고급매도설정 추천" not in html
 
 
-def test_build_paper_hidden_when_no_trades():
+def test_build_paper_placeholder_when_no_trades():
     """Paper 카드는 가상체결 0회면 숨김, 있으면 비용차감 순손익 표시."""
-    assert rr.build_paper({"paper": {"n": 0}}) == ""
-    assert rr.build_paper({}) == ""
+    # 2026-09-01 사용자 규칙: 숨김 대신 placeholder(코스피/코스닥 포맷 동일성)
+    assert "기록 없음" in rr.build_paper({"paper": {"n": 0}})
+    assert "기록 없음" in rr.build_paper({})
     html = rr.build_paper({"paper": {"n": 3, "win_rate": 0.67,
                                      "avg_net_pct": 0.4, "cum_net_pct": 1.2}})
     assert "모의 성적" in html and "누적 순손익" in html and "비용 차감" in html
@@ -359,3 +360,13 @@ def test_coming_soon_pages_reachable_in_both_renders():
         assert "준비 중입니다" in pub
         assert "·예정" not in pub                          # 옛 '예정' 표기 제거
         assert 'aria-disabled="true"><span>ETH' not in pub  # 비활성 자리 아님
+
+
+def test_paper_card_placeholder_keeps_market_parity():
+    """paper 체결 0회여도 카드를 숨기지 않고 placeholder — 한쪽 시장만 체결이 생겨도
+    코스피/코스닥 카드 구성이 항상 동일하게 유지된다(사용자 규칙 2026-09-01)."""
+    empty = rr.build_paper({"paper": {"n": 0}})
+    assert "모의 성적" in empty and "기록 없음" in empty   # 사라지지 않음
+    filled = rr.build_paper({"paper": {"n": 3, "cum_net_pct": 1.2, "avg_net_pct": 0.4,
+                                       "win_rate": 0.67}})
+    assert "모의 성적" in filled and "3회" in filled

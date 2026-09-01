@@ -82,3 +82,19 @@ def test_llm_parser_maps_codes_and_drops_titleless():
 def test_gemini_skipped_without_key():
     # 키 없으면 LLM 층은 조용히 빈 결과(파이프라인 안 막음)
     assert ur.gemini_ui_critic(ur._views(CLEAN), {}) == []
+
+
+def test_market_format_mismatch_detected_and_normalized():
+    """코스피/코스닥은 항상 같은 카드 구성(사용자 규칙 2026-09-01) — 한쪽만 카드가 있으면
+    잡고, 시장명(KOSPI/KOSDAQ)만 다른 동일 구성은 잡지 않는다."""
+    base = ('<a data-view="kospi-close" data-views="kospi-close kosdaq-close">x</a>'
+            '<section class="view" data-view="kospi-close"><div class="dt-chip">d</div>'
+            '<h2>항목별 점수</h2><h2>KOSPI 지수 차트</h2>{extra}</section>'
+            '<section class="view" data-view="kosdaq-close"><div class="dt-chip">d</div>'
+            '<h2>항목별 점수</h2><h2>KOSDAQ 지수 차트</h2></section>')
+    # 동일 구성(시장명만 다름) → 미검출
+    same = ur.ui_rules(base.format(extra=""))
+    assert "ui_market_format_mismatch" not in _codes(same)
+    # 코스피에만 카드 하나 더 → 검출
+    diff = ur.ui_rules(base.format(extra="<h2>Paper 성적</h2>"))
+    assert "ui_market_format_mismatch" in _codes(diff)

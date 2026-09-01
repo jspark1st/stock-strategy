@@ -1149,11 +1149,16 @@ def build_accuracy(r: dict) -> str:
 
 def build_paper(r: dict) -> str:
     """Paper 성적(L1) — 게이트 통과 시 가상 진입(종가)→익일 시가 청산, 비용차감 순손익 누적.
-    L0 리포트가 '실제로 돈이 되나'를 라이브 추적. 체결 0회면 숨김."""
+    L0 리포트가 '실제로 돈이 되나'를 라이브 추적.
+
+    체결 0회여도 **숨기지 않고 placeholder** — 코스피/코스닥은 항상 같은 카드 구성이어야
+    한다(사용자 규칙 2026-09-01). 한쪽만 체결이 생기면 카드가 비대칭으로 사라지던 것 방지."""
     p = r.get("paper") or {}
     n = p.get("n") or 0
     if n == 0:
-        return ""
+        return ('<div class="card"><h2>모의 성적 <span class="pill pill-ghost">기록 없음 · 실주문 아님</span>'
+                f'{_info("진입 게이트 통과 시 종가 가상 매수 → 익일 시가 청산(비용 차감)으로 기록을 시작합니다. 실주문이 아니라 검증용 가상 체결입니다.")}</h2>'
+                '<p class="note muted">아직 가상 체결 기록이 없습니다 — 게이트 통과 회차부터 누적됩니다.</p></div>')
     cum, avg, wr = p.get("cum_net_pct"), p.get("avg_net_pct"), p.get("win_rate")
     col = "var(--up)" if (cum or 0) >= 0 else "var(--down)"
     tiles = "".join([
