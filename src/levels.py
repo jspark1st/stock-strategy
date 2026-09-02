@@ -45,9 +45,55 @@ def _cluster(points: list, cluster_w: float) -> list[dict]:
     return levels
 
 
+def _volume_profile(candles: list, current: float, bin_w: float = 0.0025,
+                    top_n: int = 5, cluster_w: float = 0.006,
+                    max_dist_pct: float = 10.0) -> list[dict]:
+    """매물대(볼륨 프로파일) HVN 피크 — 각 봉의 거래량을 고저 범위 빈에 균등 배분해
+    가격대별 체결량 히스토그램을 만들고, 국소 최대(피크) 상위 top_n 을 레벨로 반환.
+    첫 번째(최다 체결)는 POC. 근접 피크는 cluster_w 로 중복 제거. (2026-09-02, BTC 병합용)"""
+    vols_ok = [c for c in candles if c.volume and c.high and c.low and c.high >= c.low]
+    if not vols_ok or not current:
+        return []
+    lo = min(c.low for c in vols_ok)
+    hi = max(c.high for c in vols_ok)
+    bw = current * bin_w
+    if hi <= lo or bw <= 0:
+        return []
+    nbins = int((hi - lo) / bw) + 1
+    if nbins < 4 or nbins > 4000:
+        return []
+    vols = [0.0] * nbins
+    for c in vols_ok:
+        b0 = int((c.low - lo) / bw)
+        b1 = min(int((c.high - lo) / bw), nbins - 1)
+        span = b1 - b0 + 1
+        for b in range(b0, b1 + 1):
+            vols[b] += c.volume / span
+    peaks = []
+    for b in range(nbins):
+        if vols[b] <= 0:
+            continue
+        left = vols[b - 1] if b > 0 else 0.0
+        right = vols[b + 1] if b < nbins - 1 else 0.0
+        if vols[b] >= left and vols[b] >= right:
+            peaks.append((vols[b], lo + (b + 0.5) * bw))
+    peaks.sort(reverse=True)
+    out: list[dict] = []
+    for v, p in peaks:
+        if len(out) >= top_n:
+            break
+        if abs(p / current - 1) * 100 > max_dist_pct:
+            continue
+        if any(abs(p / q["price"] - 1) <= cluster_w for q in out):
+            continue
+        out.append({"price": p, "poc": not out})   # 첫 채택 = 최다 체결 = POC
+    return out
+
+
 def compute_levels(candles: list, current: float | None, k: int = 3,
                    cluster_w: float = 0.006, max_each: int = 3,
-                   min_touches: int = 1, max_dist_pct: float = 10.0) -> dict | None:
+                   min_touches: int = 1, max_dist_pct: float = 10.0,
+                   with_profile: bool = False) -> dict | None:
     """지지(현재가 아래)·저항(위) 각 max_each 개 — 가까운 순.
 
     min_touches 기본 1 — 최근 단일 터치 피벗(예: 직전 반등 고점)이 오버나이트 지평에선
@@ -82,6 +128,20 @@ def compute_levels(candles: list, current: float | None, k: int = 3,
     pool = [lv for lv in lv_h + lv_l
             if (lv["touches"] >= min_touches or lv["kind"] != "피벗")
             and abs(lv["price"] / current - 1) * 100 <= max_dist_pct]
+
+    # 매물대 병합(옵션, BTC) — HVN 이 피벗과 겹치면 그 레벨을 '+매물대' 승격(두 근거 합치),
+    # 겹치지 않으면 독립 '매물대' 레벨로 추가(피벗 없는 횡보 박스를 잡는다).
+    if with_profile:
+        for hv in _volume_profile(candles, current, cluster_w=cluster_w,
+                                  max_dist_pct=max_dist_pct):
+            tag = "매물대(POC)" if hv["poc"] else "매물대"
+            for lv in pool:
+                if abs(lv["price"] / hv["price"] - 1) <= cluster_w:
+                    lv["kind"] += f"+{tag}"
+                    break
+            else:
+                pool.append({"price": hv["price"], "touches": 0, "kind": tag,
+                             "last_touch": ""})
     res = sorted((lv for lv in pool if lv["price"] > current),
                  key=lambda lv: lv["price"])[:max_each]
     sup = sorted((lv for lv in pool if lv["price"] <= current),

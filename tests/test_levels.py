@@ -83,3 +83,38 @@ def test_levels_card_and_copytext():
     # 레벨 없으면 카드·복사 모두 침묵
     assert rr.build_levels({"levels": None}) == ""
     assert "지지·저항" not in rr.build_report_text({"subscores": [], "warnings": []})
+
+
+def _c_vol(i, h, l, vol):
+    mid = (h + l) / 2
+    return Candle(date=f"2026{i:04d}", open=mid, high=h, low=l, close=mid, volume=vol)
+
+
+def test_volume_profile_merge_and_standalone():
+    """매물대 병합(BTC): 피벗과 겹치는 HVN 은 '+매물대' 승격, 피벗 없는 거래 밀집
+    박스는 독립 '매물대' 레벨로 추가. POC 표기."""
+    cs = []
+    i = 0
+    for _ in range(3):
+        cs.append(_c_vol(i, 100.5, 99.5, 10)); i += 1
+    # 110 피벗 2회(저볼륨) — 피벗 레벨
+    for _ in range(2):
+        for h, l, v in ((101, 99, 10), (104, 101, 10), (110, 108, 10),
+                        (104, 101, 10), (101, 99, 10)):
+            cs.append(_c_vol(i, float(h), float(l), v)); i += 1
+    # 95 부근 횡보 박스(초고볼륨 · 뾰족한 피벗 없음) — 독립 매물대
+    for _ in range(12):
+        cs.append(_c_vol(i, 95.6, 94.6, 500)); i += 1
+    for _ in range(3):
+        cs.append(_c_vol(i, 100.5, 99.5, 10)); i += 1
+    lv = levels.compute_levels(cs, current=100.0, with_profile=True)
+    assert lv is not None
+    kinds = [x["kind"] for x in lv["resistances"] + lv["supports"]]
+    assert any(kd.startswith("매물대") for kd in kinds)        # 독립 매물대 레벨 존재
+    assert any("피벗+매물대" in kd for kd in kinds)            # 피벗과 겹친 승격 병합 존재
+    assert any("POC" in kd for kd in kinds)                    # 최다 체결가 표기
+    sup_prices = [x["price"] for x in lv["supports"]]
+    assert any(abs(p - 95.1) < 1.0 for p in sup_prices)        # 95 박스가 지지로 잡힘
+    # with_profile=False 면 매물대 없음(주식 경로 불변)
+    lv2 = levels.compute_levels(cs, current=100.0, with_profile=False)
+    assert not any("매물대" in (x["kind"]) for x in lv2["resistances"] + lv2["supports"])

@@ -1051,14 +1051,18 @@ def build_levels(r: dict) -> str:
                     f'{esc(x.get("kind", "피벗"))}{tt}</li>')
         return out or '<li class="muted">해당 없음</li>'
 
+    has_vp = any("매물대" in (x.get("kind") or "")
+                 for x in (lv.get("resistances") or []) + (lv.get("supports") or []))
+    vp_note = (" · 매물대=가격대별 체결량 상위 구간(HVN), POC=최다 체결가 — 피벗과 겹치면 두 근거 합치"
+               if has_vp else "")
     return (f'<div class="card"><h2>지지·저항(관측)'
-            f'{_info("최근 봉의 프랙탈 피벗(양쪽 3봉 극값)을 근접 클러스터로 묶어 터치 횟수와 함께 보여줍니다. 점수·게이트·확률에 반영되지 않는 시장 구조 관측이며, 돌파·사수 여부를 판정하지 않습니다.")}</h2>'
+            f'{_info("최근 봉의 프랙탈 피벗(양쪽 3봉 극값)을 근접 클러스터로 묶어 터치 횟수와 함께 보여줍니다. BTC 는 거래량 매물대(HVN·POC)를 병합해 피벗과 겹치는 레벨을 승격 표기합니다. 점수·게이트·확률에 반영되지 않는 시장 구조 관측이며, 돌파·사수 여부를 판정하지 않습니다.")}</h2>'
             f'<div class="lv-grid">'
             f'<div><div class="sub-h">저항 — 위로 가까운 순</div><ul class="gate-ul">{_rows(lv.get("resistances") or [])}</ul></div>'
             f'<div><div class="sub-h">지지 — 아래로 가까운 순</div><ul class="gate-ul">{_rows(lv.get("supports") or [])}</ul></div>'
             f'</div>'
-            f'<div class="note muted">최근 {lv.get("n_bars", "?")}봉 피벗 클러스터 · 터치 ×N=그 레벨에 닿은 횟수 · '
-            f'점수 미반영 관측.</div></div>')
+            f'<div class="note muted">최근 {lv.get("n_bars", "?")}봉 피벗 클러스터 · 터치 ×N=그 레벨에 닿은 횟수'
+            f'{vp_note} · 점수 미반영 관측.</div></div>')
 
 
 def build_index_chart(r: dict) -> str:

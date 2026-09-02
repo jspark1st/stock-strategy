@@ -321,10 +321,12 @@ def build_report(now: datetime, env: dict, conn, dry_run: bool, manual: bool,
         "p_up": scored.get("p_long"), "p_down": scored.get("p_short"),
         "verdict": scored.get("verdict"), "quadrant": scored.get("quadrant"),
         "gate": scored.get("gate"), "atr": atr, "binance_size": sz,
-        # 지지·저항 관측(4h 300봉 ≈ 50일 피벗, 클러스터 0.8%) — 점수·게이트 미반영 표시 전용.
+        # 지지·저항 관측(4h 300봉 ≈ 50일 피벗 + 매물대 HVN 병합, 클러스터 0.8%)
+        # — 점수·게이트 미반영 표시 전용. 매물대는 BTC 만(지수는 '물린 물량' 논리 부적용).
         "levels": (levels.compute_levels((snap.get("h4").candles[-300:]
                                           if snap.get("h4") else []), mark,
-                                         cluster_w=0.008) if mark else None),
+                                         cluster_w=0.008, with_profile=True)
+                   if mark else None),
         "warnings": scored.get("warnings"), "subscores": scored.get("subscores"),
         # 유효 펀딩(fund_eff = now→avg 폴백, 스코어링과 동일 소스) + 기본율 밴드
         # (btc_scoring.score_deriv 와 동일 — 2026-09-01 감사 정정판).
