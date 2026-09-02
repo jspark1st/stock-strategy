@@ -1054,8 +1054,8 @@ def build_levels(r: dict) -> str:
     return (f'<div class="card"><h2>지지·저항(관측)'
             f'{_info("최근 봉의 프랙탈 피벗(양쪽 3봉 극값)을 근접 클러스터로 묶어 터치 횟수와 함께 보여줍니다. 점수·게이트·확률에 반영되지 않는 시장 구조 관측이며, 돌파·사수 여부를 판정하지 않습니다.")}</h2>'
             f'<div class="lv-grid">'
-            f'<div><div class="sub-h">저항 — 위로 가까운 순</div><ul class="check">{_rows(lv.get("resistances") or [])}</ul></div>'
-            f'<div><div class="sub-h">지지 — 아래로 가까운 순</div><ul class="check">{_rows(lv.get("supports") or [])}</ul></div>'
+            f'<div><div class="sub-h">저항 — 위로 가까운 순</div><ul class="gate-ul">{_rows(lv.get("resistances") or [])}</ul></div>'
+            f'<div><div class="sub-h">지지 — 아래로 가까운 순</div><ul class="gate-ul">{_rows(lv.get("supports") or [])}</ul></div>'
             f'</div>'
             f'<div class="note muted">최근 {lv.get("n_bars", "?")}봉 피벗 클러스터 · 터치 ×N=그 레벨에 닿은 횟수 · '
             f'점수 미반영 관측.</div></div>')
