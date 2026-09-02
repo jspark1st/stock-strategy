@@ -40,7 +40,7 @@ try:
 except Exception:
     pass
 
-from src import (atr, calibration, config, execution, notify, quant, remote,
+from src import (atr, calibration, config, execution, levels, notify, quant, remote,
                  report_review, store, strategy)
 from src import btc_bundle
 from src.collectors import llm, naver, news
@@ -562,6 +562,14 @@ def build_report(cfg: dict, ls, client, conn, env, session_of: dict,
     plan = atr.compute_plan(market, daily_series, rep.get("p_up"), gate=rep.get("gate"))
     atr_dict = plan.to_dict() if plan else None
     rep["atr"] = atr_dict
+
+    # ── 지지·저항 관측(피벗 클러스터, 지수 일봉 120봉) — 점수·게이트 미반영 표시 전용 ──
+    try:
+        _lv_cs = daily_series.candles[-120:] if daily_series else []
+        _lv_px = _lv_cs[-1].close if _lv_cs else None
+        rep["levels"] = levels.compute_levels(_lv_cs, _lv_px)
+    except Exception:  # noqa — 관측 카드가 파이프라인을 막지 않게
+        rep["levels"] = None
 
     # ── 상품(ETF) 실행 엔진(P1-7): 지수 ATR 레벨 → ETF 가격 변환 + 괴리/스프레드 경고 ──
     # 관망(watch)도 환산 표는 만든다 — 코스피·코스닥은 ETF가 본거래라 게이트 차단이어도

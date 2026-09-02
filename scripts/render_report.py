@@ -1032,6 +1032,35 @@ def build_flows(r: dict) -> str:
 _TF_LABEL = [("D", "일봉"), ("W", "주봉"), ("M", "월봉"), ("4H", "4시간"), ("H", "1시간봉")]
 
 
+def build_levels(r: dict) -> str:
+    """지지·저항 관측 카드(2026-09-02 사용자 요청) — 피벗 클러스터, 점수·게이트 미반영.
+
+    관측 전용이라 게이트 차단 여부와 무관하게 표시한다(타점·주문과 달리 시장 구조 요약 —
+    차트가 이미 보여주는 정보의 정리). 예측·돌파/사수 판정이 아님을 라벨에 명시."""
+    lv = r.get("levels")
+    if not lv or (not lv.get("resistances") and not lv.get("supports")):
+        return ""
+
+    def _rows(items):
+        out = ""
+        for x in items:
+            t = x.get("touches", 0)
+            tt = f" ×{t}" if t >= 2 else ""
+            out += (f'<li><b>{fmt(x.get("price"), 1)}</b> '
+                    f'<span class="muted">({x.get("dist_pct", 0):+.2f}%)</span> · '
+                    f'{esc(x.get("kind", "피벗"))}{tt}</li>')
+        return out or '<li class="muted">해당 없음</li>'
+
+    return (f'<div class="card"><h2>지지·저항(관측)'
+            f'{_info("최근 봉의 프랙탈 피벗(양쪽 3봉 극값)을 근접 클러스터로 묶어 터치 횟수와 함께 보여줍니다. 점수·게이트·확률에 반영되지 않는 시장 구조 관측이며, 돌파·사수 여부를 판정하지 않습니다.")}</h2>'
+            f'<div class="lv-grid">'
+            f'<div><div class="sub-h">저항 — 위로 가까운 순</div><ul class="check">{_rows(lv.get("resistances") or [])}</ul></div>'
+            f'<div><div class="sub-h">지지 — 아래로 가까운 순</div><ul class="check">{_rows(lv.get("supports") or [])}</ul></div>'
+            f'</div>'
+            f'<div class="note muted">최근 {lv.get("n_bars", "?")}봉 피벗 클러스터 · 터치 ×N=그 레벨에 닿은 횟수 · '
+            f'점수 미반영 관측.</div></div>')
+
+
 def build_index_chart(r: dict) -> str:
     index = (r.get("charts") or {}).get("index") or {}
     frames = index.get("frames") or {}
@@ -1546,6 +1575,20 @@ def build_report_text(r: dict) -> str:
             L.append(f"- (기준 가중 합 {_wsum*100:.0f}% — 결측·은퇴 팩터 제외분은 재배분해 100%로 산출"
                      + ("; SNS·심리 8%는 다레짐 AUC 0.491로 은퇴)"
                         if btc and not any(s.get("key") == "sns" for s in subs) else ")"))
+    # 지지·저항 관측 — 카드와 복사텍스트 정합(카드만 고치고 복사 누락하는 재발 클래스 방지)
+    _lv = r.get("levels") or {}
+    if _lv.get("resistances") or _lv.get("supports"):
+        def _lvtxt(items):
+            return " · ".join(
+                f"{fmt(x.get('price'), 1)}({x.get('dist_pct', 0):+.2f}%"
+                + (f", ×{x['touches']}" if x.get("touches", 0) >= 2 else "")
+                + f", {x.get('kind', '피벗')})" for x in items)
+        L.append("\n## 지지·저항(관측 — 점수 미반영)")
+        if _lv.get("resistances"):
+            L.append("- 저항(위로 가까운 순): " + _lvtxt(_lv["resistances"]))
+        if _lv.get("supports"):
+            L.append("- 지지(아래로 가까운 순): " + _lvtxt(_lv["supports"]))
+        L.append(f"- 최근 {_lv.get('n_bars', '?')}봉 피벗 클러스터 관측 — 돌파·사수 판정 아님")
     # 팩터 기여도
     contribs = r.get("contributions") or []
     if contribs:
@@ -2278,6 +2321,7 @@ def render_btc_view(r: dict, date: str) -> str:
     {pos}
     {sns}
     {build_index_chart(r)}
+    {build_levels(r)}
     {mtf}
     {lin_html}
     {build_risks(r)}
@@ -2677,6 +2721,7 @@ def render_report_view(r: dict, date: str) -> str:
     {build_flows(r)}
     {build_lineage(r)}
     {build_index_chart(r)}
+    {build_levels(r)}
     {build_risks(r)}
     {build_hypotheses(r)}
     {build_materials(r)}
@@ -3332,6 +3377,8 @@ TEMPLATE = r"""<!doctype html>
     color:#fff;background:linear-gradient(115deg,color-mix(in srgb,var(--accent) 85%,#000),var(--accent));
     box-shadow:0 6px 18px color-mix(in srgb,var(--accent) 30%,transparent)}
   .scalp-btn:hover{filter:brightness(1.1)} .scalp-btn:disabled{opacity:.55;cursor:wait}
+  .lv-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 18px}
+  @media (max-width:640px){.lv-grid{grid-template-columns:1fr}}
   .scalp-verdict[hidden]{display:none}
   .scalp-verdict{display:flex;align-items:center;gap:18px;margin-top:18px;
     padding:16px 18px;border:1px solid var(--border);border-radius:12px;background:var(--surface2)}
