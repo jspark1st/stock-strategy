@@ -118,3 +118,20 @@ def test_volume_profile_merge_and_standalone():
     # with_profile=False 면 매물대 없음(주식 경로 불변)
     lv2 = levels.compute_levels(cs, current=100.0, with_profile=False)
     assert not any("매물대" in (x["kind"]) for x in lv2["resistances"] + lv2["supports"])
+
+
+def test_profile_label_for_index_approximation():
+    """지수 경로(2026-09-03): 같은 병합이되 라벨은 '거래 밀집(근사)' — 매물대 심리 미성립 명시."""
+    cs = []
+    i = 0
+    for _ in range(3):
+        cs.append(_c_vol(i, 100.5, 99.5, 10)); i += 1
+    for _ in range(12):
+        cs.append(_c_vol(i, 95.6, 94.6, 500)); i += 1
+    for _ in range(6):
+        cs.append(_c_vol(i, 100.5, 99.5, 10)); i += 1
+    lv = levels.compute_levels(cs, current=100.0, with_profile=True,
+                               profile_label="거래 밀집(근사)")
+    kinds = " ".join(x["kind"] for x in lv["resistances"] + lv["supports"])
+    assert "거래 밀집(근사)" in kinds
+    assert "매물대" not in kinds

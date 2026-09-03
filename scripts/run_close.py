@@ -563,11 +563,13 @@ def build_report(cfg: dict, ls, client, conn, env, session_of: dict,
     atr_dict = plan.to_dict() if plan else None
     rep["atr"] = atr_dict
 
-    # ── 지지·저항 관측(피벗 클러스터, 지수 일봉 120봉) — 점수·게이트 미반영 표시 전용 ──
+    # ── 지지·저항 관측(피벗 클러스터 + 거래 밀집 근사, 지수 일봉 120봉) — 표시 전용 ──
+    # 지수는 '물린 물량' 심리가 없어 매물대가 아니라 '거래 밀집(근사)' 라벨(2026-09-03 병합).
     try:
         _lv_cs = daily_series.candles[-120:] if daily_series else []
         _lv_px = _lv_cs[-1].close if _lv_cs else None
-        rep["levels"] = levels.compute_levels(_lv_cs, _lv_px)
+        rep["levels"] = levels.compute_levels(_lv_cs, _lv_px, with_profile=True,
+                                              profile_label="거래 밀집(근사)")
     except Exception:  # noqa — 관측 카드가 파이프라인을 막지 않게
         rep["levels"] = None
 

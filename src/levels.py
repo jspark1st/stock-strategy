@@ -93,7 +93,8 @@ def _volume_profile(candles: list, current: float, bin_w: float = 0.0025,
 def compute_levels(candles: list, current: float | None, k: int = 3,
                    cluster_w: float = 0.006, max_each: int = 3,
                    min_touches: int = 1, max_dist_pct: float = 10.0,
-                   with_profile: bool = False) -> dict | None:
+                   with_profile: bool = False,
+                   profile_label: str = "매물대") -> dict | None:
     """지지(현재가 아래)·저항(위) 각 max_each 개 — 가까운 순.
 
     min_touches 기본 1 — 최근 단일 터치 피벗(예: 직전 반등 고점)이 오버나이트 지평에선
@@ -132,9 +133,11 @@ def compute_levels(candles: list, current: float | None, k: int = 3,
     # 매물대 병합(옵션, BTC) — HVN 이 피벗과 겹치면 그 레벨을 '+매물대' 승격(두 근거 합치),
     # 겹치지 않으면 독립 '매물대' 레벨로 추가(피벗 없는 횡보 박스를 잡는다).
     if with_profile:
+        # profile_label: BTC="매물대"(물린 물량 심리 성립) · 지수="거래 밀집(근사)"
+        # (지수는 직접 보유 자산이 아니라 본전 심리 메커니즘이 없다 — 수용 구간 근사로만).
         for hv in _volume_profile(candles, current, cluster_w=cluster_w,
                                   max_dist_pct=max_dist_pct):
-            tag = "매물대(POC)" if hv["poc"] else "매물대"
+            tag = f"{profile_label}(POC)" if hv["poc"] else profile_label
             for lv in pool:
                 if abs(lv["price"] / hv["price"] - 1) <= cluster_w:
                     lv["kind"] += f"+{tag}"

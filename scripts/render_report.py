@@ -1051,10 +1051,15 @@ def build_levels(r: dict) -> str:
                     f'{esc(x.get("kind", "피벗"))}{tt}</li>')
         return out or '<li class="muted">해당 없음</li>'
 
-    has_vp = any("매물대" in (x.get("kind") or "")
-                 for x in (lv.get("resistances") or []) + (lv.get("supports") or []))
-    vp_note = (" · 매물대=가격대별 체결량 상위 구간(HVN), POC=최다 체결가 — 피벗과 겹치면 두 근거 합치"
-               if has_vp else "")
+    _kinds = " ".join(x.get("kind") or ""
+                      for x in (lv.get("resistances") or []) + (lv.get("supports") or []))
+    if "매물대" in _kinds:
+        vp_note = " · 매물대=가격대별 체결량 상위 구간(HVN), POC=최다 체결가 — 피벗과 겹치면 두 근거 합치"
+    elif "거래 밀집" in _kinds:
+        vp_note = (" · 거래 밀집(근사)=그 지수 레벨대에서 시장 거래가 집중된 수용 구간, POC=최다 —"
+                   " 지수는 직접 보유 자산이 아니라 매물대 심리의 근사로만 읽는다")
+    else:
+        vp_note = ""
     return (f'<div class="card"><h2>지지·저항(관측)'
             f'{_info("최근 봉의 프랙탈 피벗(양쪽 3봉 극값)을 근접 클러스터로 묶어 터치 횟수와 함께 보여줍니다. BTC 는 거래량 매물대(HVN·POC)를 병합해 피벗과 겹치는 레벨을 승격 표기합니다. 점수·게이트·확률에 반영되지 않는 시장 구조 관측이며, 돌파·사수 여부를 판정하지 않습니다.")}</h2>'
             f'<div class="lv-grid">'
