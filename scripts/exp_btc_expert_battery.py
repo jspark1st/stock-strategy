@@ -195,7 +195,7 @@ def signals(k, S):
     n = len(k)
     out = {name: [] for name in ("S1 RSI2극단", "S2 BB+RSI", "S3 VWAP풀백",
                                  "S4 EMA풀백", "S5 ST플립", "S6 ORB",
-                                 "S7 %B재진입", "S8 스토캐크로스")}
+                                 "S7 %B재진입", "S8 스토캐크로스", "S9 BB+스토캐")}
     orb_done = {}
     for i in range(210, n - 24):
         c, hh, ll = S["c"][i], S["h"][i], S["l"][i]
@@ -234,6 +234,12 @@ def signals(k, S):
                 out["S8 스토캐크로스"].append((t, i, 1))
             elif sk1 >= sd1 and sk < sd_:              # 데드 = 매도
                 out["S8 스토캐크로스"].append((t, i, -1))
+        # S9 BB+스토캐(유튜브 정석 조합): 밴드 밖 + 과매도/과매수 존 크로스 동시
+        if None not in (sk, sk1, sd_, sd1) and S["bb_l"][i]:
+            if c < S["bb_l"][i] * 1.002 and sk1 <= sd1 and sk > sd_ and min(sk1, sk) < 20:
+                out["S9 BB+스토캐"].append((t, i, 1))
+            elif c > S["bb_u"][i] * 0.998 and sk1 >= sd1 and sk < sd_ and max(sk1, sk) > 80:
+                out["S9 BB+스토캐"].append((t, i, -1))
         if S["st"][i] == 1 and S["st"][i - 1] == -1:
             out["S5 ST플립"].append((t, i, 1))
         elif S["st"][i] == -1 and S["st"][i - 1] == 1:
