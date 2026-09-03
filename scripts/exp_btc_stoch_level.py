@@ -33,7 +33,7 @@ C4 = namedtuple("C4", "date high low close volume")
 LV_TOL = 0.005              # 레벨 '근처' 0.5%
 OS, OB = 20.0, 80.0         # 과매도/과매수
 COSTS = {"메이커": 0.0004, "테이커": 0.0010}
-HORIZONS = ((2, "1h"), (4, "2h"), (8, "4h"), (24, "12h"))   # 30m 봉 수
+HORIZONS = ((1, "30m"), (2, "1h"), (4, "2h"), (8, "4h"), (24, "12h"))   # 30m 봉 수
 
 
 def fetch(client, interval, iv_ms, days, ago):
