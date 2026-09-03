@@ -483,7 +483,7 @@ def test_btc_hero_shrink_is_not_self_learn():
         "calibration": None,
         "accuracy": {"n": 1},
     })
-    assert "확률 조정 56% → 55%" in html
+    assert "산식 수치 조정 56% → 55%" in html   # 2026-09-03 격하: 미검증 상태 '확률' 어휘 제거
     assert "자가학습 보정 전" not in html
     stock = build_hero({
         "report_type": "close", "total": 60, "grade": "우호",
