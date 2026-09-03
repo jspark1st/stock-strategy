@@ -16,6 +16,7 @@
 | 다음에 뭘 할지 고른다 | [`roadmap/`](roadmap/README.md) 「지금 우선순위」 |
 | 시스템 점수가 궁금하다 | `/evaluate` → `system-evaluator` (evaluation6과 같은 12항목) |
 | 이 실험 전에 이미 해봤나 | [`lessons/`](lessons/README.md) 「음성 결과」 (같은 각도 재추격 금지) |
+| 검증돼 살아남은 매매 전략 순위 | [`strategies/`](strategies/README.md) 「순위표」 |
 | 수집기가 비거나 API 스펙이 궁금 | [`code/reference.md`](code/reference.md) · `data-collector-debug` |
 | 문서가 낡은 것 같다 | `.venv/bin/python scripts/check_docs.py` · `claude-md-verifier` |
 
@@ -26,6 +27,7 @@
 | [`defects/`](defects/README.md) | 무엇이 반복해서 깨졌고, 재발을 어떻게 막는가. | 같은 구멍이 다시 열렸을 때 |
 | [`roadmap/`](roadmap/README.md) | 다음에 무엇을 하는가. L0→L4 승격 조건은. | 다음 일을 고를 때 |
 | [`lessons/`](lessons/README.md) | 무엇을 측정해서 배웠고, 무엇을 다시 하면 안 되는가. | 실패한 실험을 다시 쓰기 전에 |
+| [`strategies/`](strategies/README.md) | 측정으로 살아남은 매매 전략을 성적순으로. | 검증된 전략을 찾을 때 |
 
 ```
 AGENTS.md                 왜 · 무엇을 · 하지 말 것
