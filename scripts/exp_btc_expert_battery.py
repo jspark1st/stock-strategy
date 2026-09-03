@@ -144,6 +144,29 @@ def series(k):
         cpv += tp * v[i]
         cv += v[i]
         vwap[i] = cpv / cv if cv else c[i]
+    # ADX(14) — Wilder
+    adx = [None] * n
+    pd_, nd_, trs = [], [], []
+    for i in range(1, n):
+        up, dn = h[i] - h[i - 1], l[i - 1] - l[i]
+        pd_.append(up if (up > dn and up > 0) else 0.0)
+        nd_.append(dn if (dn > up and dn > 0) else 0.0)
+        trs.append(max(h[i] - l[i], abs(h[i] - c[i - 1]), abs(l[i] - c[i - 1])))
+    if len(trs) > 30:
+        sT, sP, sN = sum(trs[:14]), sum(pd_[:14]), sum(nd_[:14])
+        dxs = []
+        for i in range(14, len(trs)):
+            sT = sT - sT / 14 + trs[i]
+            sP = sP - sP / 14 + pd_[i]
+            sN = sN - sN / 14 + nd_[i]
+            dip, din = 100 * sP / max(sT, 1e-9), 100 * sN / max(sT, 1e-9)
+            dxs.append(100 * abs(dip - din) / max(dip + din, 1e-9))
+            if len(dxs) == 14:
+                ax = sum(dxs) / 14
+                adx[i + 1] = ax
+            elif len(dxs) > 14:
+                ax = (ax * 13 + dxs[-1]) / 14
+                adx[i + 1] = ax
     pctb = [None] * n
     for i in range(n):
         if bb_u[i] is not None and bb_u[i] > bb_l[i]:
@@ -165,7 +188,7 @@ def series(k):
     return {"o": o, "h": h, "l": l, "c": c, "ema20": ema(20), "ema200": ema(200),
             "rsi2": rsi(2), "rsi14": rsi(14), "sma200": sma200,
             "bb_u": bb_u, "bb_l": bb_l, "st": st_dir, "vwap": vwap,
-            "pctb": pctb, "stoK": stoK, "stoD": stoD}
+            "pctb": pctb, "stoK": stoK, "stoD": stoD, "adx": adx}
 
 
 def signals(k, S):
@@ -228,6 +251,13 @@ def signals(k, S):
             elif c < rl:
                 out["S6 ORB"].append((t, i, -1))
                 orb_done[day] = True
+    # ADX 조건 변형(2026-09-03 사용자 가설·사전 등록): 되돌림 3종 × ADX<20 · 추세 2종 × ADX>25
+    for src, dst, cond in (("S1 RSI2극단", "A1 RSI2+ADX<20", lambda a: a is not None and a < 20),
+                           ("S2 BB+RSI", "A2 BB+RSI+ADX<20", lambda a: a is not None and a < 20),
+                           ("S7 %B재진입", "A7 %B+ADX<20", lambda a: a is not None and a < 20),
+                           ("S4 EMA풀백", "A4 EMA풀백+ADX>25", lambda a: a is not None and a > 25),
+                           ("S5 ST플립", "A5 ST플립+ADX>25", lambda a: a is not None and a > 25)):
+        out[dst] = [(t, i, side) for (t, i, side) in out[src] if cond(S["adx"][i])]
     return out
 
 
