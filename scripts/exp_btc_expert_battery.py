@@ -185,17 +185,37 @@ def series(k):
     for i in range(17, n):
         if stoK[i - 2] is not None:
             stoD[i] = (stoK[i] + stoK[i - 1] + stoK[i - 2]) / 3
+    # StochRSI(14,14,3,3) — RSI14 에 스토캐스틱 적용
+    r14 = rsi(14)
+    srsi_raw = [None] * n
+    for i in range(n):
+        if r14[i] is None or i < 27:
+            continue
+        w = [r14[j] for j in range(i - 13, i + 1) if r14[j] is not None]
+        if len(w) < 14:
+            continue
+        mx, mn = max(w), min(w)
+        srsi_raw[i] = 50.0 if mx == mn else (r14[i] - mn) / (mx - mn) * 100
+    srK = [None] * n
+    for i in range(29, n):
+        if srsi_raw[i - 2] is not None:
+            srK[i] = (srsi_raw[i] + srsi_raw[i - 1] + srsi_raw[i - 2]) / 3
+    srD = [None] * n
+    for i in range(31, n):
+        if srK[i - 2] is not None:
+            srD[i] = (srK[i] + srK[i - 1] + srK[i - 2]) / 3
     return {"o": o, "h": h, "l": l, "c": c, "ema20": ema(20), "ema200": ema(200),
-            "rsi2": rsi(2), "rsi14": rsi(14), "sma200": sma200,
+            "rsi2": rsi(2), "rsi14": r14, "sma200": sma200,
             "bb_u": bb_u, "bb_l": bb_l, "st": st_dir, "vwap": vwap,
-            "pctb": pctb, "stoK": stoK, "stoD": stoD, "adx": adx}
+            "pctb": pctb, "stoK": stoK, "stoD": stoD, "adx": adx,
+            "srK": srK, "srD": srD}
 
 
 def signals(k, S):
     n = len(k)
     out = {name: [] for name in ("S1 RSI2극단", "S2 BB+RSI", "S3 VWAP풀백",
                                  "S4 EMA풀백", "S5 ST플립", "S6 ORB",
-                                 "S7 %B재진입", "S8 스토캐크로스", "S9 BB+스토캐")}
+                                 "S7 %B재진입", "S8 스토캐크로스", "S9 BB+스토캐", "S10 %B+스토캐RSI")}
     orb_done = {}
     for i in range(210, n - 24):
         c, hh, ll = S["c"][i], S["h"][i], S["l"][i]
@@ -240,6 +260,14 @@ def signals(k, S):
                 out["S9 BB+스토캐"].append((t, i, 1))
             elif c > S["bb_u"][i] * 0.998 and sk1 >= sd1 and sk < sd_ and max(sk1, sk) > 80:
                 out["S9 BB+스토캐"].append((t, i, -1))
+        # S10 %B + StochRSI(사용자 제안·교과서형): %B≤0.05 & StochRSI 과매도 골든 → 롱 / 대칭 숏
+        srk, srk1 = S["srK"][i], S["srK"][i - 1]
+        srd, srd1 = S["srD"][i], S["srD"][i - 1]
+        if None not in (srk, srk1, srd, srd1) and pb is not None:
+            if pb <= 0.05 and srk1 <= srd1 and srk > srd and min(srk1, srk) < 20:
+                out["S10 %B+스토캐RSI"].append((t, i, 1))
+            elif pb >= 0.95 and srk1 >= srd1 and srk < srd and max(srk1, srk) > 80:
+                out["S10 %B+스토캐RSI"].append((t, i, -1))
         if S["st"][i] == 1 and S["st"][i - 1] == -1:
             out["S5 ST플립"].append((t, i, 1))
         elif S["st"][i] == -1 and S["st"][i - 1] == 1:
