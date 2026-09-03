@@ -1192,3 +1192,33 @@ def test_scalp_five_band_verdict_and_honest_labels():
     assert "▲▲" in h and "▼▼" in h
     # 실측 json(5밴드)이 있으면 강 밴드 행이 측정 카드에 노출
     assert "강한 상방" in h and "강한 하방" in h
+
+
+def test_hero_probability_demoted_until_validated():
+    """2026-09-03: 표시의 강도는 검증의 강도를 따른다 — 캘리브 미검증(n<40)이면
+    도넛 무채색 + '기울기(산식·미검증)' 라벨, 검증되면 '확률' 라벨·색 자동 복귀."""
+    import render_report as rr
+    base = {"report_type": "btc_perp", "total": 43.6, "grade": "위험",
+            "p_long": 0.36, "p_short": 0.64, "p_up_raw": 0.35,
+            "next_session": "22:00", "accuracy": {"n": 20}}
+    h = rr.build_hero({**base, "calibration": {}})
+    assert "LONG 기울기(산식·미검증)" in h
+    assert "세션 LONG 확률" not in h
+    assert h.count("--dc:var(--muted)") >= 2          # 양쪽 도넛 무채색
+    h2 = rr.build_hero({**base, "calibration": {"n": 45, "source": "store"}})
+    assert "세션 LONG 확률" in h2 and "미검증" not in h2.split("hero-note")[0]
+    assert "--dc:var(--up)" in h2 and "--dc:var(--down)" in h2
+    # 복사텍스트도 동일 격하(카드-복사 정합)
+    txt = rr.build_report_text({**base, "calibration": {}, "verdict": "NO_TRADE",
+                                "subscores": [], "warnings": []})
+    assert "LONG 기울기(산식·미검증)" in txt
+
+
+def test_stock_hero_donut_muted_at_floor():
+    import render_report as rr
+    r = {"total": 21.6, "grade": "위험", "p_up": 0.55, "p_down": 0.45, "p_up_raw": 0.03,
+         "calibration": {"slope_at_floor": True, "source": "bootstrap:open", "n": 149,
+                         "a": 0.005, "prob_span_pp": 8.8}}
+    h = rr.build_hero(r)
+    assert "기저율(예측 아님)" in h
+    assert h.count("--dc:var(--muted)") >= 2

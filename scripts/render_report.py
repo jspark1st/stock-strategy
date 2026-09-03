@@ -253,7 +253,7 @@ def build_hero(r: dict) -> str:
         _hz = (f" 판정 기준: 다음 정규 슬롯({esc(str(r.get('next_session') or '09:30/22:00'))} KST) "
                f"마크가격 등락 부호로 채점해 적중률·Brier 로 누적합니다.")
         if raw is not None and p_up is not None and abs(raw - p_up) > 1e-9 and learned < 40:
-            calib = (f'<div class="hero-note">확률 조정 {raw*100:.0f}% → {p_up*100:.0f}%'
+            calib = (f'<div class="hero-note">산식 수치 조정 {raw*100:.0f}% → {p_up*100:.0f}%'
                      f'{_info("자가학습 보정이 아니라, 신호가 엇갈릴 때 확률을 50% 쪽으로 좁힌 값입니다." + _hz)}</div>')
         elif p_up is not None and n_acc < 40:
             calib = (f'<div class="hero-note">방향 확률은 참고용'
@@ -301,14 +301,25 @@ def build_hero(r: dict) -> str:
                       f'<div class="lbl muted">내부 게이트 밴드 {grade} · 방향 판정 아님</div>')
     else:
         grade_html = f'<div class="grade" style="color:{grade_color(r.get("grade",""))}">{grade}</div>'
+    # ── 확률 도넛 격하(2026-09-03 사용자 지시: "표시의 강도는 검증의 강도를 따른다") ──
+    # 미검증 상태(BTC: 캘리브 표본 n<40 · 주식: 기울기 하한 고착=기저율)면 도넛을 무채색으로
+    # 그리고 라벨에서 '확률'을 뺀다. 색·라벨은 데이터가 검증되면(캘리브 승격) 자동 복귀.
+    if btc:
+        _unproven = ((r.get("calibration") or {}).get("n") or 0) < 40
+        if _unproven:
+            up_lbl, down_lbl = "LONG 기울기(산식·미검증)", "SHORT 기울기(산식·미검증)"
+    else:
+        _unproven = bool((r.get("calibration") or {}).get("slope_at_floor"))
+    up_c = "var(--muted)" if _unproven else "var(--up)"
+    down_c = "var(--muted)" if _unproven else "var(--down)"
     return f"""
     <div class="stat">
       <div class="big" style="color:var(--accent)">{total_txt}</div>
       <div class="lbl">{total_lbl}</div>
       {grade_html}
     </div>
-    {_donut(p_up, 'var(--up)', up_lbl)}
-    {_donut(p_down, 'var(--down)', down_lbl)}
+    {_donut(p_up, up_c, up_lbl)}
+    {_donut(p_down, down_c, down_lbl)}
     {calib}"""
 
 
@@ -1495,7 +1506,9 @@ def build_report_text(r: dict) -> str:
         _band = _btc_direction_band(r.get('total'))
         _verd = r.get('verdict') or 'NO_TRADE'
         L.append(f"\n## 총점 {fmt(r.get('total'))} · 방향 {_band} · 실행 {_verd} "
-                 f"· 세션 LONG {pct(r.get('p_long'))} / SHORT {pct(r.get('p_short'))}")
+                 + (f"· LONG 기울기(산식·미검증) {pct(r.get('p_long'))} / SHORT {pct(r.get('p_short'))}"
+                    if ((r.get('calibration') or {}).get('n') or 0) < 40 else
+                    f"· 세션 LONG {pct(r.get('p_long'))} / SHORT {pct(r.get('p_short'))}"))
         L.append(f"- 방향 편향은 '방향'({_band}), 매매 여부는 '실행'({_verd})을 본다 "
                  f"(내부 게이트 밴드 등급={r.get('grade','')} — 실행 판정과 별개 축)")
         L.append(f"- 확률 판정 기준: 다음 정규 슬롯({r.get('next_session') or '09:30/22:00'} KST) "
