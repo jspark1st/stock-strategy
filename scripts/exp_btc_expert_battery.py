@@ -34,7 +34,7 @@ sys.path.insert(0, str(ROOT))
 KST = timezone(timedelta(hours=9))
 BASE = "https://fapi.binance.com/fapi/v1/klines"
 COSTS = {"메이커": 0.0004, "테이커": 0.0010}
-HORIZONS = ((2, "1h"), (8, "4h"), (24, "12h"))
+HORIZONS = ((1, "30m"), (2, "1h"), (8, "4h"), (24, "12h"))
 
 
 def fetch(client, days, ago):
@@ -144,15 +144,35 @@ def series(k):
         cpv += tp * v[i]
         cv += v[i]
         vwap[i] = cpv / cv if cv else c[i]
+    pctb = [None] * n
+    for i in range(n):
+        if bb_u[i] is not None and bb_u[i] > bb_l[i]:
+            pctb[i] = (c[i] - bb_l[i]) / (bb_u[i] - bb_l[i])
+    # 슬로 스토캐스틱(14,3,3)
+    raw = [None] * n
+    for i in range(13, n):
+        hh2 = max(h[j] for j in range(i - 13, i + 1))
+        ll2 = min(l[j] for j in range(i - 13, i + 1))
+        raw[i] = 50.0 if hh2 == ll2 else (c[i] - ll2) / (hh2 - ll2) * 100
+    stoK = [None] * n
+    for i in range(15, n):
+        if raw[i - 2] is not None:
+            stoK[i] = (raw[i] + raw[i - 1] + raw[i - 2]) / 3
+    stoD = [None] * n
+    for i in range(17, n):
+        if stoK[i - 2] is not None:
+            stoD[i] = (stoK[i] + stoK[i - 1] + stoK[i - 2]) / 3
     return {"o": o, "h": h, "l": l, "c": c, "ema20": ema(20), "ema200": ema(200),
             "rsi2": rsi(2), "rsi14": rsi(14), "sma200": sma200,
-            "bb_u": bb_u, "bb_l": bb_l, "st": st_dir, "vwap": vwap}
+            "bb_u": bb_u, "bb_l": bb_l, "st": st_dir, "vwap": vwap,
+            "pctb": pctb, "stoK": stoK, "stoD": stoD}
 
 
 def signals(k, S):
     n = len(k)
     out = {name: [] for name in ("S1 RSI2극단", "S2 BB+RSI", "S3 VWAP풀백",
-                                 "S4 EMA풀백", "S5 ST플립", "S6 ORB")}
+                                 "S4 EMA풀백", "S5 ST플립", "S6 ORB",
+                                 "S7 %B재진입", "S8 스토캐크로스")}
     orb_done = {}
     for i in range(210, n - 24):
         c, hh, ll = S["c"][i], S["h"][i], S["l"][i]
@@ -178,6 +198,19 @@ def signals(k, S):
             out["S4 EMA풀백"].append((t, i, 1))
         elif c < e200 and e20 < S["ema20"][i - 1] and hh >= e20:
             out["S4 EMA풀백"].append((t, i, -1))
+        pb, pb1 = S["pctb"][i], S["pctb"][i - 1]
+        if pb is not None and pb1 is not None:
+            if pb1 <= 0 and pb > 0:                    # 하단 밴드 밖 → 재진입 = 매수
+                out["S7 %B재진입"].append((t, i, 1))
+            elif pb1 >= 1 and pb < 1:                  # 상단 밴드 밖 → 재진입 = 매도
+                out["S7 %B재진입"].append((t, i, -1))
+        sk, sk1 = S["stoK"][i], S["stoK"][i - 1]
+        sd_, sd1 = S["stoD"][i], S["stoD"][i - 1]
+        if None not in (sk, sk1, sd_, sd1):
+            if sk1 <= sd1 and sk > sd_:                # 골든(무필터) = 매수
+                out["S8 스토캐크로스"].append((t, i, 1))
+            elif sk1 >= sd1 and sk < sd_:              # 데드 = 매도
+                out["S8 스토캐크로스"].append((t, i, -1))
         if S["st"][i] == 1 and S["st"][i - 1] == -1:
             out["S5 ST플립"].append((t, i, 1))
         elif S["st"][i] == -1 and S["st"][i - 1] == 1:
