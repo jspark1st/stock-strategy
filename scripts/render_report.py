@@ -1037,7 +1037,57 @@ def build_flows(r: dict) -> str:
       </div>""")
     legend = ('<div class="flow-legend"><span class="k k-up">■</span>순매수(유입) '
               '<span class="k k-down">■</span>순매도(유출)</div>')
-    return f'<div class="card"><h2>투자주체 수급 {prov_badge}</h2>{legend}{"".join(rows)}</div>'
+    zblock = build_flow_z(r)
+    return f'<div class="card"><h2>투자주체 수급 {prov_badge}</h2>{legend}{"".join(rows)}{zblock}</div>'
+
+
+def _z_badge(z):
+    """수급 z-score 배지 — |z|≥2 강조(주의), ≥1 중립, 미만 흐림. 색은 순매수/순매도 방향."""
+    if z is None:
+        return '<span class="muted">—</span>'
+    a = abs(z)
+    col = dir_color(z) if a >= 1 else "var(--muted)"
+    weight = "700" if a >= 2 else "400"
+    return f'<b style="color:{col};font-weight:{weight}">{"+" if z > 0 else ""}{z:.1f}σ</b>'
+
+
+def build_flow_z(r: dict) -> str:
+    """오늘 순매수의 최근 5/20/60일 대비 z-score 매트릭스 (관측 전용·점수 미반영).
+    BTC 파생 매트릭스의 주식판 — 단 축은 룩백 윈도우, 해석은 역발상 아님(방향 사실만)."""
+    fz = r.get("flow_z")
+    if not fz or not fz.get("rows"):
+        return ""
+    wins = fz["windows"]
+    hdr = "".join(f"<th>{w}일 대비</th>" for w in wins)
+    body = []
+    for row in fz["rows"]:
+        cells, best = "", None
+        for w in wins:
+            z = row["z"].get(w)
+            cells += f"<td>{_z_badge(z)}</td>"
+            if z is not None and (best is None or abs(z) > abs(best[1])):
+                best = (w, z)
+        today = row.get("today")
+        today_txt = (f'<b style="color:{dir_color(today)}">{won(today)}</b>'
+                     if today is not None else '<span class="muted">—</span>')
+        if best is None:
+            interp = '<span class="muted">이력 부족</span>'
+        elif abs(best[1]) < 1:
+            interp = '<span class="muted">평소 범위</span>'
+        else:
+            kind = "순매수" if best[1] > 0 else "순매도"
+            interp = f'{best[0]}일 {"+" if best[1] > 0 else ""}{best[1]:.1f}σ · 평소보다 강한 {kind}'
+        body.append(f'<tr><td>{esc(row["label"])}</td><td>{today_txt}</td>{cells}<td>{interp}</td></tr>')
+    info = _info("오늘 순매수가 최근 5·20·60거래일 평균 대비 몇 σ 벗어났는지입니다(과거 = 오늘 제외). "
+                 "BTC 파생 표의 주식판이지만 여기선 역발상이 아니라 '평소보다 강한 순매수/순매도'라는 "
+                 "사실만 표기합니다 — 수급 방향이 익일 상승을 예측한다는 검증은 없습니다. "
+                 "점수·게이트에 반영되지 않는 관측 지표입니다.")
+    return (f'<div style="margin-top:14px"><div class="flow-legend" style="margin-bottom:6px">'
+            f'평소 대비 이탈(z-score){info}</div>'
+            f'<div style="overflow-x:auto"><table class="cd-table">'
+            f'<thead><tr><th>투자주체</th><th>오늘 순매수</th>{hdr}<th>최대 이탈</th></tr></thead>'
+            f'<tbody>{"".join(body)}</tbody></table></div>'
+            f'<div class="note muted">칸 = 해당 룩백 평균 대비 z(σ) · 점수 미반영 관측 · 극단(±2σ)은 평소와 크게 다른 수급.</div></div>')
 
 
 _TF_LABEL = [("D", "일봉"), ("W", "주봉"), ("M", "월봉"), ("4H", "4시간"), ("H", "1시간봉")]

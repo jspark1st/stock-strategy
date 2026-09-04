@@ -40,8 +40,8 @@ try:
 except Exception:
     pass
 
-from src import (atr, calibration, config, execution, levels, notify, quant, remote,
-                 report_review, store, strategy)
+from src import (atr, calibration, config, execution, flow_stats, levels, notify,
+                 quant, remote, report_review, store, strategy)
 from src import btc_bundle
 from src.collectors import llm, naver, news
 from src.collectors.ls import LSClient, LSError, load_env
@@ -479,6 +479,18 @@ def build_report(cfg: dict, ls, client, conn, env, session_of: dict,
     # 이게 없으면 '환율·기술 요인 의존' 같은 과잉 인과 서술로 흐른다.
     if fl is not None and isinstance(rep.get("flows"), dict):
         rep["flows"]["etc_corp_net"] = fl.etc_corp_net
+    # 수급 z-score(관측 전용·점수 미반영): 오늘 순매수가 최근 5/20/60일 대비 몇 σ 인가.
+    # 이력은 investor_history(페이지네이션)로 확보하고 오늘 거래일은 베이스라인에서 제외.
+    if fl is not None:
+        try:
+            fz_hist = [h for h in naver.investor_history(market, limit=60, client=client)
+                       if h.date != session.trade_ymd]
+            if fz_hist:
+                rep["flow_z"] = flow_stats.flow_zscores(
+                    fz_hist,
+                    {"foreign": fl.foreign_net, "inst": fl.inst_net, "retail": fl.retail_net})
+        except Exception as e:  # noqa — 관측 카드일 뿐, 실패해도 리포트 산출은 계속
+            print(f"  수급 z-score 생략(이력 수집 실패: {type(e).__name__})")
     rep["id"] = cfg["id"]
     rep["group"] = cfg["label"]          # 코스피 / 코스닥
     rep["label"] = LABEL_CLOSE            # '장 마감 전·후 분석'(15:00 잠정·16:30 확정 공용)
