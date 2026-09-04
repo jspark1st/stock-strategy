@@ -2200,7 +2200,18 @@ def build_btc_scalp_view() -> str:
          fmt:function(x){return x.toFixed(3);},u:'',
          hi:'시장가 매수 우세(공격적 매수)',lo:'시장가 매도 우세(공격적 매도)'}
       ];
+      var derivNote=document.getElementById('scalp-deriv-note');
+      function stampDeriv(){
+        /* 파생은 가격과 달리 5분 주기 스냅샷 — 마지막 봉 시각을 박아 실시간 오해를 없앤다 */
+        fetch('https://fapi.binance.com/futures/data/openInterestHist?symbol=BTCUSDT&period=5m&limit=1',
+          {cache:'no-store'}).then(function(r){return r.ok?r.json():null;}).then(function(j){
+          if(!derivNote)return;
+          if(j&&j.length){var d=new Date(+j[0].timestamp);
+            var hh=('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);
+            derivNote.textContent='파생 스냅샷 '+hh+' 기준 · 바이낸스는 5분 주기로만 갱신(가격과 달리 실시간 아님, 같은 5분 안엔 다시 눌러도 그대로) · 칸=평균 대비 z(σ) · 점수 미반영 관측 · 극단(±2σ)은 역발상 참고.';}
+        }).catch(function(){});}
       function loadDeriv(){
+        stampDeriv();
         var jobs=[];
         DERIV_MET.forEach(function(m){DERIV_TFS.forEach(function(tp){
           jobs.push(jget(m.ep,tp[0],m.get).then(function(a){return {ep:m.ep,p:tp[0],s:stat(a||[])};}));});});
