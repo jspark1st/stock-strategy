@@ -191,6 +191,25 @@ CREATE TABLE IF NOT EXISTS btc_gate_log (
   graded       INTEGER NOT NULL DEFAULT 0,
   UNIQUE(trade_date, slot)
 );
+
+-- BTC 파생 지표 시계열 수집(2026-09-04) — **관측 전용**. 바이낸스 파생 지표(LS비율·OI·
+-- 테이커 볼륨)는 API 가 최근 30일(period=12h)~1.7일(5m)만 줘 과거 백테스트가 불가능하다.
+-- 그래서 '지금부터' 우리가 직접 쌓아, 몇 주 뒤 5분봉 파생 백테스트·S-01 컨펌 검증을 가능케 한다.
+-- 가격 지표는 다 소진됐으나 파생은 이력 부재로 미개척 — 데이터 선점이 목적. 스코어링 무영향.
+CREATE TABLE IF NOT EXISTS btc_deriv (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  ts            INTEGER NOT NULL,   -- 봉 timestamp(ms)
+  period        TEXT NOT NULL,      -- '5m' | '15m' | '1h' | '12h'
+  mark          REAL,               -- 그 시점 마크가격(정렬용)
+  global_ls     REAL,               -- 전체 계정 롱숏 비율
+  top_ls        REAL,               -- 상위 트레이더 포지션 롱숏 비율
+  oi            REAL,               -- sumOpenInterest(BTC)
+  oi_value      REAL,               -- sumOpenInterestValue(USD 명목)
+  taker_buysell REAL,               -- 테이커 매수/매도 비율
+  taker_buy     REAL,               -- 테이커 매수 볼륨
+  taker_sell    REAL,               -- 테이커 매도 볼륨
+  UNIQUE(ts, period)
+);
 """
 
 # 15:00 시점 '누적/종일' 비율 부트스트랩 — KODEX 200 / 코스닥150 10분봉 5거래일
@@ -1113,3 +1132,40 @@ def btc_gate_rows(conn: sqlite3.Connection) -> list[dict]:
 
 def btc_gate_count(conn: sqlite3.Connection) -> int:
     return conn.execute("SELECT COUNT(*) FROM btc_gate_log").fetchone()[0]
+
+
+_DERIV_COLS = ("ts", "period", "mark", "global_ls", "top_ls", "oi", "oi_value",
+               "taker_buysell", "taker_buy", "taker_sell")
+
+
+def record_btc_deriv(conn: sqlite3.Connection, rows: list[dict]) -> int:
+    """파생 지표 여러 봉 upsert(멱등). 반환: 신규+갱신 처리 건수. 스코어링 무영향."""
+    n = 0
+    ph = ",".join("?" * len(_DERIV_COLS))
+    upd = ",".join(f"{c}=excluded.{c}" for c in _DERIV_COLS if c not in ("ts", "period"))
+    for rec in rows:
+        if rec.get("ts") is None or not rec.get("period"):
+            continue
+        conn.execute(
+            f"INSERT INTO btc_deriv({','.join(_DERIV_COLS)}) VALUES({ph}) "
+            f"ON CONFLICT(ts,period) DO UPDATE SET {upd}",
+            [rec.get(c) for c in _DERIV_COLS])
+        n += 1
+    conn.commit()
+    return n
+
+
+def btc_deriv_rows(conn: sqlite3.Connection, period: str | None = None) -> list[dict]:
+    """파생 지표 시계열(시간순). period 지정 시 그 주기만."""
+    if period:
+        cur = conn.execute("SELECT * FROM btc_deriv WHERE period=? ORDER BY ts", (period,))
+    else:
+        cur = conn.execute("SELECT * FROM btc_deriv ORDER BY ts")
+    cols = [c[0] for c in cur.description]
+    return [dict(zip(cols, r)) for r in cur.fetchall()]
+
+
+def btc_deriv_count(conn: sqlite3.Connection, period: str | None = None) -> int:
+    if period:
+        return conn.execute("SELECT COUNT(*) FROM btc_deriv WHERE period=?", (period,)).fetchone()[0]
+    return conn.execute("SELECT COUNT(*) FROM btc_deriv").fetchone()[0]
