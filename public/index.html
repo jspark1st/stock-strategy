@@ -15,7 +15,7 @@
 <link rel="manifest" href="/manifest.webmanifest?v=2"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&display=swap"/>
-<title>준스탁 2026-09-04</title>
+<title>준스탁 2026-09-02</title>
 <script>try{var t=localStorage.getItem('theme');if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
 <style>
   :root, [data-theme="dark"] {
@@ -411,7 +411,7 @@
     <div class="brand"><img class="brand-mark" src="/icons/favicon.svg?v=2" width="36" height="36" alt=""/><span class="brand-name">준스탁</span></div>
     <div class="date-nav cal-wrap"><label class="slot-lab">📅 날짜
       <select class="stock-datesel" aria-label="날짜 선택" onchange="if(this.value) location=this.value">
-        <option value="/" selected>2026-09-04</option>
+        <option value="/" selected>2026-09-02</option>
       </select></label></div>
     <nav class="nav" aria-label="리포트 목록"><div class="nav-group"><div class="nav-title">주식</div><a class="nav-item" data-target="kospi-close" data-views="kospi-close kospi-preopen" href="#kospi-close" aria-label="코스피 주식"><span>코스피</span><span class="nav-score" style="color:var(--caution)">42.6</span></a><a class="nav-item" data-target="kosdaq-close" data-views="kosdaq-close kosdaq-preopen" href="#kosdaq-close" aria-label="코스닥 주식"><span>코스닥</span><span class="nav-score" style="color:var(--caution)">31.0</span></a></div><div class="nav-group"><div class="nav-title">가상화폐</div><a class="nav-item" data-target="btc-perp" data-views="btc-perp" href="#btc-perp" aria-label="BTC 선물 가상화폐"><span>BTC 선물</span><span class="nav-score" style="color:var(--neutral)">63.0</span></a><a class="nav-item" data-target="btc-scalp" href="#btc-scalp" aria-label="BTC 스캘핑 가상화폐"><span>BTC 스캘핑</span><span class="nav-badge nav-live">실시간</span></a><a class="nav-item ph" data-target="soon-eth" href="#soon-eth"><span>ETH 선물</span><span class="nav-badge">준비중</span></a></div><div class="nav-group"><div class="nav-title">종합 리포트</div><a class="nav-item ph" data-target="soon-composite" href="#soon-composite"><span>종합 리포트</span><span class="nav-badge">준비중</span></a></div></nav>
     <div class="side-foot">
@@ -1578,6 +1578,9 @@ LONG — 게이트 신규진입 허용(NO_TRADE=False), 세션확률 79%·방향
     <div class="card" id="scalp-tfs-card" hidden><h2>시간축 분해<button class="info" type="button" aria-label="설명 보기">i<span class="info-pop">각 시간축의 투표(−6~+6)와 근거. 짧은 축(1m·5m·15m)이 판정의 75%, 1h·4h 는 가중 25%를 지면서 역행 시 관망을 강제하는 레짐 필터입니다.</span></button></h2><div class="tiles" id="scalp-tfs"></div></div>
     <div class="card" id="scalp-cost-card" hidden><h2>비용 현실 체크</h2><div class="tiles" id="scalp-cost"></div>
       <div class="note muted">5분 기대변동(ATR)이 왕복비용을 못 덮으면 판정이 맞아도 손해다.</div></div>
+    <div class="card" id="scalp-deriv-card" hidden><h2>파생 수급 데이터<button class="info" type="button" aria-label="설명 보기">i<span class="info-pop">바이낸스가 제공하는 파생 시장 데이터입니다. 각 값의 '평균 대비'는 최근 구간(API 제공분) 평균과 표준편차로 계산한 z-score입니다. 극단(±2σ)일수록 역발상 주의: 과다 롱은 롱 스퀴즈, 과다 숏은 숏 스퀴즈 위험. 점수·판정에 반영되지 않는 관측 지표이며, 평균은 API 가 주는 짧은 구간 기준이라 잠정적입니다.</span></button></h2>
+      <div style="overflow-x:auto"><table class="cd-table" id="scalp-deriv"><thead><tr><th>지표</th><th>현재</th><th>평균</th><th>평균 대비</th><th>해석</th></tr></thead><tbody></tbody></table></div>
+      <div class="note muted" id="scalp-deriv-note">바이낸스 파생 API 제공 구간(5분봉 ~1.7일·1시간봉 ~20일) 평균 기준 · 점수 미반영 관측 · 극단은 역발상 참고.</div></div>
     <div class="card"><h2>판정 성적(측정)</h2><div class="note muted">과거 60일 · 18,144개 5분봉 워크스루 · 판정 후 15m 방향 채점 · 테이커 왕복 0.10% 차감 · 1m 제외 근사 · 2026-09-01 21:02 KST 측정</div><div style="overflow-x:auto"><table class="cd-table"><thead><tr><th>판정</th><th>표본</th><th>방향 적중</th><th>평균 순수익</th></tr></thead><tbody><tr><td>강한 상방</td><td>1,020</td><td>45.9%</td><td>-0.094%</td></tr><tr><td>상방</td><td>608</td><td>48.2%</td><td>-0.099%</td></tr><tr><td>하방</td><td>481</td><td>47.8%</td><td>-0.107%</td></tr><tr><td>강한 하방</td><td>757</td><td>45.4%</td><td>-0.100%</td></tr><tr><td>관망</td><td>2,190</td><td>—</td><td>—</td></tr></tbody></table></div><div class="note muted">적중 ~50%·순수익 ≤0 이면 이 판정식엔 엣지가 없다는 뜻이다 — 숫자가 말하는 대로 읽는다.</div><div class="note muted">확장 측정: 판정을 <b>역방향</b>으로 쓰면 52~55%, 급변 이벤트(테이커 불균형·점화·급변) 직후 되돌림은 53~61%로 <b>방향성 자체는 재현</b>되지만, 세 계열 모두 판당 이익이 메이커 수수료(0.04%)에 못 미쳐 <b>매매 가치는 없다</b> (exp_btc_scalp / exp_btc_scalp_events · 반쪽 분할 검증). 트리플 배리어(±ATR 익절·손절·1h 제한·스파이크 슬리피지) 청산 관리로 재채점해도 42개 조합 전원 음수, 프로 도구 2차(VWAP 리버전·CVD 다이버전스·전일 고저·시간대·펀딩 극단)도 별도 기간 OOS 에서 생존 0 — 단기 되돌림은 실재하나 리테일 비용 아래에 있다. 그래서 이 도구는 방향 신호가 아니라 상태 계기판이다.</div></div>
     <div class="card"><h2>이 도구는</h2><ul class="check">
       <li>기술 지표 <b>합산 리드아웃</b>이다 — EMA 정렬·MACD·RSI·슈퍼트렌드·ADX × 5개 시간축.</li>
@@ -1708,7 +1711,49 @@ LONG — 게이트 신규진입 허용(NO_TRADE=False), 세션확률 79%·방향
           li.textContent=hh+' · '+px.toLocaleString(undefined,{maximumFractionDigits:1})+' · '+vd.lab+' (S '+vd.S.toFixed(2)+')';
           logEl.insertBefore(li,logEl.firstChild);
           while(logEl.children.length>20)logEl.removeChild(logEl.lastChild);
+          loadDeriv();   /* 파생 수급 데이터 표(비동기·독립) */
         }).catch(function(){btn.disabled=false;meta.textContent='계산 오류 — 다시 눌러 주세요';});}
+
+      /* ── 파생 수급 데이터: 현재값 + 평균 대비 z-score(바이낸스 제공 구간 기준) ── */
+      var derivCard=document.getElementById('scalp-deriv-card');
+      var derivBody=document.querySelector('#scalp-deriv tbody');
+      function stat(arr){var v=arr.filter(function(x){return x!=null&&isFinite(x);});
+        if(v.length<5)return null;var m=v.reduce(function(a,b){return a+b;},0)/v.length;
+        var sd=Math.sqrt(v.reduce(function(a,b){return a+(b-m)*(b-m);},0)/v.length);
+        return {m:m,sd:sd,last:v[v.length-1]};}
+      function zbadge(z){if(z==null)return '<span class="muted">—</span>';
+        var a=Math.abs(z),col=a>=2?'var(--caution)':(a>=1?'var(--neutral)':'var(--muted)');
+        return '<b style="color:'+col+'">'+(z>0?'+':'')+z.toFixed(1)+'σ</b>';}
+      function jget(ep,period,extract){
+        return fetch('https://fapi.binance.com/futures/data/'+ep+'?symbol=BTCUSDT&period='+period+'&limit=500',
+          {cache:'no-store'}).then(function(r){return r.ok?r.json():null;})
+          .then(function(j){return j&&j.length?j.map(extract):null;}).catch(function(){return null;});}
+      function loadDeriv(){
+        Promise.all([
+          jget('openInterestHist','1h',function(x){return +x.sumOpenInterest;}),
+          jget('globalLongShortAccountRatio','1h',function(x){return +x.longShortRatio;}),
+          jget('topLongShortPositionRatio','1h',function(x){return +x.longShortRatio;}),
+          jget('takerlongshortRatio','5m',function(x){return +x.buySellRatio;})
+        ]).then(function(d){
+          var rows=[
+            {n:'미결제약정(OI)',u:' BTC',s:stat(d[0]||[]),fmt:function(x){return x.toLocaleString(undefined,{maximumFractionDigits:0});},
+             hi:'증가=신규 진입 유입',lo:'감소=포지션 청산'},
+            {n:'롱숏 비율(전체 계정)',u:'',s:stat(d[1]||[]),fmt:function(x){return x.toFixed(3);},
+             hi:'롱 과다 → 롱 스퀴즈 주의(역발상)',lo:'숏 과다 → 숏 스퀴즈 주의(역발상)'},
+            {n:'롱숏 비율(상위 트레이더)',u:'',s:stat(d[2]||[]),fmt:function(x){return x.toFixed(3);},
+             hi:'상위 롱 편중',lo:'상위 숏 편중'},
+            {n:'테이커 매수/매도',u:'',s:stat(d[3]||[]),fmt:function(x){return x.toFixed(3);},
+             hi:'시장가 매수 우세(공격적 매수)',lo:'시장가 매도 우세(공격적 매도)'}
+          ];
+          var html='';
+          for(var i=0;i<rows.length;i++){var r=rows[i];
+            if(!r.s){html+='<tr><td>'+r.n+'</td><td colspan="4" class="muted">데이터 부족</td></tr>';continue;}
+            var z=r.s.sd>0?(r.s.last-r.s.m)/r.s.sd:0;
+            var interp=Math.abs(z)<1?'<span class="muted">평균 범위</span>':(z>0?r.hi:r.lo);
+            html+='<tr><td>'+r.n+'</td><td><b>'+r.fmt(r.s.last)+r.u+'</b></td><td class="muted">'+r.fmt(r.s.m)+r.u+'</td><td>'+zbadge(z)+'</td><td>'+interp+'</td></tr>';}
+          derivBody.innerHTML=html;derivCard.hidden=false;
+        }).catch(function(){});}
+
       btn.addEventListener('click',run);
       setInterval(function(){
         if(lastTs&&Date.now()-lastTs>60000&&!box.hidden){staleEl.hidden=false;box.style.opacity='.45';}

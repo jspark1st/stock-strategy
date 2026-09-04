@@ -1983,6 +1983,9 @@ def build_btc_scalp_view() -> str:
     <div class="card" id="scalp-tfs-card" hidden><h2>시간축 분해{_info("각 시간축의 투표(−6~+6)와 근거. 짧은 축(1m·5m·15m)이 판정의 75%, 1h·4h 는 가중 25%를 지면서 역행 시 관망을 강제하는 레짐 필터입니다.")}</h2><div class="tiles" id="scalp-tfs"></div></div>
     <div class="card" id="scalp-cost-card" hidden><h2>비용 현실 체크</h2><div class="tiles" id="scalp-cost"></div>
       <div class="note muted">5분 기대변동(ATR)이 왕복비용을 못 덮으면 판정이 맞아도 손해다.</div></div>
+    <div class="card" id="scalp-deriv-card" hidden><h2>파생 수급 데이터{_info("바이낸스가 제공하는 파생 시장 데이터입니다. 각 값의 '평균 대비'는 최근 구간(API 제공분) 평균과 표준편차로 계산한 z-score입니다. 극단(±2σ)일수록 역발상 주의: 과다 롱은 롱 스퀴즈, 과다 숏은 숏 스퀴즈 위험. 점수·판정에 반영되지 않는 관측 지표이며, 평균은 API 가 주는 짧은 구간 기준이라 잠정적입니다.")}</h2>
+      <div style="overflow-x:auto"><table class="cd-table" id="scalp-deriv"><thead><tr><th>지표</th><th>현재</th><th>평균</th><th>평균 대비</th><th>해석</th></tr></thead><tbody></tbody></table></div>
+      <div class="note muted" id="scalp-deriv-note">바이낸스 파생 API 제공 구간(5분봉 ~1.7일·1시간봉 ~20일) 평균 기준 · 점수 미반영 관측 · 극단은 역발상 참고.</div></div>
     <div class="card"><h2>판정 성적(측정)</h2>{meas_html}</div>
     <div class="card"><h2>이 도구는</h2><ul class="check">
       <li>기술 지표 <b>합산 리드아웃</b>이다 — EMA 정렬·MACD·RSI·슈퍼트렌드·ADX × 5개 시간축.</li>
@@ -2115,7 +2118,49 @@ def build_btc_scalp_view() -> str:
           li.textContent=hh+' · '+px.toLocaleString(undefined,{maximumFractionDigits:1})+' · '+vd.lab+' (S '+vd.S.toFixed(2)+')';
           logEl.insertBefore(li,logEl.firstChild);
           while(logEl.children.length>20)logEl.removeChild(logEl.lastChild);
+          loadDeriv();   /* 파생 수급 데이터 표(비동기·독립) */
         }).catch(function(){btn.disabled=false;meta.textContent='계산 오류 — 다시 눌러 주세요';});}
+
+      /* ── 파생 수급 데이터: 현재값 + 평균 대비 z-score(바이낸스 제공 구간 기준) ── */
+      var derivCard=document.getElementById('scalp-deriv-card');
+      var derivBody=document.querySelector('#scalp-deriv tbody');
+      function stat(arr){var v=arr.filter(function(x){return x!=null&&isFinite(x);});
+        if(v.length<5)return null;var m=v.reduce(function(a,b){return a+b;},0)/v.length;
+        var sd=Math.sqrt(v.reduce(function(a,b){return a+(b-m)*(b-m);},0)/v.length);
+        return {m:m,sd:sd,last:v[v.length-1]};}
+      function zbadge(z){if(z==null)return '<span class="muted">—</span>';
+        var a=Math.abs(z),col=a>=2?'var(--caution)':(a>=1?'var(--neutral)':'var(--muted)');
+        return '<b style="color:'+col+'">'+(z>0?'+':'')+z.toFixed(1)+'σ</b>';}
+      function jget(ep,period,extract){
+        return fetch('https://fapi.binance.com/futures/data/'+ep+'?symbol=BTCUSDT&period='+period+'&limit=500',
+          {cache:'no-store'}).then(function(r){return r.ok?r.json():null;})
+          .then(function(j){return j&&j.length?j.map(extract):null;}).catch(function(){return null;});}
+      function loadDeriv(){
+        Promise.all([
+          jget('openInterestHist','1h',function(x){return +x.sumOpenInterest;}),
+          jget('globalLongShortAccountRatio','1h',function(x){return +x.longShortRatio;}),
+          jget('topLongShortPositionRatio','1h',function(x){return +x.longShortRatio;}),
+          jget('takerlongshortRatio','5m',function(x){return +x.buySellRatio;})
+        ]).then(function(d){
+          var rows=[
+            {n:'미결제약정(OI)',u:' BTC',s:stat(d[0]||[]),fmt:function(x){return x.toLocaleString(undefined,{maximumFractionDigits:0});},
+             hi:'증가=신규 진입 유입',lo:'감소=포지션 청산'},
+            {n:'롱숏 비율(전체 계정)',u:'',s:stat(d[1]||[]),fmt:function(x){return x.toFixed(3);},
+             hi:'롱 과다 → 롱 스퀴즈 주의(역발상)',lo:'숏 과다 → 숏 스퀴즈 주의(역발상)'},
+            {n:'롱숏 비율(상위 트레이더)',u:'',s:stat(d[2]||[]),fmt:function(x){return x.toFixed(3);},
+             hi:'상위 롱 편중',lo:'상위 숏 편중'},
+            {n:'테이커 매수/매도',u:'',s:stat(d[3]||[]),fmt:function(x){return x.toFixed(3);},
+             hi:'시장가 매수 우세(공격적 매수)',lo:'시장가 매도 우세(공격적 매도)'}
+          ];
+          var html='';
+          for(var i=0;i<rows.length;i++){var r=rows[i];
+            if(!r.s){html+='<tr><td>'+r.n+'</td><td colspan="4" class="muted">데이터 부족</td></tr>';continue;}
+            var z=r.s.sd>0?(r.s.last-r.s.m)/r.s.sd:0;
+            var interp=Math.abs(z)<1?'<span class="muted">평균 범위</span>':(z>0?r.hi:r.lo);
+            html+='<tr><td>'+r.n+'</td><td><b>'+r.fmt(r.s.last)+r.u+'</b></td><td class="muted">'+r.fmt(r.s.m)+r.u+'</td><td>'+zbadge(z)+'</td><td>'+interp+'</td></tr>';}
+          derivBody.innerHTML=html;derivCard.hidden=false;
+        }).catch(function(){});}
+
       btn.addEventListener('click',run);
       setInterval(function(){
         if(lastTs&&Date.now()-lastTs>60000&&!box.hidden){staleEl.hidden=false;box.style.opacity='.45';}
