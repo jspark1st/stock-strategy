@@ -25,6 +25,7 @@
 23:30  DB 백업           auto_backup.sh
 매월 1일 07:00           auto_revalidate.sh  엣지 재측정(배포 없음)
 매주 월 17:30            auto_ui_review.sh   UI LLM 초보자 비평(제안만·배포 없음)
+15분마다                 auto_level_scan.sh  레벨 스캔 스냅샷(표만·주문 없음)
 ```
 UI 규칙 비평(결정론)은 매일 `auto_final.sh` 안에서(`run_ui_review.py --no-llm`) 돈다.
 
@@ -41,6 +42,7 @@ BTC는 **별도**: 매일 09:30 · 22:00 `auto_btc.sh` (주말 포함). 주식 �
 0 7 1 * *     scripts/auto_revalidate.sh
 30 23 * * *   scripts/auto_backup.sh
 30 17 * * 1   scripts/auto_ui_review.sh
+*/15 * * * *  scripts/auto_level_scan.sh
 ```
 
 각 주식/BTC 러너: flock → 파이프라인 → `public/` 변경 시만 git push → Vercel.

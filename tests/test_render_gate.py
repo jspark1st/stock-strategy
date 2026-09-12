@@ -233,10 +233,10 @@ def test_sidebar_groups_by_asset_then_market():
     # 시장 아이템이 그 시장의 모든 국면 뷰를 포섭 → 어느 국면 뷰에서도 활성
     assert 'data-views="kospi-close kospi-preopen"' in html    # 장마감 먼저
     assert 'data-target="kospi-close"' in html                 # 대표=장마감
-    # BTC 는 가상화폐 섹션에 'BTC 선물'로 · 미래 자리 '준비중'(클릭 → 안내 페이지)
+    # BTC 는 가상화폐 섹션에 'BTC 선물'로. ETH 준비중 자리는 숨김(2026-09-12).
     assert '>BTC 선물</span>' in html
-    assert 'ETH 선물' in html and '준비중' in html
-    assert 'href="#soon-eth"' in html                          # 준비중 페이지로 이동 가능
+    assert 'ETH 선물' not in html
+    assert 'href="#soon-eth"' not in html
 
 
 def test_view_tabs_phase_links_and_horizon():
@@ -356,16 +356,16 @@ def test_public_render_strips_self_critique():
 
 
 def test_coming_soon_pages_reachable_in_both_renders():
-    """미래 트랙(중기·장기·ETH·종합)은 회색 비활성이 아니라 클릭하면 '준비중' 페이지."""
+    """미래 트랙(중기·장기·종합)은 회색 비활성이 아니라 클릭하면 '준비중' 페이지."""
     bundle = {"trade_date": "2026-09-01", "as_of": "2026-09-01 09:30",
               "reports": [{"id": "kospi-close", "label": "장 마감", "group": "코스피",
                            "total": 54.8, "grade": "약세", "p_up": 0.55, "direction": "long"}]}
     for pub in (rr.render(bundle, public=False), rr.render(bundle, public=True)):
-        for sid in ("soon-mid", "soon-long", "soon-eth", "soon-composite"):
+        for sid in ("soon-mid", "soon-long", "soon-composite"):
             assert f'data-view="{sid}"' in pub          # 섹션 존재 → 도달 가능
+        assert 'data-view="soon-eth"' not in pub
         assert "준비 중입니다" in pub
         assert "·예정" not in pub                          # 옛 '예정' 표기 제거
-        assert 'aria-disabled="true"><span>ETH' not in pub  # 비활성 자리 아님
 
 
 def test_paper_card_placeholder_keeps_market_parity():

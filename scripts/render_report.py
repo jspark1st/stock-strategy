@@ -41,7 +41,6 @@ ASSET_ORDER = ("주식", "가상화폐", "종합 리포트", "진단")
 ASSET_OF = {"코스피": "주식", "코스닥": "주식", "비트코인 선물": "가상화폐", "진단": "진단"}
 MARKET_LABEL = {"비트코인 선물": "BTC 선물", "진단": "리포트 비평"}   # 사이드바 시장 표기
 FUTURE_MARKETS = (                          # (자산, 시장 라벨, 배지, 준비중 뷰 id)
-    ("가상화폐", "ETH 선물", "준비중", "soon-eth"),
     ("종합 리포트", "종합 리포트", "준비중", "soon-composite"),
 )
 # 지평 탭 — 단기만 실제 리포트. 나머지는 클릭하면 '준비중' 페이지로.
@@ -49,7 +48,6 @@ HORIZONS = (("단기", True, None), ("중기", False, "soon-mid"), ("장기", Fa
 COMING_SOON = (                             # (뷰 id, 제목) — '준비중' 안내 페이지
     ("soon-mid", "중기 리포트"),
     ("soon-long", "장기 리포트"),
-    ("soon-eth", "ETH 선물"),
     ("soon-composite", "종합 리포트"),
 )
 DEFAULT_PLACEHOLDERS = [
@@ -1928,12 +1926,152 @@ def _all_findings(r: dict) -> list[dict]:
 
 
 def build_coming_soon_view(label: str) -> str:
-    """'준비중' 안내 페이지 — 미래 트랙(중기·장기·ETH·종합) 클릭 시 도달."""
+    """'준비중' 안내 페이지 — 미래 트랙(중기·장기·종합) 클릭 시 도달."""
     return (f'<div class="empty">'
             f'<div class="empty-icon">🚧</div>'
             f'<h2 class="empty-title">{esc(label)}</h2>'
             f'<p class="muted">준비 중입니다. 곧 제공될 예정입니다.</p>'
             f'</div>')
+
+
+def build_level_scan_view() -> str:
+    """레벨 스캔 — 15분마다 future 스캐너가 쓴 JSON 을 보여 주기만 한다.
+
+    버튼·주문·점수 게이트 없음. 지지/저항 인근 후보지 표 + 멀티TF 복사 본문.
+    스캘핑 '지금 판정'과 같이 정적 뷰이지만 데이터는 서버 크론이 채운다.
+    """
+    info = _info("15분봉 기준. 거래량 상위 선물에서 지지/저항 인근만 올린다. "
+                 "점수는 터치·순RR·손절폭·거래량. 근접은 점수에 안 들어간다(측정상 예측력 없음). "
+                 "1등이 추천이 아니다. 고르는 일은 사람. "
+                 "1h·4h·1d %B 는 기준 진입가를 그 봉 밴드에 대입한 값이다(현재가 아님).")
+    tf_tip = _info("기준 15m 진입가를 그 봉 밴드에 넣은 %B. 상위 봉의 새 진입가가 아니다.")
+    return f"""
+    <div class="view-head"><div class="view-title">레벨 스캔 <span class="view-sub">· 15분 자동</span></div>
+      <div class="muted">지지/저항 인근 후보지 — 추천이 아니다. BTC 선물 점수·게이트와 무관.</div>
+    </div>
+    <div class="card">
+      <h2>지금 인근인 자리{info}</h2>
+      <div class="note muted" id="scan-meta">15분마다 서버가 받아 둡니다. 버튼을 누르지 않습니다.</div>
+      <div class="note muted" id="scan-stale" hidden>스냅샷이 20분을 넘었습니다 — 크론이 멈췄을 수 있습니다.</div>
+      <div class="view-actions" id="scan-copy-bar" hidden>
+        <button class="copy-btn" type="button" onclick="__copyReport(this)">📋 멀티TF 복사</button>
+        {_info("future 앱 「멀티TF 복사」와 같은 마크다운. AI 챗봇에 붙여넣으면 된다.")}
+        <textarea class="copy-src" hidden aria-hidden="true"></textarea>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="cd-table" id="scan-table">
+          <thead><tr>
+            <th>종목</th><th>방향</th><th>봉</th><th>적합</th><th>점수</th>
+            <th>RSI</th><th>%B</th>
+            <th>1h %B{tf_tip}</th><th>4h %B{tf_tip}</th><th>1d %B{tf_tip}</th>
+            <th>터치</th><th>근접%</th><th>손절%</th>
+            <th>손익비</th><th>여유R</th><th>추세</th>
+          </tr></thead>
+          <tbody id="scan-body">
+            <tr><td colspan="16" class="muted">스냅샷 대기 — 15분 크론이 채웁니다.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card" id="scan-md-card" hidden>
+      <h2>멀티TF 본문{ _info("표 아래 원문이다. 버튼을 누르거나 이 글을 직접 골라 붙여넣으면 된다. 상위 봉은 맥락이지 기각 근거가 아니다.") }</h2>
+      <pre class="scan-md" id="scan-md"></pre>
+    </div>
+    <div class="card"><h2>이 표는</h2><ul class="check">
+      <li>앱이 찾아 준 <b>후보지</b>다. 어느 행이 좋은지 이 페이지는 말하지 않는다.</li>
+      <li>기계적으로 전부 잡으면 건당 <b>−0.0254R</b>(측정). 그래서 주문을 붙이지 않는다.</li>
+      <li>1h·4h·1d 는 <b>맥락</b>이다. 상위 봉으로 후보를 자르거나 진입·손절·익절을 다시 계산하지 않는다.</li>
+      <li>추세 초록 = 방향과 같은 쪽(눌림/반등), 빨강 = 역추세(과매도 지지매수 등).</li>
+      <li>손익비는 수수료 반영 순RR(잔고 $1,000·리스크 2%·20x 기본값으로 환산). 주문 가능 여부는 표시하지 않는다.</li>
+    </ul></div>
+    <script>
+    (function(){{
+      var meta=document.getElementById('scan-meta');
+      var stale=document.getElementById('scan-stale');
+      var body=document.getElementById('scan-body');
+      var copyBar=document.getElementById('scan-copy-bar');
+      var copySrc=copyBar?copyBar.querySelector('.copy-src'):null;
+      var mdCard=document.getElementById('scan-md-card');
+      var mdPre=document.getElementById('scan-md');
+      if(!body) return;
+      var STALE_SEC=20*60;
+      var COLS=16;
+      function esc(s){{return String(s==null?'':s).replace(/[&<>"]/g,function(c){{
+        return {{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}}[c];}});}}
+      function inline(t){{
+        return esc(t).replace(/\\*\\*(.*?)\\*\\*/g,'<b>$1</b>');
+      }}
+      function fmtMd(s){{
+        return String(s||'').split('\\n').map(function(ln){{
+          if(/^### /.test(ln)) return '<div class="scan-h3">'+inline(ln.slice(4))+'</div>';
+          if(/^## /.test(ln)) return '<div class="scan-h2">'+inline(ln.slice(3))+'</div>';
+          if(/^# /.test(ln)) return '<div class="scan-h1">'+inline(ln.slice(2))+'</div>';
+          return inline(ln);
+        }}).join('\\n');
+      }}
+      function tfPb(h, iv){{
+        var t=(h.tf||{{}})[iv]||{{}};
+        if(!t.ok || t.pct_b_entry==null || t.pct_b_entry==='') return '—';
+        return Number(t.pct_b_entry).toFixed(2);
+      }}
+      function rowHtml(h){{
+        var sideCls=h.is_long?'scan-long':'scan-short';
+        var trCls=h.trend_aligned?'scan-trend-ok':'scan-trend-rev';
+        var room=(h.room_r==null)?'—':Number(h.room_r).toFixed(1);
+        var ema=(h.ema_dist_pct==null)?'—':((h.ema_dist_pct>0?'+':'')+Number(h.ema_dist_pct).toFixed(2));
+        return '<tr class="'+trCls+'">'
+          +'<td>'+esc(h.symbol)+'</td>'
+          +'<td class="'+sideCls+'">'+esc(h.side)+'</td>'
+          +'<td>'+esc(h.interval)+'</td>'
+          +'<td>'+esc(h.fit)+'/4</td>'
+          +'<td class="num">'+esc(Math.round(h.score))+'</td>'
+          +'<td class="num">'+esc(Math.round(h.rsi))+'</td>'
+          +'<td class="num">'+esc(Number(h.pct_b).toFixed(2))+'</td>'
+          +'<td class="num">'+tfPb(h,'1h')+'</td>'
+          +'<td class="num">'+tfPb(h,'4h')+'</td>'
+          +'<td class="num">'+tfPb(h,'1d')+'</td>'
+          +'<td class="num">'+esc(h.touches)+'</td>'
+          +'<td class="num">'+esc(Number(h.near_pct).toFixed(2))+'</td>'
+          +'<td class="num">'+esc(Number(h.risk_pct).toFixed(2))+'</td>'
+          +'<td class="num">'+esc(Number(h.rr).toFixed(2))+'</td>'
+          +'<td class="num">'+room+'</td>'
+          +'<td class="num scan-ema">'+ema+'%</td>'
+          +'</tr>';
+      }}
+      function paint(d){{
+        var hits=d.hits||[];
+        if(!hits.length){{
+          body.innerHTML='<tr><td colspan="'+COLS+'" class="muted">'
+            +(d.as_of?('후보 0건 · '+esc(d.as_of)):'아직 스냅샷 없음')+'</td></tr>';
+        }} else {{
+          body.innerHTML=hits.map(rowHtml).join('');
+        }}
+        var extra=(d.n&&d.n_shown&&d.n>d.n_shown)?(' · 상위 '+d.n_shown+'/'+d.n):'';
+        var ivs=(d.context_intervals&&d.context_intervals.length)
+          ? ('+'+d.context_intervals.join('/')) : '+1h/4h/1d';
+        if(meta) meta.textContent=(d.as_of?('기준 '+d.as_of):'시각 없음')
+          +' · '+((d.interval)||'15m')+ivs+' · '+(d.n||0)+'건'+extra;
+        var age=d.as_of_ts? (Date.now()/1000 - d.as_of_ts) : 99999;
+        if(stale) stale.hidden=!(d.as_of_ts && age>STALE_SEC);
+        var md=d.copy_md||'';
+        if(copySrc) copySrc.value=md;
+        if(copyBar) copyBar.hidden=!md;
+        if(mdPre) mdPre.innerHTML=fmtMd(md);
+        if(mdCard) mdCard.hidden=!md;
+      }}
+      function load(){{
+        fetch('/scan_latest.json?t='+Date.now(), {{cache:'no-store'}})
+          .then(function(r){{ return r.ok?r.json():Promise.reject(r.status); }})
+          .then(paint)
+          .catch(function(){{
+            if(meta) meta.textContent='스냅샷을 읽지 못했습니다.';
+          }});
+      }}
+      load();
+      setInterval(load, 60000);
+    }})();
+    </script>
+    """
 
 
 def build_btc_scalp_view() -> str:
@@ -3052,6 +3190,10 @@ def build_sidebar(items: list[dict]) -> str:
             out.append('<a class="nav-item" data-target="btc-scalp" href="#btc-scalp" '
                        'aria-label="BTC 스캘핑 가상화폐"><span>BTC 스캘핑</span>'
                        '<span class="nav-badge nav-live">실시간</span></a>')
+            # 레벨 스캔 — 15분 크론 스냅샷(후보지 표). 주문·버튼 없음.
+            out.append('<a class="nav-item" data-target="level-scan" href="#level-scan" '
+                       'aria-label="레벨 스캔 가상화폐"><span>레벨 스캔</span>'
+                       '<span class="nav-badge nav-live">15분</span></a>')
         for (_, flabel, note, sid) in futures:          # 준비중 자리(클릭 → 안내 페이지)
             out.append(f'<a class="nav-item ph" data-target="{esc(sid)}" href="#{esc(sid)}">'
                        f'<span>{esc(flabel)}</span><span class="nav-badge">{esc(note)}</span></a>')
@@ -3150,12 +3292,14 @@ def render(data: dict, lwc_src: str | None = None, public: bool = False) -> str:
         tabs = _view_tabs(g, vid, market_views) if len(market_views.get(g, {})) > 1 else ""
         views.append((vid, tabs + render_placeholder_view(p)))
 
-    # 미래 트랙(중기·장기·ETH·종합) '준비중' 페이지 — 사이드바/지평탭에서 클릭해 도달.
+    # 미래 트랙(중기·장기·종합) '준비중' 페이지 — 사이드바/지평탭에서 클릭해 도달.
     for sid, slabel in COMING_SOON:
         views.append((sid, build_coming_soon_view(slabel)))
 
     # BTC 스캘핑 — 리포트와 다른 유형(버튼 즉시 판정 도구). 전부 클라이언트 사이드.
     views.append(("btc-scalp", build_btc_scalp_view()))
+    # 레벨 스캔 — 15분 스냅샷 표. JSON 은 크론이 쓰고, 이 뷰는 읽기만.
+    views.append(("level-scan", build_level_scan_view()))
 
     # 리포트 비평(자가비평) — **소유자 전용**. 공개본(public)에는 메뉴·데이터를 넣지 않는다.
     # 구독 상품으로 팔 때 비평은 나만 본다: 공개 HTML 에 비평 텍스트 자체가 실리지 않게 한다.
@@ -3522,6 +3666,20 @@ TEMPLATE = r"""<!doctype html>
   .scalp-lab{font-size:1.9rem;font-weight:800;line-height:1.15}
   .scalp-sub{font-size:.86rem;color:var(--muted);margin-top:4px}
   .nav-badge.nav-live{color:var(--accent);border:1px solid var(--accent);background:transparent}
+  .scan-long{color:var(--up);font-weight:700}
+  .scan-short{color:var(--down);font-weight:700}
+  .scan-trend-ok .scan-ema{color:var(--good)}
+  .scan-trend-rev .scan-ema{color:var(--caution)}
+  #scan-stale:not([hidden]){color:var(--caution)}
+  #scan-table{font-size:.82rem;width:max-content;min-width:100%;table-layout:auto}
+  #scan-table th,#scan-table td{white-space:nowrap;overflow-wrap:normal;word-break:keep-all}
+  .scan-md{white-space:pre-wrap;word-break:break-word;margin:0;padding:14px 16px;
+    font:0.82rem/1.5 ui-sans-serif,system-ui,sans-serif;
+    background:var(--surface2);border:1px solid var(--border);border-radius:10px;
+    max-height:70vh;overflow:auto;user-select:text}
+  .scan-md .scan-h1{font-size:1.05rem;font-weight:800;margin:4px 0 8px}
+  .scan-md .scan-h2{font-size:.95rem;font-weight:800;margin:14px 0 6px}
+  .scan-md .scan-h3{font-size:.86rem;font-weight:700;margin:10px 0 4px;color:var(--muted)}
 
   /* 리포트 자가비평 */
   .rv-list{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:10px}
