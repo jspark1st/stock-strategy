@@ -7,15 +7,15 @@
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-<meta name="apple-mobile-web-app-title" content="준스탁"/>
-<meta name="application-name" content="준스탁"/>
+<meta name="apple-mobile-web-app-title" content="효도리포트"/>
+<meta name="application-name" content="효도리포트"/>
 <link rel="icon" href="/icons/favicon.svg?v=2" type="image/svg+xml"/>
 <link rel="icon" href="/icons/favicon-32.png?v=2" sizes="32x32" type="image/png"/>
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=2"/>
 <link rel="manifest" href="/manifest.webmanifest?v=2"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&display=swap"/>
-<title>준스탁 2026-09-10</title>
+<title>효도리포트 2026-09-10</title>
 <script>try{var t=localStorage.getItem('theme');if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
 <style>
   :root, [data-theme="dark"] {
@@ -53,8 +53,8 @@
   .sidebar{width:252px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);
     padding:18px 14px;position:sticky;top:0;height:100vh;height:100dvh;overflow-y:auto;
     display:flex;flex-direction:column;gap:6px}
-  .brand{font-weight:800;font-size:1.6rem;display:flex;align-items:center;gap:10px;
-    letter-spacing:-.02em;margin-bottom:10px}
+  .brand{font-weight:800;font-size:1.35rem;display:flex;align-items:center;gap:10px;
+    letter-spacing:-.02em;margin-bottom:10px;white-space:nowrap}
   .brand-mark{border-radius:9px;flex:0 0 auto;box-shadow:0 2px 8px rgba(0,0,0,.4)}
   .topnav .brand-mark{border-radius:7px}
   .topnav strong{font-size:1.25rem;letter-spacing:-.02em}
@@ -305,6 +305,7 @@
 
   /* 전체 복사 버튼 — 보고서 텍스트를 클립보드로(LLM 이어붙이기용) */
   .view-actions{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap}
+  .view-actions[hidden],#scan-md-card[hidden]{display:none!important}
   .copy-btn{border:1px solid var(--accent);
     background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent);
     border-radius:8px;padding:7px 14px;font:inherit;font-size:.82rem;font-weight:700;
@@ -422,7 +423,7 @@
 <a class="skip-link" href="#main">본문으로 건너뛰기</a>
 <div class="app">
   <aside class="sidebar" id="sidebar" aria-label="사이드바">
-    <div class="brand"><img class="brand-mark" src="/icons/favicon.svg?v=2" width="36" height="36" alt=""/><span class="brand-name">준스탁</span></div>
+    <div class="brand"><img class="brand-mark" src="/icons/favicon.svg?v=2" width="36" height="36" alt=""/><span class="brand-name">효도리포트</span></div>
     <div class="date-nav cal-wrap"><label class="slot-lab">📅 날짜
       <select class="stock-datesel" aria-label="날짜 선택" onchange="if(this.value) location=this.value">
         <option value="/" selected>2026-09-10</option>
@@ -439,7 +440,7 @@
     <div class="topnav">
       <button class="hamb" type="button" aria-label="메뉴 열기" aria-expanded="false"
         aria-controls="sidebar" onclick="window.__toggleSidebar()">☰</button>
-      <img class="brand-mark" src="/icons/favicon.svg?v=2" width="28" height="28" alt=""/><strong class="brand-name">준스탁</strong>
+      <img class="brand-mark" src="/icons/favicon.svg?v=2" width="28" height="28" alt=""/><strong class="brand-name">효도리포트</strong>
     </div>
     <section class="view" data-view="kospi-close"><div class="view-nav"><div class="vtabs"><span class="vtabs-lbl">지평</span><span class="vtab active">단기</span><a class="vtab vtab-off" data-target="soon-mid" href="#soon-mid">중기·준비중</a><a class="vtab vtab-off" data-target="soon-long" href="#soon-long">장기·준비중</a></div><div class="vtabs"><span class="vtabs-lbl">국면</span><a class="vtab active" data-target="kospi-close" href="#kospi-close">장 마감 전·후 분석</a><a class="vtab" data-target="kospi-preopen" href="#kospi-preopen">개장전 분석</a></div></div>
     <div class="view-head">

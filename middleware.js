@@ -1,4 +1,4 @@
-// 준스탁 비밀번호 게이트 — es_auth 쿠키 값이 AUTH_TOKEN 과 일치해야 통과.
+// 효도리포트 비밀번호 게이트 — es_auth 쿠키 값이 AUTH_TOKEN 과 일치해야 통과.
 // 미인증 시 /login.html 로. 환경변수 AUTH_TOKEN·VIEW_PASSWORD 는 Vercel 프로젝트 설정.
 // fail-closed: AUTH_TOKEN 미설정이면 아무도 통과 못 함(설정 전까지 잠김 — 안전 기본값).
 // 아이콘·매니페스트(icons/·manifest·apple-touch)는 게이트 밖 — 로그인 화면·홈화면 설치가

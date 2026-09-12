@@ -25,6 +25,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 LWC_PATH = ROOT / "assets" / "vendor" / "lightweight-charts.standalone.production.js"
+BRAND_NAME = "효도리포트"
 
 FAVORABLE = {"강세", "우호", "매수우위", "긍정", "호전", "적극"}
 NEUTRAL = {"중립", "관망", "혼조", "보통"}
@@ -3328,6 +3329,7 @@ def render(data: dict, lwc_src: str | None = None, public: bool = False) -> str:
         "{{CHART_DATA_JSON}}": chart_json,
         "{{LWC_SCRIPT}}": lwc_script,
         "{{BTC_DATESEL_SYNC}}": BTC_DATESEL_SYNC,
+        "{{BRAND}}": BRAND_NAME,
     }
     tpl = TEMPLATE
     for k, v in repl.items():
@@ -3344,15 +3346,15 @@ TEMPLATE = r"""<!doctype html>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-<meta name="apple-mobile-web-app-title" content="준스탁"/>
-<meta name="application-name" content="준스탁"/>
+<meta name="apple-mobile-web-app-title" content="{{BRAND}}"/>
+<meta name="application-name" content="{{BRAND}}"/>
 <link rel="icon" href="/icons/favicon.svg?v=2" type="image/svg+xml"/>
 <link rel="icon" href="/icons/favicon-32.png?v=2" sizes="32x32" type="image/png"/>
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=2"/>
 <link rel="manifest" href="/manifest.webmanifest?v=2"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&display=swap"/>
-<title>준스탁 {{DATE}}</title>
+<title>{{BRAND}} {{DATE}}</title>
 <script>try{var t=localStorage.getItem('theme');if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
 <style>
   :root, [data-theme="dark"] {
@@ -3390,8 +3392,8 @@ TEMPLATE = r"""<!doctype html>
   .sidebar{width:252px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);
     padding:18px 14px;position:sticky;top:0;height:100vh;height:100dvh;overflow-y:auto;
     display:flex;flex-direction:column;gap:6px}
-  .brand{font-weight:800;font-size:1.6rem;display:flex;align-items:center;gap:10px;
-    letter-spacing:-.02em;margin-bottom:10px}
+  .brand{font-weight:800;font-size:1.35rem;display:flex;align-items:center;gap:10px;
+    letter-spacing:-.02em;margin-bottom:10px;white-space:nowrap}
   .brand-mark{border-radius:9px;flex:0 0 auto;box-shadow:0 2px 8px rgba(0,0,0,.4)}
   .topnav .brand-mark{border-radius:7px}
   .topnav strong{font-size:1.25rem;letter-spacing:-.02em}
@@ -3642,6 +3644,7 @@ TEMPLATE = r"""<!doctype html>
 
   /* 전체 복사 버튼 — 보고서 텍스트를 클립보드로(LLM 이어붙이기용) */
   .view-actions{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap}
+  .view-actions[hidden],#scan-md-card[hidden]{display:none!important}
   .copy-btn{border:1px solid var(--accent);
     background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent);
     border-radius:8px;padding:7px 14px;font:inherit;font-size:.82rem;font-weight:700;
@@ -3759,7 +3762,7 @@ TEMPLATE = r"""<!doctype html>
 <a class="skip-link" href="#main">본문으로 건너뛰기</a>
 <div class="app">
   <aside class="sidebar" id="sidebar" aria-label="사이드바">
-    <div class="brand"><img class="brand-mark" src="/icons/favicon.svg?v=2" width="36" height="36" alt=""/><span class="brand-name">준스탁</span></div>
+    <div class="brand"><img class="brand-mark" src="/icons/favicon.svg?v=2" width="36" height="36" alt=""/><span class="brand-name">{{BRAND}}</span></div>
     <div class="date-nav cal-wrap"><label class="slot-lab">📅 날짜
       <select class="stock-datesel" aria-label="날짜 선택" onchange="if(this.value) location=this.value">
         <option value="/" selected>{{DATE}}</option>
@@ -3776,7 +3779,7 @@ TEMPLATE = r"""<!doctype html>
     <div class="topnav">
       <button class="hamb" type="button" aria-label="메뉴 열기" aria-expanded="false"
         aria-controls="sidebar" onclick="window.__toggleSidebar()">☰</button>
-      <img class="brand-mark" src="/icons/favicon.svg?v=2" width="28" height="28" alt=""/><strong class="brand-name">준스탁</strong>
+      <img class="brand-mark" src="/icons/favicon.svg?v=2" width="28" height="28" alt=""/><strong class="brand-name">{{BRAND}}</strong>
     </div>
     {{VIEWS}}
     <p class="disc">투자 판단의 참고 자료이며 투자 권유가 아님.</p>
