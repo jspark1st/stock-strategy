@@ -702,10 +702,11 @@ def build_conclusion(r: dict) -> str:
                     else f"비중 배수 <b>{ps:.0%}</b>" if ps is not None else "")
         bits.append(f"후보 최대 <b>{gate.get('max_candidates')}</b>종목")
         # 종가베팅은 15:00 마감 전용 개념 — 개장전 리포트엔 표시하지 않는다. 종가베팅=종가 신규진입
-        # 그 자체라, 차단/청산/보유관리(no_new_entry)면 close_betting 이 True(강세등급)여도 '불가'로
-        # 억제한다(등급게이트만 보는 close_betting 이 entry.allow 차단을 무시하고 새던 누출).
+        # 그 자체라 진입 가부와 한 몸이다: 차단/청산/보유관리(no_new_entry)면 '불가', 진입 허용이면
+        # '검토 가능'. 등급만 보던 close_betting(강세만 True)은 양방향으로 샜다 — True인데 진입차단
+        # (구 누출), False인데 진입허용('진입 허용·종가베팅 불가' 모순, gate_sizing 2026-09-12).
         if r.get("report_type") != "preopen":
-            _cb = "불가" if no_new_entry else ("검토 가능" if gate.get("close_betting") else "불가")
+            _cb = "불가" if no_new_entry else "검토 가능"
             bits.append(f"종가베팅 <b>{_cb}</b>")
     # 신규진입이 아니면(차단·청산·보유관리) 신규 매수 '실행 수단'을 병기하지 않는다.
     if no_new_entry:

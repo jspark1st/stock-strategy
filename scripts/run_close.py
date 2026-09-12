@@ -329,6 +329,12 @@ def _reconcile_atr_with_entry(rep: dict) -> None:
     grade_blocked = bool((rep.get("gate") or {}).get("new_entry_blocked"))
     entry_blocked = ("allow" in entry) and (entry.get("allow") is False)
     atr["entry_allow"] = not (grade_blocked or entry_blocked)
+    # 종가베팅 = 종가 신규진입 그 자체다(단일 오버나이트 트랙엔 종가 말곤 진입 시점이 없다).
+    # 등급에서만 파생되던 gate.close_betting(강세만 True)은 종목선정 플레이북 유물이라
+    # '진입 허용·비중 11.8%·종가베팅 불가'를 함께 띄웠다(gate_sizing, 2026-09-12 사용자 결정 A).
+    # 여기서 진입 게이트에 맞춰 확정해 번들·LLM·화면이 한 정의를 쓰게 한다. 등급은 grade 로 남는다.
+    if isinstance(rep.get("gate"), dict):
+        rep["gate"]["close_betting"] = not (grade_blocked or entry_blocked)
     if not (grade_blocked or entry_blocked):
         return
     prim = atr.get("primary")

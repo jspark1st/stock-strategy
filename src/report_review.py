@@ -236,7 +236,11 @@ LLM_CODES = {
     "gate_on_degenerate_prob": "진입 허용인데 확률이 판별이 아님",
     "calib_slope_floor": "캘리브 기울기 하한 — 총점이 확률에 영향 없음",
     "no_discrimination": "방향 판별 미확보(확률≈기저율)",
-    "horizon_divergence": "라벨(종가→종가)과 실거래(종가→시가) 괴리",
+    "horizon_divergence": ("라벨(종가→종가) 적중률이 실거래(종가→시가)보다 **표본으로**(n≥10, "
+                           "격차≥20%p) 유의하게 높다 — 전략 전제 위협. 단일 회차 괴리나 표본 "
+                           "부족엔 쓰지 말고 horizon_unverified 를 골라라"),
+    "horizon_unverified": ("실거래 지평이 아직 검증 안 됨 — primary_n/overnight_n 이 0이거나 "
+                           "소표본이라 비교 불가, 또는 단일 회차에서만 라벨과 실거래가 엇갈림"),
     "confidence_zero": "신뢰도 0 — 데이터 품질 결손",
     "incomplete_data": "필수/선택 데이터 결측·미수집",
     "sample_short": "검증 표본 부족 — 성적을 실력으로 읽을 수 없음",
@@ -258,6 +262,9 @@ LLM_CODES = {
 ACCEPTED_CODES = frozenset({
     "btc_gate_block", "btc_core_unaligned", "no_discrimination", "calib_slope_floor",
     "gate_on_degenerate_prob", "sample_short", "mixed_signals", "news_dead",
+    # 실거래 지평 미검증 = 표본 대기(2026-08-22 설계결정: 라벨은 유지하고 두 지평을 나란히 누적).
+    # 규칙 R5 의 horizon_divergence(표본으로 확인된 위협)는 **수용 아님** — 그건 경보로 남긴다.
+    "horizon_unverified",
 })
 
 _CRITIC_SYS = (
@@ -283,6 +290,12 @@ def _facts_for_critic(r: dict) -> str:
     atr = r.get("atr") or {}
     if atr.get("primary"):
         d["atr_primary"] = atr["primary"]
+    # 등급 기준선을 같이 준다 — 없으면 비평기가 50을 중립 기준으로 가정해 '54인데 약세'를
+    # 매 회차 모순으로 오탐한다(narrative_mismatch 17회 재발, 2026-09-12 확인). 총점은
+    # 50 대칭이 아니다(scoring-close.md §4). 밴드 자체는 불변 — 맥락만 제공.
+    d["grade_bands"] = {"강세": "total>=75", "우호": "65<=total<75", "중립": "55<=total<65",
+                        "약세": "45<=total<55", "위험": "total<45",
+                        "_주의": "총점 중립점은 50이 아니라 55다. 50~55 는 규정상 '약세'이며 모순이 아니다."}
     return json.dumps(d, ensure_ascii=False)
 
 

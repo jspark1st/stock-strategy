@@ -6,7 +6,7 @@
 텔레그램 보고 + out/review_backlog.md 에 마크다운으로 남긴다. 읽기 전용(비평 자동 반영 없음).
 
 실행: .venv/bin/python scripts/review_digest.py [--no-telegram] [--since YYYY-MM-DD]
-cron 권장: 매월 1일(revalidate 옆). 배포/커밋 없음.
+cron: auto_ui_review.sh(매주 월 17:30) 꼬리 단계로 자동 실행. 배포/커밋 없음.
 """
 import sys
 from pathlib import Path
@@ -44,11 +44,11 @@ def build(db: str = DB, since: str | None = None) -> tuple[str, str]:
     llm = dg.get("llm_open", [])
     res = dg.get("resolution", {})
     _rate = res.get("rate")
-    health = (f"해결 {res.get('resolved', 0)}/{(res.get('open', 0) + res.get('resolved', 0))}"
+    health = (f"실행가능 해결 {res.get('resolved', 0)}/{(res.get('open', 0) + res.get('resolved', 0))}"
               + (f" ({_rate*100:.0f}%)" if _rate is not None else ""))
 
     # ── 텔레그램 요약 ──
-    tg = [f"📋 개선 백로그 — 실행가능 {len(act)}건 · 수용/데이터대기 {len(acc)}건 · {health}"
+    tg = [f"📋 개선 백로그 — 실행가능 {len(act)}종 · 수용/데이터대기 {len(acc)}종 · {health}"
           + (f" · {since}~" if since else "")]
     if act:
         tg.append("\n[실행가능 — 지금 고칠 것]")
@@ -64,7 +64,8 @@ def build(db: str = DB, since: str | None = None) -> tuple[str, str]:
 
     # ── 마크다운 전문 ──
     md = ["# 리포트 자가비평 — 개선 백로그", "",
-          f"미해결 **{res.get('open', dg.get('n_total', 0))}건** · {health}"
+          f"실행가능 미해결 **{res.get('open', dg.get('n_total', 0))}건** "
+          f"(수용/데이터대기 제외 · 전체 미해결 {dg.get('n_total', 0)}건) · {health}"
           + (f" (기간 {since}~)" if since else ""),
           "",
           "> **실행가능** = 지금 코드로 고칠 표시·논리·품질 결함. **수용/데이터대기** = 문서화된 설계"
@@ -86,7 +87,8 @@ def build(db: str = DB, since: str | None = None) -> tuple[str, str]:
                 "btc_core_unaligned": "BTC 코어 정렬 상시 관측=설계", "sample_short": "n<40 표본 대기",
                 "calib_slope_floor": "정직한 무신호=데이터",
                 "gate_on_degenerate_prob": "기울기 하한 파생=데이터(설계상 매일 표기)",
-                "mixed_signals": "코어 소수 팩터 상시 관측", "news_dead": "재료 상시 제외=설계"}
+                "mixed_signals": "코어 소수 팩터 상시 관측", "news_dead": "재료 상시 제외=설계",
+                "horizon_unverified": "실거래 지평 표본 대기(두 지평 병행 누적=설계)"}
         for d in acc:
             md.append(f"| {d['n']} | `{d.get('code')}` | {d.get('title')} "
                       f"| {_why.get(d.get('code'), '문서화된 한계')} |")

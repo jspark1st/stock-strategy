@@ -31,6 +31,37 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 아래 진행 로그는 **감사 추적**(무엇이 언제 바뀌었나). 다음 할 일은 `guide_docs/roadmap/` 이 이 파일 하단 목록보다 우선한다.
 
+## 2026-09-12 — 자가비평 백로그 정합 (테스트 430→434)
+
+「비평에 오른 게 다 반영됐나」 점검에서 출발. **백로그가 실제보다 좋아 보이던 배선 결함**이 먼저 나왔다.
+
+- ✅ **`review_digest.py` 크론 배선 누락** — md 를 쓰는 유일한 경로가 수동 실행이라 `out/review_backlog.md`
+  가 08-31 에 멈춰 「실행가능 반복 발견 없음」을 보여줬다(실제론 8종 미해결). `auto_ui_review.sh`
+  꼬리 단계로 배선(주 1회·비치명적, `check_docs` 패턴).
+- ✅ **해결률 구조적 왜곡** — `run_ui_review.py` 가 `review_digest(accepted=)` 를 안 넘겨 수용코드가
+  분모에 섞였다(`8/270`). `store.review_digest` 주석이 경고한 바로 그 케이스 → `6/103`.
+- ✅ **md 헤더 오독** — `resolution.open`(실행가능분)을 「미해결 N건」으로 적어 전체처럼 읽혔다.
+  「실행가능 미해결 97건 (수용/데이터대기 제외 · 전체 미해결 262건)」으로 분리 표기.
+- ✅ **[중대] `gate_sizing` 실재 모순** — `gate.close_betting` 은 등급에서만 파생(강세만 True)돼
+  「진입 허용 · 비중 11.8% · 실행수단 ○○ · **종가베팅 불가**」를 한 화면에 띄웠다(09-04·07·09·10
+  4회차 실측). 종가베팅=종가 신규진입 그 자체라 진입 가부와 한 몸 — **사용자 결정 A**: 진입 게이트를
+  따른다. 원본 플레이북의 「우호=종가베팅 금지」는 종목선정 시절 유물로 폐기. `_reconcile_atr_with_entry`
+  (게이트·entry 가 둘 다 정해진 뒤 정합화하는 기존 지점)에서 확정해 **번들·LLM·화면이 한 정의**를 쓴다.
+  구 누출(강세 True인데 진입차단)도 표시가 아니라 데이터 층에서 막힌다. `test_render_gate.py` +4.
+- ✅ **`narrative_mismatch` 는 오탐이었다** — 「총점 54.2인데 등급 약세」는 스펙대로다(등급 컷 75/65/55/45,
+  50 대칭 아님 · `scoring-close.md` §4). `_facts_for_critic` 가 기준선 없이 원값만 넘겨 비평기가 50을
+  중립으로 가정, 총점이 45~55 에 떨어지는 날마다 영구 재발하던 구조(17회). 팩트에 `grade_bands` 추가.
+- ✅ **`horizon_divergence` 코드 분리** — 통째로 수용 처리하려던 최초 판단은 **틀렸다**. 규칙 R5 는
+  `n≥10` 且 라벨이 실거래보다 `≥20%p` 우위일 때만 점화하는 **전략 전제 위협 경보**라 죽이면 안 된다.
+  오염원은 표본 가드가 없는 LLM 36건(`primary_n=0`·단일 회차 괴리) → `horizon_unverified` 신설·
+  `ACCEPTED_CODES` 등록·기존 36건 이관(제목/본문 보존). 그 결과 **규칙 8회·높음이 실행가능 최상위로
+  올라왔다** — 표본으로 확인된 지평 괴리라 로드맵 P0(비용 차감 순손익)에 직결. 미착수.
+- ✅ **문서 드리프트 3건** — 테스트 수 364→434, ops 크론표에 `auto_deriv.sh` 누락. `check_docs` 통과.
+
+**해결 처리(`--resolve`)는 하지 않았다.** 08-30 에 `horizon_divergence`·`narrative_mismatch` 를 닫은
+뒤 09-10 까지 계속 재발한 게 이번 점검의 출발점이다. 라이브 회차에서 실제로 안 나오는 걸 보고 닫는다.
+
+
 ## 2026-08-30 — 문서 분류 (`ops` · `code` · `defects` · `roadmap` · `lessons`)
 
 코드 변경 없음. `guide_docs/index.md` 를 분류 카탈로그로 재작성하고 목적별 폴더를 채움.
@@ -258,7 +289,7 @@ BTC 상세는 **HANDOFF_BTC.md** (이 파일의 주식 로그보다 그쪽이 So
 
 ### 지금 서버·repo
 - **KS6F-JNT-3-VM-1** `~/overnight_report` (구 KS5F `~/stock_strategy` 는 폐기).
-- Python은 **`.venv/bin/python`** (시스템 python3 에 pytest/httpx 없음). 테스트 **364 collected** (2026-08-31, `.venv`).
+- Python은 **`.venv/bin/python`** (시스템 python3 에 pytest/httpx 없음). 테스트 **434 collected** (2026-09-12, `.venv`).
 - 라이브: https://easystock-junaitech.vercel.app — `public/index.html` push → Vercel.
 - 마지막 사이트 배포: `2ee469a` (2026-08-22 11:11, HTML만).
 

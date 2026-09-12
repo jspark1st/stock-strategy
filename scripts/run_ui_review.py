@@ -20,6 +20,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from src import ui_review, store          # noqa: E402
+from src.report_review import ACCEPTED_CODES  # noqa: E402
 from src.collectors.ls import load_env    # noqa: E402
 
 KST = timezone(timedelta(hours=9))
@@ -81,9 +82,9 @@ def main(argv: list[str]) -> int:
 
     if conn is not None:
         try:
-            dg = store.review_digest(conn, since=None)
+            dg = store.review_digest(conn, since=None, accepted=tuple(ACCEPTED_CODES))
             r = dg.get("resolution") or {}
-            print(f"\n백로그 해결률: {r.get('resolved',0)}/"
+            print(f"\n백로그 해결률(실행가능분): {r.get('resolved',0)}/"
                   f"{(r.get('open',0)+r.get('resolved',0))} (rate {r.get('rate')})")
         except Exception:  # noqa
             pass

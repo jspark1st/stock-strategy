@@ -32,3 +32,11 @@ if [ $RC -ne 0 ]; then
   echo "[$(date '+%F %T')] (참고) UI LLM 비평 실패(exit $RC) — 무시(제안일 뿐, 배포 무관)" >> "$LOG"
 fi
 echo "[$(date '+%F %T')] ✓ 주간 UI 비평 완료(제안 누적 — /triage 로 선별)" >> "$LOG"
+
+# 개선 백로그 스냅샷 갱신 — out/review_backlog.md + 텔레그램 요약 (비치명적)
+# 이게 없으면 md 가 마지막 수동 실행 시점에 멈춰 백로그를 실제보다 좋게 보여준다(2026-09-12 발견).
+"$PY" scripts/review_digest.py >> "$LOG" 2>&1
+GRC=$?
+if [ $GRC -ne 0 ]; then
+  echo "[$(date '+%F %T')] (참고) 백로그 다이제스트 실패(exit $GRC) — 무시(보고일 뿐)" >> "$LOG"
+fi

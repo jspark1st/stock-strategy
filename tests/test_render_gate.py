@@ -398,3 +398,52 @@ def test_trade_state_card_authoritative(monkeypatch=None):
            "report_type": "preopen", "confidence": 0.5, "accuracy": {"n": 9}}
     hp = rr.build_trade_state(pre)
     assert "관망·현금" in hp and "09:00 개장 확인" in hp and "재료 미충족" in hp
+
+
+# ── 종가베팅 정합 (gate_sizing 회귀 · 2026-09-12) ────────────────────────────
+# 자가비평이 4회차 연속 잡은 모순: gate.close_betting 은 등급에서만 파생돼(강세만 True)
+# '진입 허용 · 비중 11.8% · 실행수단 ○○ · 종가베팅 불가'를 한 화면에 띄웠다. 종가베팅은
+# 종가 신규진입 그 자체라 진입 가부와 한 몸이어야 한다(사용자 결정 A). 구 누출(강세 True인데
+# 진입차단)과 신 모순(False인데 진입허용) 양방향을 데이터 층에서 고정한다.
+import run_close as rc
+
+
+def _rep_cb(close_betting, grade_blocked, entry_allow, kelly=11.8):
+    return {"gate": {"close_betting": close_betting, "new_entry_blocked": grade_blocked},
+            "entry": {"allow": entry_allow,
+                      "blocked_reasons": ([] if entry_allow else ["신뢰도 미달"])},
+            "atr": {"primary": {"kelly_pct": kelly}, "variants": []}}
+
+
+def test_close_betting_follows_entry_gate_when_grade_is_not_strong():
+    """중립·우호·약세 등급(close_betting=False)이라도 진입 게이트가 허용이면 종가베팅 가능.
+    실제 재발 회차: 09-04·09-09 우호, 09-07 약세, 09-10 중립 — 전부 allow=True·kelly>0."""
+    rep = _rep_cb(close_betting=False, grade_blocked=False, entry_allow=True)
+    rc._reconcile_atr_with_entry(rep)
+    assert rep["gate"]["close_betting"] is True
+    assert rep["atr"]["primary"]["kelly_pct"] == 11.8      # 비중은 그대로
+
+
+def test_close_betting_false_when_entry_gate_blocks_despite_strong_grade():
+    """구 누출 방향 — 강세 등급이어도 진입 게이트가 차단이면 종가베팅 불가."""
+    rep = _rep_cb(close_betting=True, grade_blocked=False, entry_allow=False)
+    rc._reconcile_atr_with_entry(rep)
+    assert rep["gate"]["close_betting"] is False
+    assert rep["atr"]["primary"]["kelly_pct"] == 0         # 차단이면 비중 0
+
+
+def test_close_betting_false_when_grade_gate_blocks():
+    """위험 등급(등급 게이트 차단) → 종가베팅 불가."""
+    rep = _rep_cb(close_betting=False, grade_blocked=True, entry_allow=False, kelly=0)
+    rc._reconcile_atr_with_entry(rep)
+    assert rep["gate"]["close_betting"] is False
+
+
+def test_conclusion_strip_has_no_entry_vs_close_betting_contradiction():
+    """화면 회귀 — '진입 허용'과 '종가베팅 불가'가 같은 결론 스트립에 함께 나오지 않는다."""
+    r = _report(entry_allow=True, grade_blocked=False)
+    r["gate"]["close_betting"] = True          # _reconcile 이 확정한 유효값
+    r["report_type"] = "close"
+    html = rr.build_conclusion(r)
+    assert "종가베팅 <b>검토 가능</b>" in html
+    assert "종가베팅 <b>불가</b>" not in html
