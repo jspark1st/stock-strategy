@@ -89,5 +89,7 @@ def test_level_scan_nav_and_no_eth(monkeypatch):
     assert "멀티TF 복사" in chunk
     assert "1h %B" in chunk and "4h %B" in chunk and "1d %B" in chunk
     assert "scan-md" in chunk
+    assert "scan-th" in chunk and "클릭하면 정렬" in chunk
+    assert "sortKey" in chunk
     assert "효도리포트" in html
     assert "준스탁" not in html

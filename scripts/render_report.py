@@ -1962,11 +1962,22 @@ def build_level_scan_view() -> str:
       <div style="overflow-x:auto">
         <table class="cd-table" id="scan-table">
           <thead><tr>
-            <th>종목</th><th>방향</th><th>봉</th><th>적합</th><th>점수</th>
-            <th>RSI</th><th>%B</th>
-            <th>1h %B{tf_tip}</th><th>4h %B{tf_tip}</th><th>1d %B{tf_tip}</th>
-            <th>터치</th><th>근접%</th><th>손절%</th>
-            <th>손익비</th><th>여유R</th><th>추세</th>
+            <th class="scan-th" title="클릭하면 정렬">종목</th>
+            <th class="scan-th" title="클릭하면 정렬">방향</th>
+            <th class="scan-th" title="클릭하면 정렬">봉</th>
+            <th class="scan-th" title="클릭하면 정렬">적합</th>
+            <th class="scan-th" title="클릭하면 정렬">점수</th>
+            <th class="scan-th" title="클릭하면 정렬">RSI</th>
+            <th class="scan-th" title="클릭하면 정렬">%B</th>
+            <th class="scan-th" title="클릭하면 정렬">1h %B{tf_tip}</th>
+            <th class="scan-th" title="클릭하면 정렬">4h %B{tf_tip}</th>
+            <th class="scan-th" title="클릭하면 정렬">1d %B{tf_tip}</th>
+            <th class="scan-th" title="클릭하면 정렬">터치</th>
+            <th class="scan-th" title="클릭하면 정렬">근접%</th>
+            <th class="scan-th" title="클릭하면 정렬">손절%</th>
+            <th class="scan-th" title="클릭하면 정렬">손익비</th>
+            <th class="scan-th" title="클릭하면 정렬">여유R</th>
+            <th class="scan-th" title="클릭하면 정렬">추세</th>
           </tr></thead>
           <tbody id="scan-body">
             <tr><td colspan="16" class="muted">스냅샷 대기 — 15분 크론이 채웁니다.</td></tr>
@@ -1997,6 +2008,54 @@ def build_level_scan_view() -> str:
       if(!body) return;
       var STALE_SEC=20*60;
       var COLS=16;
+      var rows=[];
+      var sortKey='';
+      var sortDir=-1;
+      var KEYS=['symbol','side','interval','fit','score','rsi','pct_b',
+                'tf1h','tf4h','tf1d','touches','near_pct','risk_pct','rr','room_r','ema_dist_pct'];
+      function valOf(h, key){{
+        if(key==='tf1h'||key==='tf4h'||key==='tf1d'){{
+          var t=(h.tf||{{}})[key.slice(2)]||{{}};
+          if(!t.ok || t.pct_b_entry==null || t.pct_b_entry==='') return null;
+          return Number(t.pct_b_entry);
+        }}
+        if(key==='side') return h.is_long?0:1;
+        var v=h[key];
+        if(v==null || v==='') return null;
+        return v;
+      }}
+      function sortedRows(){{
+        var out=rows.slice();
+        if(!sortKey) return out;
+        out.sort(function(a,b){{
+          var va=valOf(a,sortKey), vb=valOf(b,sortKey);
+          if(va==null && vb==null) return 0;
+          if(va==null) return 1;
+          if(vb==null) return -1;
+          if(typeof va==='number' && typeof vb==='number') return (va-vb)*sortDir;
+          return String(va).localeCompare(String(vb),'ko')*sortDir;
+        }});
+        return out;
+      }}
+      function markHeads(){{
+        var ths=document.querySelectorAll('#scan-table thead th');
+        for(var i=0;i<ths.length;i++){{
+          var on=KEYS[i]===sortKey;
+          ths[i].classList.toggle('scan-sorted', on);
+          ths[i].classList.toggle('scan-asc', on && sortDir>0);
+          ths[i].classList.toggle('scan-desc', on && sortDir<0);
+          ths[i].setAttribute('aria-sort', on?(sortDir>0?'ascending':'descending'):'none');
+        }}
+      }}
+      function drawBody(asOf){{
+        if(!rows.length){{
+          body.innerHTML='<tr><td colspan="'+COLS+'" class="muted">'
+            +(asOf?('후보 0건 · '+esc(asOf)):'아직 스냅샷 없음')+'</td></tr>';
+        }} else {{
+          body.innerHTML=sortedRows().map(rowHtml).join('');
+        }}
+        markHeads();
+      }}
       function esc(s){{return String(s==null?'':s).replace(/[&<>"]/g,function(c){{
         return {{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}}[c];}});}}
       function inline(t){{
@@ -2040,13 +2099,8 @@ def build_level_scan_view() -> str:
           +'</tr>';
       }}
       function paint(d){{
-        var hits=d.hits||[];
-        if(!hits.length){{
-          body.innerHTML='<tr><td colspan="'+COLS+'" class="muted">'
-            +(d.as_of?('후보 0건 · '+esc(d.as_of)):'아직 스냅샷 없음')+'</td></tr>';
-        }} else {{
-          body.innerHTML=hits.map(rowHtml).join('');
-        }}
+        rows=d.hits||[];
+        drawBody(d.as_of);
         var extra=(d.n&&d.n_shown&&d.n>d.n_shown)?(' · 상위 '+d.n_shown+'/'+d.n):'';
         var ivs=(d.context_intervals&&d.context_intervals.length)
           ? ('+'+d.context_intervals.join('/')) : '+1h/4h/1d';
@@ -2068,6 +2122,21 @@ def build_level_scan_view() -> str:
             if(meta) meta.textContent='스냅샷을 읽지 못했습니다.';
           }});
       }}
+      var thead=document.querySelector('#scan-table thead');
+      if(thead) thead.addEventListener('click', function(e){{
+        if(e.target.closest && e.target.closest('.info')) return;
+        var th=e.target.closest?e.target.closest('th'):null;
+        if(!th || !th.parentNode) return;
+        var i=Array.prototype.indexOf.call(th.parentNode.children, th);
+        var key=KEYS[i];
+        if(!key) return;
+        if(sortKey===key) sortDir=-sortDir;
+        else {{
+          sortKey=key;
+          sortDir=(key==='symbol'||key==='side'||key==='interval')?1:-1;
+        }}
+        drawBody();
+      }});
       load();
       setInterval(load, 60000);
     }})();
@@ -3676,6 +3745,10 @@ TEMPLATE = r"""<!doctype html>
   #scan-stale:not([hidden]){color:var(--caution)}
   #scan-table{font-size:.82rem;width:max-content;min-width:100%;table-layout:auto}
   #scan-table th,#scan-table td{white-space:nowrap;overflow-wrap:normal;word-break:keep-all}
+  #scan-table thead th.scan-th{cursor:pointer;user-select:none}
+  #scan-table thead th.scan-th:hover{color:var(--accent)}
+  #scan-table thead th.scan-sorted.scan-desc::after{content:' ▾';color:var(--accent);font-size:.72rem}
+  #scan-table thead th.scan-sorted.scan-asc::after{content:' ▴';color:var(--accent);font-size:.72rem}
   .scan-md{white-space:pre-wrap;word-break:break-word;margin:0;padding:14px 16px;
     font:0.82rem/1.5 ui-sans-serif,system-ui,sans-serif;
     background:var(--surface2);border:1px solid var(--border);border-radius:10px;
