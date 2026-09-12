@@ -22,4 +22,5 @@ README.md
 .env.*
 db/
 reports/
-public/*.json
+# public/scan_latest.json 은 레벨 스캔 페이지가 읽는다. 루트 json 을 통째로
+# 빼면 라이브에서 404 가 난다(archive/**/manifest.json 은 하위 폴더라 예외였음).
