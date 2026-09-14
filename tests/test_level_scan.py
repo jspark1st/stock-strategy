@@ -93,3 +93,118 @@ def test_level_scan_nav_and_no_eth(monkeypatch):
     assert "sortKey" in chunk
     assert "효도리포트" in html
     assert "준스탁" not in html
+
+
+def _write_btc(tmp_path, monkeypatch, payload):
+    import json
+    p = tmp_path / "btc_latest.json"
+    p.write_text(json.dumps(payload), encoding="utf-8")
+    monkeypatch.setattr(level_scan, "BTC_LATEST", p)
+    return p
+
+
+def test_btc_pred_mirror_no_trade_hides_size(tmp_path, monkeypatch):
+    """NO_TRADE 면 확률·게이트만 미러하고 타점/사이즈는 애초에 안 가져온다."""
+    _write_btc(tmp_path, monkeypatch, {
+        "as_of": "2026-09-14 09:30 KST", "slot": "0930", "grade": "약세",
+        "verdict": "NO_TRADE", "direction": "watch", "total": 50.2,
+        "p_long": 0.5045, "p_short": 0.4955,
+        "atr": {"entry": 1}, "binance_size": {"qty": 9},  # 있어도 무시돼야 한다
+        "gate": {"no_trade": True, "reasons": ["우위 부족 — 관망"]},
+    })
+    now = datetime(2026, 9, 14, 14, 25, tzinfo=timezone(timedelta(hours=9)))
+    b = level_scan.read_btc_pred(now=now)
+    assert b["p_long"] == 50.4 and b["p_short"] == 49.5
+    assert b["no_trade"] is True and b["verdict"] == "NO_TRADE"
+    assert b["gate_reason"] == "우위 부족 — 관망"
+    assert b["age_h"] == 4.9 and b["next_slot"] == "22:00"
+    assert "atr" not in b and "binance_size" not in b   # 게이트가 확률을 이긴다
+
+
+def test_btc_pred_missing_or_broken_is_none(tmp_path, monkeypatch):
+    monkeypatch.setattr(level_scan, "BTC_LATEST", tmp_path / "nope.json")
+    assert level_scan.read_btc_pred() is None            # 파일 없음 → 표는 그대로
+    _write_btc(tmp_path, monkeypatch, {"grade": "약세"})   # p_long 없음
+    assert level_scan.read_btc_pred() is None
+
+
+def test_snapshot_embeds_btc_pred(tmp_path, monkeypatch):
+    _write_btc(tmp_path, monkeypatch, {
+        "as_of": "2026-09-14 09:30 KST", "slot": "0930", "grade": "강세",
+        "verdict": "LONG", "p_long": 0.62, "p_short": 0.38, "gate": {"no_trade": False},
+    })
+    now = datetime(2026, 9, 14, 10, 0, tzinfo=timezone(timedelta(hours=9)))
+    snap = level_scan.build_snapshot([], now=now)
+    assert snap["btc_pred"]["p_long"] == 62.0
+    assert snap["btc_pred"]["no_trade"] is False
+
+
+def test_copy_md_appends_btc_block(tmp_path, monkeypatch):
+    _write_btc(tmp_path, monkeypatch, {
+        "as_of": "2026-09-14 09:30 KST", "slot": "0930", "grade": "약세",
+        "verdict": "NO_TRADE", "p_long": 0.504, "p_short": 0.496,
+        "gate": {"no_trade": True, "reasons": ["우위 부족 — 관망"]},
+    })
+    now = datetime(2026, 9, 14, 14, 30, tzinfo=timezone(timedelta(hours=9)))
+    snap = level_scan.build_snapshot([], now=now, copy_md="### 후보\n본문")
+    md = snap["copy_md"]
+    assert "### 후보" in md                                  # future 본문 보존
+    assert "BTC 12h 방향예측" in md and "LONG 50%" in md
+    assert "게이트 차단: 우위 부족 — 관망" in md
+    assert "검증된 엣지" in md                                # 정직한 꼬리표 필수
+
+
+def test_copy_md_no_btc_when_empty_body(tmp_path, monkeypatch):
+    _write_btc(tmp_path, monkeypatch, {"p_long": 0.6, "p_short": 0.4, "gate": {}})
+    now = datetime(2026, 9, 14, 14, 30, tzinfo=timezone(timedelta(hours=9)))
+    snap = level_scan.build_snapshot([], now=now)            # md 없음(fetch_tf=False)
+    assert snap["copy_md"] == ""                             # 본문 없으면 BTC만 담지 않는다
+    assert snap["btc_pred"]["p_long"] == 60.0               # 카드 데이터는 그대로 있음
+
+
+# ── 꼬리표는 하드코딩이 아니라 오늘 값에서 나온다 (2026-09-14) ────────────
+# 최초 구현은 "캘리브 표본<40·게이트 미개방 상태라"를 문자열로 박아, 게이트가 열린 날
+# (실측 09-14 22:00 no_trade=False)에도 '미개방'이라 적어 표시가 데이터와 어긋났다.
+def test_copy_md_tail_reflects_open_gate(tmp_path, monkeypatch):
+    _write_btc(tmp_path, monkeypatch, {
+        "as_of": "2026-09-14 22:00 KST", "slot": "2200", "grade": "중립",
+        "verdict": "LONG", "direction": "long", "total": 59.0,
+        "p_long": 0.711, "p_short": 0.289,
+        "gate": {"no_trade": False, "reasons": []},
+        "accuracy": {"n": 20, "primary_n": 0},
+    })
+    now = datetime(2026, 9, 14, 22, 20, tzinfo=timezone(timedelta(hours=9)))
+    b = level_scan.read_btc_pred(now=now)
+    assert b["no_trade"] is False and b["primary_n"] == 0
+    tail = level_scan._btc_copy_md(b).splitlines()[-1]
+    assert "미개방" not in tail                       # 열린 게이트를 닫혔다 하지 않는다
+    assert "검증된 엣지" in tail                       # 과신 방지 꼬리표는 유지
+    assert "표본 0건" in tail                          # 표본은 실제 값으로
+
+
+def test_copy_md_tail_reflects_closed_gate(tmp_path, monkeypatch):
+    _write_btc(tmp_path, monkeypatch, {
+        "as_of": "2026-09-14 09:30 KST", "slot": "0930", "grade": "약세",
+        "verdict": "NO_TRADE", "direction": "watch", "total": 48.4,
+        "p_long": 0.4638, "p_short": 0.5362,
+        "gate": {"no_trade": True, "reasons": ["우위 부족 — 관망"]},
+        "accuracy": {"n": 18, "primary_n": 12},
+    })
+    now = datetime(2026, 9, 14, 14, 0, tzinfo=timezone(timedelta(hours=9)))
+    b = level_scan.read_btc_pred(now=now)
+    tail = level_scan._btc_copy_md(b).splitlines()[-1]
+    assert "게이트 미개방(관망)" in tail
+    assert "표본 12건(<40)" in tail
+
+
+def test_scan_view_dims_unverified_probability_on_surface():
+    """표시의 강도는 검증의 강도를 따른다(2026-09-03 규율) — 주 지평 표본이 모자라면
+    확률 숫자를 무채색으로 죽이고 사유를 ⓘ 가 아니라 **표면**에 적는다."""
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+    import render_report as rr
+    html = rr.build_level_scan_view()
+    assert 'id="btc-pred-unproven"' in html          # 표면 경고 자리
+    assert "btc-pred-dim" in html                    # 무채색 처리
+    assert "검증된 엣지가 아닙니다" in html
