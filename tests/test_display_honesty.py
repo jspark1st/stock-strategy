@@ -492,3 +492,18 @@ def test_report_text_blocked_hides_prices():
     assert "6,840" not in t and "107,615" not in t     # 지수·ETF 실행 가격 미노출
     assert "방향 확률 임계" in t                        # 차단 사유는 노출
     assert "다음 재평가" in t
+
+
+# ── 서버 용어 노출 금지 (2026-09-14 UI 비평) ─────────────────────────────
+# '크론이 멈췄을 수 있습니다' / '15분 크론이 채웁니다' — 초보자는 '크론'을 몰라
+# 매매 기능이 고장난 것으로 오해한다. 상태 안내는 사용자 언어로만 쓴다.
+def test_no_server_jargon_in_scan_view():
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+    import render_report as rr
+    html = rr.build_level_scan_view()
+    for bad in ("크론", "cron", "배치", "파이프라인"):
+        assert bad not in html, f"화면 문구에 서버 용어 '{bad}'"
+    # 안내 자체는 남아 있어야 한다(용어만 바꾸고 정보를 지우면 안 된다).
+    assert "20분" in html and "15분마다" in html
