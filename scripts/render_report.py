@@ -1976,18 +1976,6 @@ def build_level_scan_view() -> str:
     <div class="view-head"><div class="view-title">레벨 스캔 <span class="view-sub">· 15분 자동</span></div>
       <div class="muted">지지/저항 인근 후보지 — 추천이 아니다. BTC 선물 점수·게이트와 무관.</div>
     </div>
-    <div class="card" id="btc-pred-card" hidden>
-      <h2>BTC 12h 방향예측 <span class="view-sub">· BTC 선물 트랙에서 가져옴 · 아래 표와 무관</span>{_info("정규 발행(09:30·22:00 KST)한 BTCUSDT 무기한 12h 방향예측을 그대로 미러한 것이다. 이 레벨 스캔 표(future 스캐너)와는 별개 트랙이며, 성적(적중률)은 표본 규율상 여기 싣지 않는다. 게이트가 NO_TRADE 면 확률만 보이고 타점·사이즈는 숨긴다.")}</h2>
-      <div class="btc-pred-row">
-        <span class="btc-pred-ls scan-long"><b id="btc-pred-long">–</b> LONG</span>
-        <span class="btc-pred-ls scan-short"><b id="btc-pred-short">–</b> SHORT</span>
-        <span class="btc-pred-badge" id="btc-pred-grade">–</span>
-        <span class="btc-pred-badge" id="btc-pred-verdict">–</span>
-      </div>
-      <div class="note muted" id="btc-pred-meta"></div>
-      <div class="note muted" id="btc-pred-reason" hidden></div>
-      <p><a class="vtab" href="/#btc-perp">전체 BTC 리포트 보기 →</a></p>
-    </div>
     <div class="card">
       <h2>지금 인근인 자리{info}</h2>
       <div class="note muted" id="scan-meta">15분마다 서버가 받아 둡니다. 버튼을 누르지 않습니다.</div>
@@ -2136,35 +2124,7 @@ def build_level_scan_view() -> str:
           +'<td class="num scan-ema">'+ema+'%</td>'
           +'</tr>';
       }}
-      var btcCard=document.getElementById('btc-pred-card');
-      function paintBtc(b){{
-        if(!btcCard) return;
-        if(!b || b.p_long==null){{ btcCard.hidden=true; return; }}
-        btcCard.hidden=false;
-        var elL=document.getElementById('btc-pred-long');
-        var elS=document.getElementById('btc-pred-short');
-        var elG=document.getElementById('btc-pred-grade');
-        var elV=document.getElementById('btc-pred-verdict');
-        var elM=document.getElementById('btc-pred-meta');
-        var elR=document.getElementById('btc-pred-reason');
-        if(elL) elL.textContent=Number(b.p_long).toFixed(0)+'%';
-        if(elS) elS.textContent=Number(b.p_short).toFixed(0)+'%';
-        if(elG) elG.textContent='등급 '+(b.grade||'—');
-        if(elV){{
-          elV.textContent='판정 '+(b.no_trade?'관망(NO_TRADE)':(b.verdict||'—'));
-          elV.classList.toggle('btc-pred-notrade', !!b.no_trade);
-        }}
-        var age=(b.age_h==null)?'':(' · '+(b.age_h<1?'방금':(Number(b.age_h).toFixed(b.age_h<10?1:0)+'시간 전'))+' 발행');
-        var nxt=b.next_slot?(' · 다음 '+b.next_slot):'';
-        if(elM) elM.textContent=(b.as_of?('기준 '+b.as_of):'')+age+nxt;
-        if(elR){{
-          var show=b.no_trade && b.gate_reason;
-          elR.hidden=!show;
-          if(show) elR.textContent='차단 사유: '+b.gate_reason;
-        }}
-      }}
       function paint(d){{
-        paintBtc(d.btc_pred);
         rows=d.hits||[];
         drawBody(d.as_of);
         var extra=(d.n&&d.n_shown&&d.n>d.n_shown)?(' · 상위 '+d.n_shown+'/'+d.n):'';
@@ -3832,11 +3792,6 @@ TEMPLATE = r"""<!doctype html>
   .nav-badge.nav-live{color:var(--accent);border:1px solid var(--accent);background:transparent}
   .scan-long{color:var(--up);font-weight:700}
   .scan-short{color:var(--down);font-weight:700}
-  .btc-pred-row{display:flex;flex-wrap:wrap;align-items:center;gap:14px 18px;margin:6px 0 2px}
-  .btc-pred-ls{font-size:.86rem;letter-spacing:.02em}
-  .btc-pred-ls b{font-size:1.5rem;margin-right:4px}
-  .btc-pred-badge{font-size:.8rem;padding:2px 10px;border-radius:999px;background:var(--chip,rgba(127,127,127,.14));border:1px solid rgba(127,127,127,.25)}
-  .btc-pred-badge.btc-pred-notrade{color:var(--caution);border-color:var(--caution)}
   .scan-trend-ok .scan-ema{color:var(--good)}
   .scan-trend-rev .scan-ema{color:var(--caution)}
   #scan-stale:not([hidden]){color:var(--caution)}
