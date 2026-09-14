@@ -320,6 +320,19 @@ def _facts_for_critic(r: dict) -> str:
     d["grade_bands"] = {"강세": "total>=75", "우호": "65<=total<75", "중립": "55<=total<65",
                         "약세": "45<=total<55", "위험": "total<45",
                         "_주의": "총점 중립점은 50이 아니라 55다. 50~55 는 규정상 '약세'이며 모순이 아니다."}
+    # 등급과 확률은 서로 다른 축이다 — 같은 값에서 나오지 않는다. 이 맥락이 없으면 비평기가
+    # '총점 54.8 약세인데 p_up 58.6%'를 모순으로 신고한다(narrative_mismatch 17회 · 2026-09-14).
+    # 특히 캘리브 기울기가 하한이면 확률은 총점과 거의 무관한 기저율이라 어긋나는 게 정상이다.
+    _cal = r.get("calibration") or {}
+    d["axis_note"] = {
+        "grade_from": "total (등급 컷 75/65/55/45)",
+        "p_up_from": "calibration (시장별 적합, 총점과 별개 축)",
+        "slope_at_floor": _cal.get("slope_at_floor"),
+        "_주의": ("등급과 p_up 이 서로 다른 방향을 가리키는 것은 모순이 아니다 — 두 축이 같은 "
+                "값을 쓰지 않기 때문이다. 특히 slope_at_floor 가 true 면 총점이 확률을 거의 "
+                "못 움직이므로 어긋남이 기본값이다. 이걸 narrative_mismatch 로 신고하지 마라. "
+                "narrative_mismatch 는 '같은 축 안에서' 수치와 서술이 어긋날 때만 쓴다."),
+    }
     return json.dumps(d, ensure_ascii=False)
 
 

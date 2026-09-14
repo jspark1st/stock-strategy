@@ -271,6 +271,23 @@ def build_hero(r: dict) -> str:
             _caution = "이 확률은 방향을 정하는 근거로 쓰기 어렵습니다 (50%에 가까움)."
             _d.append(f"{p_up*100:.0f}%는 40–60% 판별 미확보 구간이라 방향 예측력이 확보되지 "
                       "않았습니다 — 방향 베팅 근거가 아니며 등급·총점과는 별개 축입니다.")
+        # 등급(총점 축)과 확률(캘리브 축)이 반대를 가리키면 화면이 스스로 모순돼 보인다
+        # (자가비평 narrative_mismatch 17회 · xmarket_inversion 5회). 실측 2026-08-21 KOSPI:
+        # 총점 54.8 '약세'인데 p_up 58.6% — |0.586-0.5|=0.086 이라 위 판별 미확보 밴드(±8%p)
+        # 밖이고, 그래서 '별개 축' 설명이 안 붙은 채 모순만 남았다. 정작 축 어긋남이 가장
+        # 두드러지는 게 이 경우다 → 밴드와 무관하게, 방향이 어긋날 때 설명한다.
+        _graw = r.get("grade") or ""
+        _gd = 1 if _graw in ("강세", "우호") else -1 if _graw in ("약세", "위험") else 0
+        _pd = 1 if (p_up is not None and p_up > 0.5) else -1 if (p_up is not None and p_up < 0.5) else 0
+        if _gd and _pd and _gd != _pd:
+            if not _caution:
+                _caution = (f"등급('{esc(_graw)}')과 상승 확률({p_up*100:.0f}%)이 "
+                            "서로 다른 방향을 가리킵니다 — 모순이 아니라 축이 다릅니다.")
+            _d.append("등급은 <b>총점</b>에서 나옵니다(75↑ 강세 · 65↑ 우호 · 55↑ 중립 · 45↑ 약세 · "
+                      "그 아래 위험). 상승 확률은 <b>캘리브레이션</b>에서 따로 나옵니다. 두 축은 "
+                      "같은 값을 쓰지 않으므로 서로 다른 방향을 가리킬 수 있고, 진입 가부는 "
+                      "등급·게이트가 정합니다.")
+
         cal_meta = r.get("calibration") or {}
         if cal_meta.get("source") and cal_meta["source"] != "sot":
             if not _caution:
@@ -286,6 +303,14 @@ def build_hero(r: dict) -> str:
                 if rs is not None and rs < 0:
                     reg += " 원시로는 총점이 오히려 역방향이라 하한으로 방어 중입니다."
             _d.append(reg)
+        _xm = r.get("_xmarket_inv")
+        if _xm:
+            _d.append(f"{_xm['name']}은 총점 {_xm['total']:.1f}·상승확률 {_xm['p_up']*100:.0f}% 로, "
+                      "두 시장의 총점 순서와 확률 순서가 서로 반대입니다 — 확률이 총점이 아니라 "
+                      "시장별 캘리브레이션에서 나오기 때문이며, 총점이 높은 시장이 항상 확률도 "
+                      "높은 것은 아닙니다.")
+            if not _caution:
+                _caution = "총점 순서와 상승 확률 순서가 시장 간에 서로 반대입니다."
         if _caution or _d:
             lead = f'<b>{_caution}</b> ' if _caution else "방향 확률은 참고용 점추정입니다. "
             cls = "hero-note hero-caution" if _caution else "hero-note"
@@ -3235,6 +3260,7 @@ def normalize_bundle(data: dict) -> dict:
     for p in b["placeholders"]:
         _remap_nav(p)
     _attach_preopen_order_cards(b["reports"])
+    _attach_xmarket_axis_note(b["reports"])
     _attach_preopen_calibration(b["reports"])
     # 이미 실제 리포트가 있는 그룹/라벨의 placeholder 는 제거(중복 방지)
     present = {(r.get("group"), r.get("label")) for r in b["reports"]}
@@ -3249,6 +3275,31 @@ def normalize_bundle(data: dict) -> dict:
         _remap_nav(rep)
     return b
 
+
+
+def _attach_xmarket_axis_note(reports: list[dict]) -> None:
+    """총점 순서와 확률 순서가 시장 간에 뒤집히면 각 리포트에 교차 맥락을 붙인다.
+
+    자가비평 xmarket_inversion(5회)이 스스로 적어둔 해법이다 — "등급(총점)과 확률
+    (캘리브)이 다른 축임을 화면이 분명히 해야 오해가 없다". 히어로의 축 설명은 **한
+    시장 안에서** 등급과 확률이 어긋날 때만 뜨는데, 2026-09-04 처럼 두 시장이 개별로는
+    정합인데 순서만 역전되는 날은 그걸로 못 덮는다(코스피 61.6/59.4% · 코스닥 66.7/64.5%).
+    점수·확률·게이트는 불변 — 표시 맥락만 더한다.
+    """
+    by: dict = {}
+    for r in reports:
+        g, pu, tot = r.get("group"), r.get("p_up"), r.get("total")
+        if g in ("코스피", "코스닥") and pu is not None and tot is not None:
+            by.setdefault(r.get("label") or r.get("report_type") or "", {})[g] = r
+    for pair in by.values():
+        a, b2 = pair.get("코스피"), pair.get("코스닥")
+        if not (a and b2):
+            continue
+        if (a["total"] - b2["total"]) * (a["p_up"] - b2["p_up"]) >= 0:
+            continue                      # 순서가 같으면 설명할 게 없다
+        for me, other, oname in ((a, b2, "코스닥"), (b2, a, "코스피")):
+            me["_xmarket_inv"] = {"name": oname, "total": other["total"],
+                                  "p_up": other["p_up"]}
 
 def _nav_badge(it: dict) -> str:
     if it.get("ph"):

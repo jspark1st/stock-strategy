@@ -507,3 +507,69 @@ def test_no_server_jargon_in_scan_view():
         assert bad not in html, f"화면 문구에 서버 용어 '{bad}'"
     # 안내 자체는 남아 있어야 한다(용어만 바꾸고 정보를 지우면 안 된다).
     assert "20분" in html and "15분마다" in html
+
+
+# ── 등급(총점 축) vs 확률(캘리브 축) 어긋남 설명 (2026-09-14) ────────────
+# 자가비평 narrative_mismatch 17회가 "총점 54.8인데 등급 약세, 그런데 p_up 58.6%"를
+# 모순으로 신고했다. 모순이 아니라 축이 다른 것인데, 기존 설명이 판별 미확보
+# 밴드(|p_up-0.5|<0.08) 안에서만 붙어 정작 가장 두드러지는 경우에 빠져 있었다.
+def _hero(grade, total, p_up):
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+    import render_report as rr
+    return rr.build_hero({"id": "kospi-close", "grade": grade, "total": total,
+                          "p_up": p_up, "p_down": round(1 - p_up, 4),
+                          "calibration": {"source": "bootstrap", "n": 149, "a": 0.005}})
+
+
+def test_axis_divergence_is_explained_outside_the_undiscriminated_band():
+    """실측 08-21 KOSPI — |0.586-0.5|=0.086 이라 밴드 밖이다. 그래도 설명해야 한다."""
+    html = _hero("약세", 54.8, 0.5864)
+    assert "서로 다른 방향을 가리킵니다" in html
+    assert "등급은 <b>총점</b>에서 나옵니다" in html
+
+
+def test_axis_divergence_explained_inside_the_band_too():
+    """밴드 안(p_up 55.8%)에서도 등급 기준선이 함께 나와야 한다."""
+    html = _hero("위험", 36.2, 0.558)
+    assert "별개 축" in html or "서로 다른 방향을 가리킵니다" in html
+    assert "등급은 <b>총점</b>에서 나옵니다" in html
+
+
+def test_axis_note_absent_when_grade_and_probability_agree():
+    """축이 같은 방향이면 굳이 설명하지 않는다 — 없는 혼동을 만들지 않는다."""
+    html = _hero("우호", 66.4, 0.61)
+    assert "서로 다른 방향을 가리킵니다" not in html
+
+
+# ── 교차시장 총점↔확률 순서 역전 설명 (xmarket_inversion · 2026-09-14) ────
+# 두 시장이 개별로는 정합인데 순서만 뒤집히는 날(09-04 코스피 67.3/60% vs
+# 코스닥 63.6/63%)은 시장별 히어로 노트로 못 덮는다 — 교차 맥락을 붙여야 한다.
+def _pair(kt, kp, dt, dp):
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+    import render_report as rr
+    cal = {"source": "bootstrap", "n": 149, "a": 0.005}
+    reps = [{"id": "kospi-close", "group": "코스피", "label": "마감", "grade": "중립",
+             "total": kt, "p_up": kp, "calibration": cal},
+            {"id": "kosdaq-close", "group": "코스닥", "label": "마감", "grade": "중립",
+             "total": dt, "p_up": dp, "calibration": cal}]
+    rr._attach_xmarket_axis_note(reps)
+    return rr, reps
+
+
+def test_xmarket_inversion_is_explained_on_both_markets():
+    """실측 5건 중 시장별 노트로 못 덮는 09-04 형태."""
+    rr, reps = _pair(67.3, 0.60, 63.6, 0.63)
+    assert all("_xmarket_inv" in r for r in reps)
+    for r in reps:
+        assert "총점 순서와 확률 순서" in rr.build_hero(r)
+
+
+def test_xmarket_note_absent_when_order_agrees():
+    """총점이 높은 시장의 확률도 높으면 설명할 게 없다."""
+    rr, reps = _pair(66.7, 0.645, 61.6, 0.594)
+    assert not any("_xmarket_inv" in r for r in reps)
+    assert "총점 순서와 확률 순서" not in rr.build_hero(reps[0])
