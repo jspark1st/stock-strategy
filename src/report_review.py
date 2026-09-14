@@ -82,6 +82,21 @@ def _per_report_rules(r: dict) -> list[dict]:
                       "게이트/진입판정이 차단인데 ATR 타점 켈리 비중이 남아 있어 화면이 모순될 수 있다.",
                       f"kelly_pct={prim.get('kelly_pct')}"))
 
+    # R1-b 종가베팅이 진입 가부와 어긋남 — 종가베팅=종가 신규진입 그 자체라 한 몸이다.
+    # 구 코드는 close_betting 을 등급에서만 파생(강세만 True)해 양방향으로 샜다:
+    # True인데 진입차단(구 누출), False인데 진입허용('진입 허용·비중 11.8%·종가베팅 불가',
+    # 실측 7회차 전부 코스닥 2026-08-28~09-10). run_close._reconcile_atr_with_entry 가
+    # 진입 게이트에 맞춰 확정하지만, 그 배선이 끊기면 조용히 옛 모순으로 돌아간다 → 상시 감시.
+    if not btc and _report_type(r) == "close" and gate.get("close_betting") is not None:
+        _expect = not bool(blocked)
+        if bool(gate.get("close_betting")) is not _expect:
+            out.append(_f("rule", "모순", "gate_sizing", "high",
+                          "종가베팅 표시가 진입 가부와 어긋남",
+                          "종가베팅은 종가 신규진입 그 자체다 — 진입 허용인데 '불가'(또는 차단인데 "
+                          "'검토 가능')로 나가면 화면이 스스로 모순된다.",
+                          f"close_betting={gate.get('close_betting')}, entry.allow={ent.get('allow')}, "
+                          f"new_entry_blocked={gate.get('new_entry_blocked')}"))
+
     # R2 신뢰도 0 — 데이터 품질 결손(부족).
     # 2026-08-28 전: 신호 일치도가 신뢰도에 곱해져 '완전 혼재 = 신뢰도 0 = 영구 차단'이었다.
     # 이제 신뢰도는 데이터 품질만 뜻하므로 0 이면 진짜로 데이터가 없는 것이다(별개 사건).

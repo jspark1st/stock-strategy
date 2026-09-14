@@ -342,3 +342,50 @@ def test_horizon_divergence_fires_on_real_threat():
     per, _ = report_review.rule_findings([_report(
         accuracy={"n": 45, "hit_rate": 0.85, "overnight_hit_rate": 0.30, "overnight_n": 20})])
     assert "horizon_divergence" in _codes(sum(per.values(), []))
+
+
+# ── R1-b 종가베팅 정합 (2026-09-14) ──────────────────────────────────
+# 종가베팅=종가 신규진입 그 자체라 진입 가부와 한 몸이다. 구 코드는 close_betting 을
+# 등급에서만 파생(강세만 True)해 양방향으로 샜다 — 실측 7회차(코스닥 08-28~09-10)가
+# '진입 허용 · 비중 11.8% · 종가베팅 불가'를 한 화면에 띄웠다. run_close 가 확정하지만
+# 그 배선이 끊기면 조용히 돌아가므로 규칙으로 상시 감시한다.
+def _cb_titles(findings):
+    return [f["title"] for f in findings if f["code"] == "gate_sizing"
+            and "종가베팅" in f["title"]]
+
+
+def test_close_betting_true_while_entry_blocked_is_flagged():
+    """구 누출 방향 — 강세 등급(close_betting=True)인데 진입 게이트 차단."""
+    rep = _report(gate={"close_betting": True, "new_entry_blocked": False},
+                  entry={"allow": False, "blocked_reasons": ["신뢰도 미달"]})
+    assert _cb_titles(report_review._per_report_rules(rep))
+
+
+def test_close_betting_false_while_entry_allowed_is_flagged():
+    """신 모순 방향 — 중립 등급(close_betting=False)인데 진입 허용(실측 09-10 코스닥)."""
+    rep = _report(grade="중립", total=61.4,
+                  gate={"close_betting": False, "new_entry_blocked": False},
+                  entry={"allow": True, "blocked_reasons": []})
+    assert _cb_titles(report_review._per_report_rules(rep))
+
+
+def test_close_betting_consistent_is_silent():
+    """진입 허용 + 종가베팅 가능 → 침묵. 차단 + 불가도 침묵."""
+    ok_open = _report(gate={"close_betting": True, "new_entry_blocked": False},
+                      entry={"allow": True, "blocked_reasons": []})
+    ok_shut = _report(gate={"close_betting": False, "new_entry_blocked": True},
+                      entry={"allow": False, "blocked_reasons": ["등급 위험"]})
+    assert not _cb_titles(report_review._per_report_rules(ok_open))
+    assert not _cb_titles(report_review._per_report_rules(ok_shut))
+
+
+def test_close_betting_rule_skips_preopen_and_btc():
+    """개장전엔 종가베팅을 표시하지 않고, BTC 는 이 개념이 없다 — 오탐 금지."""
+    pre = _report(id="kospi-preopen",
+                  gate={"close_betting": False, "new_entry_blocked": False},
+                  entry={"allow": True, "blocked_reasons": []})
+    assert not _cb_titles(report_review._per_report_rules(pre))
+    btc = _report(id="btc-perp", group="BTC",
+                  gate={"close_betting": False, "new_entry_blocked": False},
+                  entry={"allow": True, "blocked_reasons": []})
+    assert not _cb_titles(report_review._per_report_rules(btc))
