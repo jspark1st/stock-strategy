@@ -413,3 +413,33 @@ def test_horizon_divergence_needs_discordant_pairs():
         accuracy={"n": 45, "hit_rate": 0.85, "overnight_hit_rate": 0.30,
                   "overnight_n": 20})])
     assert "horizon_divergence" not in _codes(sum(per.values(), []))
+
+
+# ── 비평기 팩트 맥락 (2026-09-14) ────────────────────────────────────
+# 화면·규칙이 맞아도 비평기가 팩트만 보고 같은 지적을 매 회차 재진술하면 백로그가
+# 오염된다. 설계상 비어 있는 항목과 진짜 결측을 팩트에서 갈라준다.
+def test_facts_carry_grade_bands_and_axis_and_data_gap_context():
+    import json
+    facts = json.loads(report_review._facts_for_critic(_report()))
+    assert facts["grade_bands"]["중립"] == "55<=total<65"
+    assert "50이 아니라 55" in facts["grade_bands"]["_주의"]
+    assert "별개 축" in facts["axis_note"]["p_up_from"]
+    assert "narrative_mismatch" in facts["axis_note"]["_주의"]
+    for k in ("program_net", "excluded_keys.news", "excluded_keys.call"):
+        assert k in facts["data_gap_note"]
+    assert "incomplete_data" in facts["data_gap_note"]["_주의"]
+
+
+def test_incomplete_data_rule_still_fires_on_real_gap():
+    """맥락을 줘도 **진짜** 결측(missing_keys·완전성<1.0)은 규칙이 계속 잡는다."""
+    codes = _codes(report_review._per_report_rules(
+        _report(data_completeness=0.8, missing_keys=["foreign_net"])))
+    assert "incomplete_data" in codes
+
+
+def test_incomplete_data_rule_silent_when_only_designed_exclusions():
+    """excluded_keys(call·news)만으로는 결함이 아니다 — 완전성 1.0 이면 침묵."""
+    codes = _codes(report_review._per_report_rules(
+        _report(data_completeness=1.0, missing_keys=[],
+                excluded_keys=["call", "news"])))
+    assert "incomplete_data" not in codes

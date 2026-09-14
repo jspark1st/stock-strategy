@@ -323,6 +323,17 @@ def _facts_for_critic(r: dict) -> str:
     # 등급과 확률은 서로 다른 축이다 — 같은 값에서 나오지 않는다. 이 맥락이 없으면 비평기가
     # '총점 54.8 약세인데 p_up 58.6%'를 모순으로 신고한다(narrative_mismatch 17회 · 2026-09-14).
     # 특히 캘리브 기울기가 하한이면 확률은 총점과 거의 무관한 기저율이라 어긋나는 게 정상이다.
+    # 설계상 비어 있는 항목과 진짜 결측을 가른다. 이 맥락이 없으면 비평기가 매 회차
+    # 'program_net null · call/news 제외'를 incomplete_data 로 재진술한다(8회 · 2026-09-14).
+    # 판정 기준은 규칙 R6 와 같다: missing_keys 또는 data_completeness<1.0 일 때만 결함이다.
+    d["data_gap_note"] = {
+        "program_net": "의도적 미수집(소스 미확보). 화면도 '프로그램 수급 미수집'으로 표기한다",
+        "excluded_keys.news": "상시 제외가 설계다(측정 불가 팩터에 가중을 주지 않는다)",
+        "excluded_keys.call": "마감 동시호가는 소스 미확보로 제외. 확보 전 구현 금지(로드맵 P2)",
+        "_주의": ("위 세 가지는 문서화된 한계이지 결함이 아니다 — incomplete_data 로 신고하지 "
+                "마라. incomplete_data 는 missing_keys 가 비어 있지 않거나 data_completeness 가 "
+                "1.0 미만일 때만 쓴다(예: 수집기가 깨져 foreign_net 이 사라진 경우)."),
+    }
     _cal = r.get("calibration") or {}
     d["axis_note"] = {
         "grade_from": "total (등급 컷 75/65/55/45)",
