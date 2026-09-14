@@ -31,6 +31,7 @@ _SLOPE_FLOOR = 0.006
 _HORIZON_GAP = 0.20
 # 괴리 경보에 필요한 최소 실거래 표본 — n 작으면 괴리가 노이즈라 매 회차 재점화한다(소표본 방어).
 _MIN_HORIZON_N = 10
+_HORIZON_ALPHA = 0.05   # 격차의 McNemar 유의수준(이걸 못 넘으면 '확인됨'이 아니다)
 
 
 def _is_btc(r: dict) -> bool:
@@ -142,12 +143,18 @@ def _per_report_rules(r: dict) -> list[dict]:
     # 위협이 아니라 점화 안 한다(주 라벨은 이미 open 으로 전환됨 — 이 규칙은 '악화 감시'만 남긴다).
     hr, ohr = acc.get("hit_rate"), acc.get("overnight_hit_rate")
     on = acc.get("overnight_n") or 0
-    if hr is not None and ohr is not None and on >= _MIN_HORIZON_N and (hr - ohr) >= _HORIZON_GAP:
+    # 2026-09-14: 격차만으로 '확인됨'이라 부르지 않는다. 실측 KOSPI n=18 은 격차 22.3%p
+    # 였지만 불일치쌍 b=5·d=1 → McNemar p=0.219 로 우연과 구별되지 않았다. n<40 숨김과
+    # 같은 규율 — 유의하지 않은 것을 high 로 단정하면 이 도구 자체가 부정직해진다.
+    h_p = acc.get("horizon_p")
+    if (hr is not None and ohr is not None and on >= _MIN_HORIZON_N
+            and (hr - ohr) >= _HORIZON_GAP and h_p is not None and h_p < _HORIZON_ALPHA):
         out.append(_f("rule", "모순", "horizon_divergence", "high",
                       "라벨 적중률과 실거래(시가청산) 적중률 괴리",
                       "라벨(종가→종가)은 맞는데 실제 거래 지평(종가→익일 시가)은 유의하게 나쁨 — "
                       "'라벨은 맞고 실거래는 지는' 위험이 표본으로 확인됨.",
-                      f"라벨 {hr*100:.0f}% vs 실거래 {ohr*100:.0f}% (n={on}, 격차 {(hr-ohr)*100:.0f}%p)"))
+                      f"라벨 {hr*100:.0f}% vs 실거래 {ohr*100:.0f}% (n={on}, 격차 {(hr-ohr)*100:.0f}%p, "
+                      f"b={acc.get('horizon_b')} d={acc.get('horizon_d')}, McNemar p={h_p:.3f})"))
 
     # R6 데이터 완전성 미달(부족)
     dc = r.get("data_completeness")
@@ -251,9 +258,11 @@ LLM_CODES = {
     "gate_on_degenerate_prob": "진입 허용인데 확률이 판별이 아님",
     "calib_slope_floor": "캘리브 기울기 하한 — 총점이 확률에 영향 없음",
     "no_discrimination": "방향 판별 미확보(확률≈기저율)",
-    "horizon_divergence": ("라벨(종가→종가) 적중률이 실거래(종가→시가)보다 **표본으로**(n≥10, "
-                           "격차≥20%p) 유의하게 높다 — 전략 전제 위협. 단일 회차 괴리나 표본 "
-                           "부족엔 쓰지 말고 horizon_unverified 를 골라라"),
+    "horizon_divergence": ("라벨(종가→종가) 적중률이 실거래(종가→시가)보다 **통계적으로** 높다 — "
+                           "전략 전제 위협. 팩트의 accuracy.horizon_p(McNemar)가 0.05 미만일 "
+                           "때만 골라라. 적중률 격차가 커 보여도 horizon_p 가 크면(예: 22%p 인데 "
+                           "p=0.219) 우연과 구별되지 않으므로 horizon_unverified 다. 단일 회차 "
+                           "괴리·표본 부족도 horizon_unverified"),
     "horizon_unverified": ("실거래 지평이 아직 검증 안 됨 — primary_n/overnight_n 이 0이거나 "
                            "소표본이라 비교 불가, 또는 단일 회차에서만 라벨과 실거래가 엇갈림"),
     "confidence_zero": "신뢰도 0 — 데이터 품질 결손",

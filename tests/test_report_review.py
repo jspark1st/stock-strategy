@@ -16,7 +16,10 @@ def _report(**over):
             "excluded_keys": ["news"], "signal_agreement": 0.0,
             "atr": {"primary": {"kelly_pct": 5}},
             "accuracy": {"n": 45, "hit_rate": 0.857, "overnight_hit_rate": 0.25,
-                         "overnight_n": 12}}   # R5: 실거래 표본 ≥ _MIN_HORIZON_N 이라야 점화
+                         "overnight_n": 12,
+                         # R5: 표본(≥_MIN_HORIZON_N)·격차(≥_HORIZON_GAP)에 더해 불일치쌍이
+                         # McNemar 유의(p<_HORIZON_ALPHA)해야 점화한다(2026-09-14).
+                         "horizon_b": 8, "horizon_d": 0, "horizon_p": 0.008}}
     base.update(over)
     return base
 
@@ -325,7 +328,8 @@ def test_review_persist_failure_is_surfaced(monkeypatch):
 # ── R5 정제: 소표본·favorable 괴리는 노이즈라 점화 안 함 ──────────────────
 def test_horizon_divergence_suppressed_on_small_sample():
     per, _ = report_review.rule_findings([_report(
-        accuracy={"n": 45, "hit_rate": 0.857, "overnight_hit_rate": 0.25, "overnight_n": 4})])
+        accuracy={"n": 45, "hit_rate": 0.857, "overnight_hit_rate": 0.25, "overnight_n": 4,
+                   "horizon_b": 3, "horizon_d": 0, "horizon_p": 0.25})])
     codes = _codes(sum(per.values(), []))
     assert "horizon_divergence" not in codes          # n<10 → 소표본, 점화 안 함
 
@@ -333,14 +337,16 @@ def test_horizon_divergence_suppressed_on_small_sample():
 def test_horizon_divergence_suppressed_when_real_beats_label():
     # 실거래(0.80)가 라벨(0.55)보다 나으면 '전략 전제 위협'이 아니라 favorable → 점화 안 함
     per, _ = report_review.rule_findings([_report(
-        accuracy={"n": 45, "hit_rate": 0.55, "overnight_hit_rate": 0.80, "overnight_n": 20})])
+        accuracy={"n": 45, "hit_rate": 0.55, "overnight_hit_rate": 0.80, "overnight_n": 20,
+                   "horizon_b": 2, "horizon_d": 9, "horizon_p": 0.065})])
     assert "horizon_divergence" not in _codes(sum(per.values(), []))
 
 
 def test_horizon_divergence_fires_on_real_threat():
     # 라벨이 실거래보다 유의하게 낫고(위협 방향) 표본 충분하면 점화
     per, _ = report_review.rule_findings([_report(
-        accuracy={"n": 45, "hit_rate": 0.85, "overnight_hit_rate": 0.30, "overnight_n": 20})])
+        accuracy={"n": 45, "hit_rate": 0.85, "overnight_hit_rate": 0.30, "overnight_n": 20,
+                   "horizon_b": 11, "horizon_d": 1, "horizon_p": 0.006})])
     assert "horizon_divergence" in _codes(sum(per.values(), []))
 
 
@@ -389,3 +395,21 @@ def test_close_betting_rule_skips_preopen_and_btc():
                   gate={"close_betting": False, "new_entry_blocked": False},
                   entry={"allow": True, "blocked_reasons": []})
     assert not _cb_titles(report_review._per_report_rules(btc))
+
+
+def test_horizon_divergence_suppressed_when_gap_not_significant():
+    """실측 회귀 — KOSPI n=18 은 격차 22.3%p 였지만 b=5·d=1 → McNemar p=0.219.
+    유의하지 않은 격차를 '표본으로 확인됨'이라 high 로 단정하면 안 된다(2026-09-14)."""
+    per, _ = report_review.rule_findings([_report(
+        accuracy={"n": 18, "hit_rate": 0.667, "overnight_hit_rate": 0.444,
+                  "overnight_n": 18, "horizon_b": 5, "horizon_d": 1,
+                  "horizon_p": 0.219})])
+    assert "horizon_divergence" not in _codes(sum(per.values(), []))
+
+
+def test_horizon_divergence_needs_discordant_pairs():
+    """불일치쌍 정보가 없으면(구 번들·미채점) 점화하지 않는다 — 모르면 단정 안 한다."""
+    per, _ = report_review.rule_findings([_report(
+        accuracy={"n": 45, "hit_rate": 0.85, "overnight_hit_rate": 0.30,
+                  "overnight_n": 20})])
+    assert "horizon_divergence" not in _codes(sum(per.values(), []))

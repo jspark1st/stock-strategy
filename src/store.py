@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import datetime
 import json
+import math
 import sqlite3
 from pathlib import Path
 
@@ -479,7 +480,8 @@ def accuracy(conn: sqlite3.Connection, market: str, report_type: str = "close",
                 "primary_horizon": DIRECTION_LABEL, "primary_hit_rate": None,
                 "primary_n": 0, "primary_brier": None,
                 "primary_realized_up_rate": None, "primary_calibration_bias": None,
-                "secondary_hit_rate": None, "secondary_n": 0}
+                "secondary_hit_rate": None, "secondary_n": 0,
+                "horizon_b": 0, "horizon_d": 0, "horizon_p": None}
     # 적중률 분모는 **방향을 낸 행(correct 존재)만** — p_up=None(데이터부족) 채점행이 분모에
     # 섞이면 적중률이 부당하게 낮아진다(그 행은 correct=None 이라 분자엔 안 들어가므로).
     graded_dir = [r["correct"] for r in rows if r["correct"] is not None]
@@ -501,7 +503,22 @@ def accuracy(conn: sqlite3.Connection, market: str, report_type: str = "close",
     ov_pred = (sum(p for p, _ in ov_pairs) / len(ov_pairs)) if ov_pairs else None
     ov_bias = (ov_pred - ov_real) if (ov_pred is not None and ov_real is not None) else None
     prim_hit = round(sum(ov) / len(ov), 3) if ov else None
+    # ── 두 지평 불일치쌍 + McNemar (2026-09-14) ────────────────────────────
+    # 라벨 적중률과 실거래 적중률의 '격차'만으로는 우연과 구별이 안 된다. 실측: KOSPI
+    # n=18 에서 66.7% vs 44.4%(격차 22.3%p)였지만 불일치쌍 b=5·d=1 → p=0.219 로
+    # 유의하지 않았다. 격차를 '확인된 위협'이라 부르려면 이 검정을 통과해야 한다.
+    pair = [(r["correct"], r["overnight_correct"]) for r in rows
+            if r["correct"] is not None and r["overnight_correct"] is not None]
+    h_b = sum(1 for a, o in pair if a == 1 and o == 0)     # 라벨만 맞음(위협 방향)
+    h_d = sum(1 for a, o in pair if a == 0 and o == 1)     # 실거래만 맞음
+    h_p = None
+    if h_b + h_d > 0:
+        m, k = h_b + h_d, min(h_b, h_d)
+        h_p = min(1.0, 2 * sum(math.comb(m, i) for i in range(k + 1)) / 2 ** m)
     return {
+        # 지평 불일치 — 격차의 유의성 판정용(규칙 R5).
+        "horizon_b": h_b, "horizon_d": h_d,
+        "horizon_p": round(h_p, 4) if h_p is not None else None,
         "n": n,
         # 주 지평(실거래) — 화면·경보·캘리브가 이 값을 쓴다.
         "primary_horizon": DIRECTION_LABEL,
