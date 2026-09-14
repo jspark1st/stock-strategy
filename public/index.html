@@ -337,6 +337,7 @@
   .btc-pred-ls b{font-size:1.5rem;margin-right:4px}
   .btc-pred-badge{font-size:.8rem;padding:2px 10px;border-radius:999px;background:var(--chip,rgba(127,127,127,.14));border:1px solid rgba(127,127,127,.25)}
   .btc-pred-badge.btc-pred-notrade{color:var(--caution);border-color:var(--caution)}
+  .btc-pred-ls.btc-pred-dim b{color:var(--muted)}
   .scan-trend-ok .scan-ema{color:var(--good)}
   .scan-trend-rev .scan-ema{color:var(--caution)}
   #scan-stale:not([hidden]){color:var(--caution)}
@@ -1837,6 +1838,7 @@ LONG — 게이트 신규진입 허용·NO_TRADE=False, 세션확률 71%로 방�
         <span class="btc-pred-badge" id="btc-pred-verdict">–</span>
       </div>
       <div class="note muted" id="btc-pred-meta"></div>
+      <div class="note muted" id="btc-pred-unproven" hidden></div>
       <div class="note muted" id="btc-pred-reason" hidden></div>
       <p><a class="vtab" href="/#btc-perp">전체 BTC 리포트 보기 →</a></p>
     </div>
@@ -2001,6 +2003,19 @@ LONG — 게이트 신규진입 허용·NO_TRADE=False, 세션확률 71%로 방�
         var elR=document.getElementById('btc-pred-reason');
         if(elL) elL.textContent=Number(b.p_long).toFixed(0)+'%';
         if(elS) elS.textContent=Number(b.p_short).toFixed(0)+'%';
+        // 표시의 강도는 검증의 강도를 따른다 — 주 지평 표본이 모자라면 색을 빼고 표면에 적는다.
+        var pn=b.primary_n, unproven=(pn==null||pn<40);
+        var elU=document.getElementById('btc-pred-unproven');
+        if(elL) elL.classList.toggle('btc-pred-dim', unproven);
+        if(elS) elS.classList.toggle('btc-pred-dim', unproven);
+        if(elU){
+          elU.hidden=!unproven;
+          if(unproven){
+            var cnt=(pn==null)?'미상':(pn+'건');
+            elU.textContent='주 지평(종가→시가) 검증 표본 '+cnt+' — 검증된 엣지가 아닙니다. '
+              +'아래 표의 후보를 자르는 기준으로 쓰지 마세요.';
+          }
+        }
         if(elG) elG.textContent='등급 '+(b.grade||'—');
         if(elV){
           elV.textContent='판정 '+(b.no_trade?'관망(NO_TRADE)':(b.verdict||'—'));
