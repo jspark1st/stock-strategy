@@ -1363,15 +1363,25 @@ def build_paper(r: dict) -> str:
 
 
 def build_reopen(r: dict) -> str:
+    """체크리스트 카드. **비어도 카드를 지우지 않는다.**
+
+    이 목록은 LLM(`narrative.reopen_review`)이 만든다. 빈 배열로 와도 종합 단계는
+    '✓' 라 조용히 통과하는데, 예전엔 카드가 통째로 사라져 같은 트랙의 두 시장이
+    서로 다른 화면이 됐다(실측 2026-09-15 개장전: 코스피 0건·코스닥 5건 → 11 vs 12
+    카드, ui_market_format_mismatch 점화. 직전 17영업일은 양쪽 4~5건이었다).
+    사라지면 사용자는 이유를 알 수 없다 → 다른 빈 섹션들처럼 정직하게 적는다.
+    """
     rr = (r.get("narrative", {}) or {}).get("reopen_review") or []
-    if not rr:
-        return ""
     title = "장중 확인 체크리스트" if r.get("report_type") == "preopen" else "익일 개장 전 재검토 체크리스트"
-    items = "".join(f"<li>{esc(x)}</li>" for x in rr)
+    if not rr:
+        body = ('<p class="note muted">이번 회차에서는 항목이 생성되지 않았습니다 — '
+                '점수·확률·게이트에는 영향이 없습니다.</p>')
+    else:
+        body = f'<ul class="check">{"".join(f"<li>{esc(x)}</li>" for x in rr)}</ul>'
     return f"""
   <div class="card">
     <h2>{esc(title)}</h2>
-    <ul class="check">{items}</ul>
+    {body}
   </div>"""
 
 

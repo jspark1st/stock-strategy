@@ -573,3 +573,35 @@ def test_xmarket_note_absent_when_order_agrees():
     rr, reps = _pair(66.7, 0.645, 61.6, 0.594)
     assert not any("_xmarket_inv" in r for r in reps)
     assert "총점 순서와 확률 순서" not in rr.build_hero(reps[0])
+
+
+# ── 체크리스트가 비어도 카드를 지우지 않는다 (2026-09-15) ──────────────
+# reopen_review 는 LLM 이 만든다. 빈 배열로 와도 종합 단계는 '✓' 라 조용히 통과하는데,
+# 카드를 통째로 지우면 같은 트랙의 두 시장이 서로 다른 화면이 된다(실측 09-15 개장전:
+# 코스피 0건·코스닥 5건 → 11 vs 12 카드, ui_market_format_mismatch 점화).
+def _reopen(items, rtype="preopen"):
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+    import render_report as rr
+    return rr.build_reopen({"report_type": rtype,
+                            "narrative": {"reopen_review": items}})
+
+
+def test_reopen_card_survives_empty_list():
+    html = _reopen([])
+    assert '<div class="card">' in html                 # 카드가 사라지면 포맷이 갈린다
+    assert "장중 확인 체크리스트" in html                 # 제목은 그대로
+    assert "생성되지 않았습니다" in html                   # 왜 비었는지 표면에 적는다
+    assert "점수·확률·게이트에는 영향이 없습니다" in html   # 오해 방지
+
+
+def test_reopen_card_renders_items_when_present():
+    html = _reopen(["환율 확인", "수급 확인"])
+    assert "<li>환율 확인</li>" in html and "<li>수급 확인</li>" in html
+    assert "생성되지 않았습니다" not in html
+
+
+def test_reopen_title_differs_by_report_type():
+    assert "장중 확인 체크리스트" in _reopen([], "preopen")
+    assert "익일 개장 전 재검토 체크리스트" in _reopen([], "close")
