@@ -30,9 +30,16 @@ GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:ge
 # 버전 고정 모델명은 시간이 지나면 404(폐기)된다(gemini-2.0/1.5-flash 실측 404, 2026-08).
 # → `-latest` 별칭을 우선 두어 폐기 내성을 갖는다. 서술은 flash(저렴).
 GEMINI_MODELS = ["gemini-flash-latest", "gemini-2.5-flash", "gemini-3.5-flash"]
-# 리포트 자가비평 담당 — 저렴·긴 컨텍스트라 Gemini 고급(pro) 우선, 실패 시 flash 폴백.
-# .env `critic_model` 로 오버라이드(콤마 체인). 최신 고급(pro) 별칭을 기본으로 둔다.
-CRITIC_MODELS = ["gemini-pro-latest", "gemini-3.1-pro-preview", "gemini-flash-latest"]
+# 리포트 자가비평 담당 — flash 우선, 실패 시 pro 폴백. .env `critic_model` 로 오버라이드(콤마 체인).
+# 2026-09-15 측정: 같은 팩트로 모델별 3회씩 돌려 비교한 결과 pro 를 쓸 근거가 없었다.
+#   pro   $0.0254/회 · 파싱 3/3 · 발견 4.0 · 오탐 0
+#   flash $0.0042/회 · 파싱 3/3 · 발견 4.0 · 오탐 0  ← 6배 싸고 발견 동일,
+#         게다가 pro 가 놓친 'blocked 인데 atr_primary.qualified=true' 를 잡았다
+#   flash-lite 는 쓰지 않는다 — 3.5 는 권고문("Kelly 0% 유지해야")을 '모순'으로 코딩하고
+#         3.1 은 other(분류 실패)를 낸다. other 는 review_digest 가 클러스터로 안 올려
+#         백로그 루프 자체가 망가진다.
+# 구 체인은 pro 별칭 2개가 실은 같은 gemini-3.1-pro 로 해석돼 폴백이 1단뿐이었다.
+CRITIC_MODELS = ["gemini-flash-latest", "gemini-pro-latest"]
 # 종합 단계 모델 체인. Opus 5 가 과부하(529)면 Sonnet 5 로 내려가 서술을 살린다.
 # (모델을 임의로 낮추지 않되, '아예 못 쓰는 것'보다는 한 단계 아래가 낫다.)
 CLAUDE_MODELS = ["claude-opus-5", "claude-sonnet-5"]
@@ -45,7 +52,7 @@ def resolve_models(env: dict | None = None) -> dict:
         perplexity_model=sonar-pro
         gemini_model=gemini-flash-latest,gemini-2.5-flash   # 서술 초안(저렴)
         claude_model=claude-opus-5,claude-sonnet-5           # 최종 종합
-        critic_model=gemini-pro-latest,gemini-3.1-pro-preview  # 리포트 자가비평(고급)
+        critic_model=gemini-flash-latest,gemini-pro-latest      # 리포트 자가비평
 
     우리가 쓰는 모든 LLM 이 이 함수 하나로 모델명을 해석한다(하드코딩 없음). 값이 없으면
     각 엔진 기본 체인으로 폴백. `-latest` 별칭을 권장(버전 고정명은 폐기 시 404).
@@ -423,7 +430,9 @@ def claude_synthesize(ctx: dict, research: dict | None, draft: str | None,
             try:
                 msg = client.messages.create(
                     model=model, max_tokens=CLAUDE_MAX_TOKENS,
-                    output_config={"effort": "medium"},
+                    # 2026-09-15 측정: medium 은 low 대비 출력 토큰을 40% 더 쓰는데
+                    # 본문 길이는 사실상 같다(1,869자 vs 1,872자) — 차이가 전부 thinking.
+                    output_config={"effort": "low"},
                     system=sys or _CLAUDE_SYS,
                     messages=[{"role": "user", "content": user}])
                 if msg.stop_reason == "max_tokens":

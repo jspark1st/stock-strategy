@@ -31,6 +31,40 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 아래 진행 로그는 **감사 추적**(무엇이 언제 바뀌었나). 다음 할 일은 `guide_docs/roadmap/` 이 이 파일 하단 목록보다 우선한다.
 
+## 2026-09-15 — LLM 비용 실측 후 모델·effort 조정 (월 16,499원 → 10,449원)
+
+전 엔진의 `usage` 를 실제 회차로 재고(추정 아님) 단가를 곱해 산정. 환율 1,348.50(당일 수집).
+
+| 엔진 | 모델 | 실측 | 회당 |
+|---|---|---|---|
+| Perplexity | sonar | in 595 · out 351 | $0.0060 (검색요청료 $0.005 포함) |
+| Gemini 초안 | gemini-3.8-flash | in 1,317 · out+think 1,658 | $0.0072 |
+| Claude 종합 | claude-sonnet-5 | in 3,977 · out 1,989 | $0.0278 |
+| Gemini critic | gemini-3.1-pro | in 2,309 · out+think 1,559 | $0.0233 |
+
+평일 $0.49(661원) · 주말 $0.15 · 월 $12.24(16,499원). Claude 가 44%, critic 이 35%.
+
+### 바꾼 것 2개 (코드 2줄)
+- ✅ **critic pro → flash** — 같은 팩트로 모델별 3회 비교: pro $0.0254 vs **flash $0.0042**(6배),
+  파싱 3/3 동일·발견 4.0 동일·오탐 0 동일. 게다가 flash 가 pro 가 놓친 결함을 잡았다
+  (아래 관측 항목). **flash-lite 는 탈락** — 3.5 는 권고문을 '모순'으로 코딩하고, 3.1 은
+  `other`(분류 실패)를 낸다. `other` 는 `review_digest` 가 클러스터로 안 올려 백로그 루프가 망가진다.
+  구 체인의 pro 별칭 2개(`gemini-pro-latest`·`gemini-3.1-pro-preview`)는 실은 같은
+  `gemini-3.1-pro` 로 해석돼 폴백이 1단뿐이었다 → `[flash, pro]` 로 정리.
+- ✅ **Claude effort medium → low** — 같은 프롬프트에서 medium 이 출력 토큰을 40% 더 쓰는데
+  본문 길이는 사실상 같다(1,869자 vs 1,872자). 차이가 전부 thinking.
+
+결과 월 **10,449원(37% 절감)**. Claude→Haiku(49% 절감)는 **보류** — 품질 미검증이고
+`_CLAUDE_SYS` 의 "확정 수치만 인용" 준수 여부를 따로 확인해야 한다.
+
+### 관측: 차단인데 `qualified=true` (flash critic 발견, 미조치)
+09-14 KOSPI 는 `new_entry_blocked=True`·`entry_allow=False`·`kelly_pct=0` 인데
+`atr.primary.qualified=True` 와 진입/손절가가 팩트에 남아 있다. `_reconcile_atr_with_entry`
+가 kelly 만 0으로 만들고 `qualified`(= edge>0, 통계적 우위 플래그)는 안 건드리기 때문.
+화면은 숨기지만(test_render_gate) 팩트를 읽는 LLM·감사자에겐 모순으로 보인다.
+이번 세션에서 고친 gate_sizing 과 같은 계열 — 조치 전 사용자 판단 대기.
+
+
 ## 2026-09-14 (2차) — BTC 12h 예측을 레벨 스캔에 미러 (테스트 454→457)
 
 레벨 스캔 카드/복사본문에 `btc_perp` 12h 방향예측을 **읽기 전용으로** 얹는다. 별개 트랙이므로
