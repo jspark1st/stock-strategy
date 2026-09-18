@@ -29,7 +29,12 @@ import httpx
 from ..models import Candle, CandleSeries, InvestorFlows
 
 FCHART = "https://fchart.stock.naver.com/sise.nhn"
-INVESTOR = "https://finance.naver.com/sise/investorDealTrendDay.naver"
+# 2026-09-18: 네이버가 finance.naver.com 레거시를 Npay 증권으로 이전하며 아래 두 페이지를
+# 410 Gone 으로 폐기했다("이 페이지는 더 이상 제공되지 않습니다"). 같은 KRX 원천 수치를
+# 신 모바일 API(키 기반 JSON)에서 받는다. 저장된 과거 8회차와 대조해 단위(억원)·부호·규모
+# 일치 확인(차이 1~2%, 집계 기준 미세차). bizdate 로 과거 조회 가능, 비거래일은 전부 0.
+TREND_API = "https://m.stock.naver.com/api/index/{market}/trend"
+INVESTOR = "https://finance.naver.com/sise/investorDealTrendDay.naver"   # 폐기(410) — 참고용
 INVESTOR_TIME = "https://finance.naver.com/sise/investorDealTrendTime.naver"
 FX_USDKRW = "https://api.stock.naver.com/marketindex/exchange/FX_USDKRW"
 INDEX_RT = "https://polling.finance.naver.com/api/realtime/domestic/index/{symbol}"
@@ -222,6 +227,15 @@ def market_flows(market: str, trade_date: str, client: httpx.Client | None = Non
         if live is not None:                 # 잠정치도 항등식 깨지면 신뢰 불가
             _flow_integrity_warn(live)
         return None, hist
+    except (httpx.HTTPError, OSError) as e:
+        # 소스가 사라지거나(410/404) 네트워크가 끊겨도 **파이프라인 전체를 죽이지 않는다**.
+        # 위 ③ 경로는 '표는 받았는데 오늘 행이 없다'만 상정했고, 소스 자체가 폐기되는 경우는
+        # 없었다 → 2026-09-18 네이버가 finance.naver.com 레거시를 Npay 증권으로 이전하며
+        # investorDealTrend{Day,Time} 이 410 Gone 이 되자 마감 리포트가 통째로 미발행됐다.
+        # 수급 결측은 호출부가 이미 다룬다(flow_warn · missing_keys · 가중치 재배분).
+        # 조용히 삼키지 않는다 — 사유를 실어 보내 호출부가 경고로 노출하게 한다.
+        _FLOW_SOURCE_ERROR.append(f"{type(e).__name__}: {str(e)[:160]}")
+        return None, []
     finally:
         if own:
             c.close()
@@ -430,16 +444,55 @@ def _all_time_rows(html: str):
     return out
 
 
+# 마지막 수급 소스 실패 사유 — 호출부가 경고 문구에 싣는다(무성 실패 금지).
+_FLOW_SOURCE_ERROR: list = []
+
+
+def flow_source_error() -> str | None:
+    """직전 market_flows 가 소스 오류로 결측 처리했으면 그 사유."""
+    return _FLOW_SOURCE_ERROR[-1] if _FLOW_SOURCE_ERROR else None
+
+
+_TREND_WINDOW = 12          # 한 '페이지'로 받아올 달력일 수(투자자이력 페이지네이션이 이걸 이어붙인다)
+
+
+def _trend_one(c: httpx.Client, market: str, ymd: str):
+    """신 API 하루치 → (ymd, vals10) 또는 None(비거래일·결측).
+
+    신 API 는 개인·외국인·기관계 3종만 준다. 기타법인·세부기관(금융투자/보험/…)은 제공되지
+    않아 0 으로 채운다 — 그래서 시장 항등식(합≈0) 검증은 이 소스에서 성립하지 않는다.
+    대신 컬럼 밀림 위험 자체가 없다(HTML 표가 아니라 **키 있는 JSON**이라 순서가 무의미).
+    """
+    r = c.get(TREND_API.format(market=market), params={"bizdate": ymd})
+    r.raise_for_status()
+    d = r.json() or {}
+    vals = [_num(d.get(k)) for k in ("personalValue", "foreignValue", "institutionalValue")]
+    if not any(vals):                       # 주말·공휴일은 전부 0 으로 온다
+        return None
+    return (str(d.get("bizdate") or ymd), vals + [0.0] * 7)
+
+
 def _fetch_rows(c: httpx.Client, market: str, date: str | None):
-    if not date:  # investorDealTrendDay 는 bizdate 필수 → 최근 지수 거래일 사용
+    """`date` 부터 과거로 _TREND_WINDOW 달력일을 받아 최근순 반환(비거래일 제외)."""
+    from datetime import date as _date, timedelta
+    if not date:
         last = index_daily(market, count=1, client=c).last
         date = last.date if last else None
-    params = {"sosok": _SOSOK[market]}
-    if date:
-        params["bizdate"] = date
-    r = c.get(INVESTOR, params=params)
-    r.raise_for_status()
-    return _all_data_rows(r.content.decode("euc-kr", "replace"))
+    if not date:
+        return []
+    y, m, d0 = int(date[:4]), int(date[4:6]), int(date[6:8])
+    base = _date(y, m, d0)
+    days = [(base - timedelta(days=i)).strftime("%Y%m%d") for i in range(_TREND_WINDOW)]
+    out = []
+    for ymd in days:                        # 순차 — 신 API 를 몰아치지 않는다
+        try:
+            row = _trend_one(c, market, ymd)
+        except httpx.HTTPError:
+            continue                        # 하루 실패가 창 전체를 버리게 두지 않는다
+        if row:
+            out.append(row)
+    out.sort(key=lambda t: t[0], reverse=True)
+    return out
 
 
 def _all_data_rows(html: str):
@@ -478,6 +531,11 @@ _FLOW_IDENTITY_FRAC = 0.03    # gross 대비 3%
 
 
 def _identity_ok(f: InvestorFlows) -> bool:
+    # 신 API(키 기반 JSON)는 기타법인·세부기관을 주지 않아 항등식(합≈0)이 성립하지 않는다.
+    # 이 검증은 원래 **HTML 표의 컬럼 밀림**을 잡으려던 것인데, 키 있는 JSON 에는 그 위험이
+    # 없다 → 검증 불가일 뿐 결함이 아니므로 통과시킨다(2026-09-18 소스 이전).
+    if f.etc_corp_net == 0.0 and not any(f.inst_breakdown.values()):
+        return True
     gross = (abs(f.retail_net) + abs(f.foreign_net)
              + abs(f.inst_net) + abs(f.etc_corp_net))
     tol = max(_FLOW_IDENTITY_ABS, _FLOW_IDENTITY_FRAC * gross)

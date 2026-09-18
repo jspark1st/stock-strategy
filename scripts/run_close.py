@@ -414,8 +414,15 @@ def build_report(cfg: dict, ls, client, conn, env, session_of: dict,
                          provisional=fl.provisional)
     else:
         newest = hist[0].date if hist else "없음"
-        flow_warn = (f"투자자 수급 미확보 — 거래일({session.trade_ymd}) 데이터 없음"
-                     f"(최신 {newest}). 전일 수급 대체 사용 금지 원칙에 따라 결측 처리")
+        src_err = naver.flow_source_error()
+        if src_err and not hist:
+            # 소스 자체가 죽은 경우(410/404/네트워크) — '오늘 행이 없다'와 구분해서 적는다.
+            # 그래야 표본이 없는 날인지 수집기가 깨진 날인지 나중에 구분된다.
+            flow_warn = (f"투자자 수급 미확보 — 수집 소스 오류({src_err[:80]}). "
+                         "전일 수급 대체 사용 금지 원칙에 따라 결측 처리")
+        else:
+            flow_warn = (f"투자자 수급 미확보 — 거래일({session.trade_ymd}) 데이터 없음"
+                         f"(최신 {newest}). 전일 수급 대체 사용 금지 원칙에 따라 결측 처리")
 
     breadth = None
     ls_warn = None
