@@ -1,6 +1,6 @@
 {
-  "as_of": "2026-09-22 17:30 KST",
-  "as_of_ts": 1790065806,
+  "as_of": "2026-09-22 17:45 KST",
+  "as_of_ts": 1790066704,
   "btc_pred": {
     "as_of": "2026-09-22 09:30 KST",
     "slot": "0930",
@@ -12,7 +12,7 @@
     "p_short": 26.0,
     "no_trade": true,
     "gate_reason": "가중 일치도 13%(<60%) — 관망",
-    "age_h": 8.0,
+    "age_h": 8.3,
     "next_slot": "22:00",
     "primary_n": 0,
     "acc_n": 20
@@ -23,555 +23,27 @@
     "4h",
     "1d"
   ],
-  "n": 19,
-  "n_shown": 19,
+  "n": 21,
+  "n_shown": 20,
   "hits": [
     {
-      "symbol": "SOLUSDT",
-      "side": "숏",
-      "is_long": false,
-      "interval": "15m",
-      "fit": 2,
-      "score": 73.3,
-      "rsi": 37.7,
-      "pct_b": 0.44,
-      "touches": 1,
-      "near_pct": 0.38,
-      "risk_pct": 1.18,
-      "rr": 1.36,
-      "room_r": 0.62,
-      "ema_dist_pct": -0.58,
-      "trend_aligned": true,
-      "last": 115.94,
-      "chg_24h": 2.14,
-      "tf": {
-        "1h": {
-          "ok": true,
-          "pct_b_entry": 0.19
-        },
-        "4h": {
-          "ok": true,
-          "pct_b_entry": 0.75
-        },
-        "1d": {
-          "ok": true,
-          "pct_b_entry": 0.99
-        }
-      }
-    },
-    {
-      "symbol": "HYPEUSDT",
-      "side": "롱",
-      "is_long": true,
-      "interval": "15m",
-      "fit": 2,
-      "score": 72.6,
-      "rsi": 55.1,
-      "pct_b": 0.54,
-      "touches": 1,
-      "near_pct": 0.34,
-      "risk_pct": 1.23,
-      "rr": 1.37,
-      "room_r": 0.28,
-      "ema_dist_pct": 0.29,
-      "trend_aligned": true,
-      "last": 94.261,
-      "chg_24h": -0.53,
-      "tf": {
-        "1h": {
-          "ok": true,
-          "pct_b_entry": 0.66
-        },
-        "4h": {
-          "ok": true,
-          "pct_b_entry": 0.7
-        },
-        "1d": {
-          "ok": true,
-          "pct_b_entry": 0.89
-        }
-      }
-    },
-    {
-      "symbol": "LTCUSDT",
+      "symbol": "ETHUSDT",
       "side": "숏",
       "is_long": false,
       "interval": "15m",
       "fit": 3,
-      "score": 71.9,
-      "rsi": 38.6,
-      "pct_b": 1.01,
+      "score": 76.7,
+      "rsi": 56.8,
+      "pct_b": 1.2,
       "touches": 1,
-      "near_pct": 1.24,
-      "risk_pct": 1.22,
-      "rr": 1.36,
-      "room_r": 0.84,
-      "ema_dist_pct": -0.2,
-      "trend_aligned": true,
-      "last": 60.41,
-      "chg_24h": 2.86,
-      "tf": {
-        "1h": {
-          "ok": true,
-          "pct_b_entry": 0.36
-        },
-        "4h": {
-          "ok": true,
-          "pct_b_entry": 0.78
-        },
-        "1d": {
-          "ok": true,
-          "pct_b_entry": 1.02
-        }
-      }
-    },
-    {
-      "symbol": "AAVEUSDT",
-      "side": "롱",
-      "is_long": true,
-      "interval": "15m",
-      "fit": 3,
-      "score": 70.2,
-      "rsi": 35.1,
-      "pct_b": 0.05,
-      "touches": 1,
-      "near_pct": 0.06,
-      "risk_pct": 1.57,
-      "rr": 1.39,
-      "room_r": 1.32,
-      "ema_dist_pct": -1.09,
-      "trend_aligned": false,
-      "last": 140.71,
-      "chg_24h": 0.6,
-      "tf": {
-        "1h": {
-          "ok": true,
-          "pct_b_entry": -0.03
-        },
-        "4h": {
-          "ok": true,
-          "pct_b_entry": 0.49
-        },
-        "1d": {
-          "ok": true,
-          "pct_b_entry": 0.83
-        }
-      }
-    },
-    {
-      "symbol": "XLMUSDT",
-      "side": "롱",
-      "is_long": true,
-      "interval": "15m",
-      "fit": 3,
-      "score": 68.2,
-      "rsi": 40.8,
-      "pct_b": 0.08,
-      "touches": 1,
-      "near_pct": 0.06,
-      "risk_pct": 1.69,
-      "rr": 1.4,
+      "near_pct": 0.12,
+      "risk_pct": 0.95,
+      "rr": 1.33,
       "room_r": 0.54,
-      "ema_dist_pct": -0.91,
+      "ema_dist_pct": 0.45,
       "trend_aligned": false,
-      "last": 0.21024,
-      "chg_24h": 4.51,
-      "tf": {
-        "1h": {
-          "ok": true,
-          "pct_b_entry": 0.3
-        },
-        "4h": {
-          "ok": true,
-          "pct_b_entry": 0.76
-        },
-        "1d": {
-          "ok": true,
-          "pct_b_entry": 1.02
-        }
-      }
-    },
-    {
-      "symbol": "XRPUSDT",
-      "side": "롱",
-      "is_long": true,
-      "interval": "15m",
-      "fit": 0,
-      "score": 65.8,
-      "rsi": 47.9,
-      "pct_b": 0.22,
-      "touches": 2,
-      "near_pct": 0.36,
-      "risk_pct": 1.19,
-      "rr": 1.36,
-      "room_r": 0.45,
-      "ema_dist_pct": -0.14,
-      "trend_aligned": false,
-      "last": 1.5154,
-      "chg_24h": 4.54,
-      "tf": {
-        "1h": {
-          "ok": true,
-          "pct_b_entry": 0.43
-        },
-        "4h": {
-          "ok": true,
-          "pct_b_entry": 0.81
-        },
-        "1d": {
-          "ok": true,
-          "pct_b_entry": 0.96
-        }
-      }
-    },
-    {
-      "symbol": "TRUMPUSDT",
-      "side": "롱",
-      "is_long": true,
-      "interval": "15m",
-      "fit": 2,
-      "score": 65.0,
-      "rsi": 44.9,
-      "pct_b": 0.24,
-      "touches": 1,
-      "near_pct": 0.28,
-      "risk_pct": 1.9,
-      "rr": 1.41,
-      "room_r": 0.57,
-      "ema_dist_pct": -0.47,
-      "trend_aligned": false,
-      "last": 2.142,
-      "chg_24h": 2.05,
-      "tf": {
-        "1h": {
-          "ok": true,
-          "pct_b_entry": 0.17
-        },
-        "4h": {
-          "ok": true,
-          "pct_b_entry": 0.68
-        },
-        "1d": {
-          "ok": true,
-          "pct_b_entry": 0.55
-        }
-      }
-    },
-    {
-      "symbol": "ASTERUSDT",
-      "side": "숏",
-      "is_long": false,
-      "interval": "15m",
-      "fit": 1,
-      "score": 64.4,
-      "rsi": 41.0,
-      "pct_b": 0.79,
-      "touches": 1,
-      "near_pct": 1.21,
-      "risk_pct": 1.94,
-      "rr": 1.41,
-      "room_r": 0.3,
-      "ema_dist_pct": 0.13,
-      "trend_aligned": false,
-      "last": 0.7261,
-      "chg_24h": -1.92,
-      "tf": {
-        "1h": {
-          "ok": true,
-          "pct_b_entry": 0.39
-        },
-        "4h": {
-          "ok": true,
-          "pct_b_entry": 0.31
-        },
-        "1d": {
-          "ok": true,
-          "pct_b_entry": 0.54
-        }
-      }
-    },
-    {
-      "symbol": "SUIUSDT",
-      "side": "숏",
-      "is_long": false,
-      "interval": "15m",
-      "fit": 2,
-      "score": 63.9,
-      "rsi": 41.9,
-      "pct_b": 0.59,
-      "touches": 1,
-      "near_pct": 1.03,
-      "risk_pct": 2.0,
-      "rr": 1.42,
-      "room_r": 0.64,
-      "ema_dist_pct": -0.9,
-      "trend_aligned": true,
-      "last": 1.0107,
-      "chg_24h": 4.16,
-      "tf": {
-        "1h": {
-          "ok": true,
-          "pct_b_entry": 0.43
-        },
-        "4h": {
-          "ok": true,
-          "pct_b_entry": 0.79
-        },
-        "1d": {
-          "ok": true,
-          "pct_b_entry": 1.1
-        }
-      }
-    },
-    {
-      "symbol": "LINKUSDT",
-      "side": "숏",
-      "is_long": false,
-      "interval": "15m",
-      "fit": 2,
-      "score": 63.0,
-      "rsi": 39.3,
-      "pct_b": 0.86,
-      "touches": 2,
-      "near_pct": 1.17,
-      "risk_pct": 1.6,
-      "rr": 1.4,
-      "room_r": 0.82,
-      "ema_dist_pct": -0.7,
-      "trend_aligned": true,
-      "last": 12.829,
-      "chg_24h": 1.27,
-      "tf": {
-        "1h": {
-          "ok": true,
-          "pct_b_entry": 0.45
-        },
-        "4h": {
-          "ok": true,
-          "pct_b_entry": 0.78
-        },
-        "1d": {
-          "ok": true,
-          "pct_b_entry": 0.87
-        }
-      }
-    },
-    {
-      "symbol": "ARBUSDT",
-      "side": "롱",
-      "is_long": true,
-      "interval": "15m",
-      "fit": 1,
-      "score": 62.1,
-      "rsi": 45.3,
-      "pct_b": 0.39,
-      "touches": 1,
-      "near_pct": 0.15,
-      "risk_pct": 2.09,
-      "rr": 1.42,
-      "room_r": 0.32,
-      "ema_dist_pct": -0.27,
-      "trend_aligned": false,
-      "last": 0.21908,
-      "chg_24h": 2.06,
-      "tf": {
-        "1h": {
-          "ok": true,
-          "pct_b_entry": 0.23
-        },
-        "4h": {
-          "ok": true,
-          "pct_b_entry": 0.58
-        },
-        "1d": {
-          "ok": true,
-          "pct_b_entry": 0.88
-        }
-      }
-    },
-    {
-      "symbol": "UNIUSDT",
-      "side": "숏",
-      "is_long": false,
-      "interval": "15m",
-      "fit": 2,
-      "score": 60.9,
-      "rsi": 44.8,
-      "pct_b": 0.52,
-      "touches": 1,
-      "near_pct": 0.48,
-      "risk_pct": 2.18,
-      "rr": 1.42,
-      "room_r": 0.32,
-      "ema_dist_pct": -0.58,
-      "trend_aligned": true,
-      "last": 8.884,
-      "chg_24h": 2.19,
-      "tf": {
-        "1h": {
-          "ok": true,
-          "pct_b_entry": 0.52
-        },
-        "4h": {
-          "ok": true,
-          "pct_b_entry": 0.65
-        },
-        "1d": {
-          "ok": true,
-          "pct_b_entry": 0.92
-        }
-      }
-    },
-    {
-      "symbol": "BCHUSDT",
-      "side": "롱",
-      "is_long": true,
-      "interval": "15m",
-      "fit": 1,
-      "score": 59.7,
-      "rsi": 49.8,
-      "pct_b": 0.44,
-      "touches": 2,
-      "near_pct": 0.28,
-      "risk_pct": 1.81,
-      "rr": 1.41,
-      "room_r": 0.29,
-      "ema_dist_pct": 0.04,
-      "trend_aligned": true,
-      "last": 265.45,
-      "chg_24h": 3.54,
-      "tf": {
-        "1h": {
-          "ok": true,
-          "pct_b_entry": 0.38
-        },
-        "4h": {
-          "ok": true,
-          "pct_b_entry": 0.77
-        },
-        "1d": {
-          "ok": true,
-          "pct_b_entry": 0.81
-        }
-      }
-    },
-    {
-      "symbol": "FILUSDT",
-      "side": "숏",
-      "is_long": false,
-      "interval": "15m",
-      "fit": 1,
-      "score": 59.6,
-      "rsi": 46.1,
-      "pct_b": 0.57,
-      "touches": 2,
-      "near_pct": 0.73,
-      "risk_pct": 1.81,
-      "rr": 1.41,
-      "room_r": 0.4,
-      "ema_dist_pct": -0.11,
-      "trend_aligned": true,
-      "last": 0.9879,
-      "chg_24h": 2.16,
-      "tf": {
-        "1h": {
-          "ok": true,
-          "pct_b_entry": 0.74
-        },
-        "4h": {
-          "ok": true,
-          "pct_b_entry": 0.74
-        },
-        "1d": {
-          "ok": true,
-          "pct_b_entry": 0.95
-        }
-      }
-    },
-    {
-      "symbol": "ONDOUSDT",
-      "side": "숏",
-      "is_long": false,
-      "interval": "15m",
-      "fit": 1,
-      "score": 59.0,
-      "rsi": 38.7,
-      "pct_b": 0.44,
-      "touches": 2,
-      "near_pct": 0.53,
-      "risk_pct": 1.85,
-      "rr": 1.41,
-      "room_r": 0.37,
-      "ema_dist_pct": -0.93,
-      "trend_aligned": true,
-      "last": 0.4307,
-      "chg_24h": -1.17,
-      "tf": {
-        "1h": {
-          "ok": true,
-          "pct_b_entry": 0.19
-        },
-        "4h": {
-          "ok": true,
-          "pct_b_entry": 0.58
-        },
-        "1d": {
-          "ok": true,
-          "pct_b_entry": 0.91
-        }
-      }
-    },
-    {
-      "symbol": "ZECUSDT",
-      "side": "롱",
-      "is_long": true,
-      "interval": "15m",
-      "fit": 0,
-      "score": 58.1,
-      "rsi": 57.7,
-      "pct_b": 0.69,
-      "touches": 2,
-      "near_pct": 0.14,
-      "risk_pct": 1.99,
-      "rr": 1.42,
-      "room_r": 0.09,
-      "ema_dist_pct": 0.94,
-      "trend_aligned": true,
-      "last": 1504.28,
-      "chg_24h": -0.16,
-      "tf": {
-        "1h": {
-          "ok": true,
-          "pct_b_entry": 0.73
-        },
-        "4h": {
-          "ok": true,
-          "pct_b_entry": 0.56
-        },
-        "1d": {
-          "ok": true,
-          "pct_b_entry": 0.85
-        }
-      }
-    },
-    {
-      "symbol": "ADAUSDT",
-      "side": "숏",
-      "is_long": false,
-      "interval": "15m",
-      "fit": 1,
-      "score": 56.9,
-      "rsi": 45.3,
-      "pct_b": 0.41,
-      "touches": 2,
-      "near_pct": 0.41,
-      "risk_pct": 1.99,
-      "rr": 1.42,
-      "room_r": 0.31,
-      "ema_dist_pct": -0.59,
-      "trend_aligned": true,
-      "last": 0.244,
-      "chg_24h": 4.45,
+      "last": 2745.25,
+      "chg_24h": 1.47,
       "tf": {
         "1h": {
           "ok": true,
@@ -583,78 +55,639 @@
         },
         "1d": {
           "ok": true,
+          "pct_b_entry": 1.05
+        }
+      }
+    },
+    {
+      "symbol": "LTCUSDT",
+      "side": "숏",
+      "is_long": false,
+      "interval": "15m",
+      "fit": 3,
+      "score": 73.7,
+      "rsi": 50.8,
+      "pct_b": 1.03,
+      "touches": 1,
+      "near_pct": 0.38,
+      "risk_pct": 1.31,
+      "rr": 1.37,
+      "room_r": 0.78,
+      "ema_dist_pct": 0.15,
+      "trend_aligned": false,
+      "last": 60.94,
+      "chg_24h": 2.78,
+      "tf": {
+        "1h": {
+          "ok": true,
+          "pct_b_entry": 0.35
+        },
+        "4h": {
+          "ok": true,
+          "pct_b_entry": 0.77
+        },
+        "1d": {
+          "ok": true,
+          "pct_b_entry": 1.01
+        }
+      }
+    },
+    {
+      "symbol": "HYPEUSDT",
+      "side": "숏",
+      "is_long": false,
+      "interval": "15m",
+      "fit": 3,
+      "score": 73.7,
+      "rsi": 62.9,
+      "pct_b": 1.17,
+      "touches": 1,
+      "near_pct": 0.6,
+      "risk_pct": 1.29,
+      "rr": 1.37,
+      "room_r": 1.4,
+      "ema_dist_pct": 0.29,
+      "trend_aligned": false,
+      "last": 95.102,
+      "chg_24h": 0.09,
+      "tf": {
+        "1h": {
+          "ok": true,
+          "pct_b_entry": 1.24
+        },
+        "4h": {
+          "ok": true,
           "pct_b_entry": 1.04
+        },
+        "1d": {
+          "ok": true,
+          "pct_b_entry": 0.95
+        }
+      }
+    },
+    {
+      "symbol": "SOLUSDT",
+      "side": "롱",
+      "is_long": true,
+      "interval": "15m",
+      "fit": 1,
+      "score": 71.9,
+      "rsi": 54.4,
+      "pct_b": 0.79,
+      "touches": 1,
+      "near_pct": 0.21,
+      "risk_pct": 1.1,
+      "rr": 1.35,
+      "room_r": 0.75,
+      "ema_dist_pct": 0.45,
+      "trend_aligned": true,
+      "last": 117.18,
+      "chg_24h": 1.31,
+      "tf": {
+        "1h": {
+          "ok": true,
+          "pct_b_entry": 0.3
+        },
+        "4h": {
+          "ok": true,
+          "pct_b_entry": 0.78
+        },
+        "1d": {
+          "ok": true,
+          "pct_b_entry": 1.0
+        }
+      }
+    },
+    {
+      "symbol": "AAVEUSDT",
+      "side": "롱",
+      "is_long": true,
+      "interval": "15m",
+      "fit": 3,
+      "score": 70.2,
+      "rsi": 49.6,
+      "pct_b": -0.02,
+      "touches": 1,
+      "near_pct": 1.37,
+      "risk_pct": 1.57,
+      "rr": 1.39,
+      "room_r": 1.32,
+      "ema_dist_pct": -1.09,
+      "trend_aligned": false,
+      "last": 142.54,
+      "chg_24h": 0.52,
+      "tf": {
+        "1h": {
+          "ok": true,
+          "pct_b_entry": -0.1
+        },
+        "4h": {
+          "ok": true,
+          "pct_b_entry": 0.48
+        },
+        "1d": {
+          "ok": true,
+          "pct_b_entry": 0.82
+        }
+      }
+    },
+    {
+      "symbol": "ASTERUSDT",
+      "side": "숏",
+      "is_long": false,
+      "interval": "15m",
+      "fit": 2,
+      "score": 69.0,
+      "rsi": 48.9,
+      "pct_b": 0.63,
+      "touches": 1,
+      "near_pct": 0.16,
+      "risk_pct": 1.64,
+      "rr": 1.4,
+      "room_r": 0.17,
+      "ema_dist_pct": -0.04,
+      "trend_aligned": true,
+      "last": 0.7316,
+      "chg_24h": -2.5,
+      "tf": {
+        "1h": {
+          "ok": true,
+          "pct_b_entry": 0.31
+        },
+        "4h": {
+          "ok": true,
+          "pct_b_entry": 0.25
+        },
+        "1d": {
+          "ok": true,
+          "pct_b_entry": 0.52
+        }
+      }
+    },
+    {
+      "symbol": "XLMUSDT",
+      "side": "롱",
+      "is_long": true,
+      "interval": "15m",
+      "fit": 3,
+      "score": 68.2,
+      "rsi": 52.1,
+      "pct_b": 0.02,
+      "touches": 1,
+      "near_pct": 1.38,
+      "risk_pct": 1.69,
+      "rr": 1.4,
+      "room_r": 0.54,
+      "ema_dist_pct": -0.91,
+      "trend_aligned": false,
+      "last": 0.21301,
+      "chg_24h": 4.63,
+      "tf": {
+        "1h": {
+          "ok": true,
+          "pct_b_entry": 0.28
+        },
+        "4h": {
+          "ok": true,
+          "pct_b_entry": 0.76
+        },
+        "1d": {
+          "ok": true,
+          "pct_b_entry": 1.01
+        }
+      }
+    },
+    {
+      "symbol": "XRPUSDT",
+      "side": "숏",
+      "is_long": false,
+      "interval": "15m",
+      "fit": 2,
+      "score": 67.6,
+      "rsi": 61.2,
+      "pct_b": 1.08,
+      "touches": 2,
+      "near_pct": 0.06,
+      "risk_pct": 1.28,
+      "rr": 1.37,
+      "room_r": 0.59,
+      "ema_dist_pct": 1.07,
+      "trend_aligned": false,
+      "last": 1.536,
+      "chg_24h": 4.28,
+      "tf": {
+        "1h": {
+          "ok": true,
+          "pct_b_entry": 0.79
+        },
+        "4h": {
+          "ok": true,
+          "pct_b_entry": 0.93
+        },
+        "1d": {
+          "ok": true,
+          "pct_b_entry": 1.04
+        }
+      }
+    },
+    {
+      "symbol": "ZECUSDT",
+      "side": "롱",
+      "is_long": true,
+      "interval": "15m",
+      "fit": 1,
+      "score": 66.9,
+      "rsi": 58.9,
+      "pct_b": 0.71,
+      "touches": 1,
+      "near_pct": 0.1,
+      "risk_pct": 1.86,
+      "rr": 1.41,
+      "room_r": 0.67,
+      "ema_dist_pct": 1.07,
+      "trend_aligned": true,
+      "last": 1507.76,
+      "chg_24h": -0.02,
+      "tf": {
+        "1h": {
+          "ok": true,
+          "pct_b_entry": 0.77
+        },
+        "4h": {
+          "ok": true,
+          "pct_b_entry": 0.58
+        },
+        "1d": {
+          "ok": true,
+          "pct_b_entry": 0.85
+        }
+      }
+    },
+    {
+      "symbol": "TRUMPUSDT",
+      "side": "롱",
+      "is_long": true,
+      "interval": "15m",
+      "fit": 2,
+      "score": 65.0,
+      "rsi": 54.5,
+      "pct_b": 0.23,
+      "touches": 1,
+      "near_pct": 1.59,
+      "risk_pct": 1.9,
+      "rr": 1.41,
+      "room_r": 0.57,
+      "ema_dist_pct": -0.47,
+      "trend_aligned": false,
+      "last": 2.17,
+      "chg_24h": 2.12,
+      "tf": {
+        "1h": {
+          "ok": true,
+          "pct_b_entry": 0.14
+        },
+        "4h": {
+          "ok": true,
+          "pct_b_entry": 0.67
+        },
+        "1d": {
+          "ok": true,
+          "pct_b_entry": 0.54
+        }
+      }
+    },
+    {
+      "symbol": "LINKUSDT",
+      "side": "숏",
+      "is_long": false,
+      "interval": "15m",
+      "fit": 2,
+      "score": 64.3,
+      "rsi": 55.6,
+      "pct_b": 1.19,
+      "touches": 2,
+      "near_pct": 0.35,
+      "risk_pct": 1.17,
+      "rr": 1.36,
+      "room_r": 1.63,
+      "ema_dist_pct": -0.7,
+      "trend_aligned": true,
+      "last": 13.013,
+      "chg_24h": 1.6,
+      "tf": {
+        "1h": {
+          "ok": true,
+          "pct_b_entry": 0.62
+        },
+        "4h": {
+          "ok": true,
+          "pct_b_entry": 0.82
+        },
+        "1d": {
+          "ok": true,
+          "pct_b_entry": 0.89
+        }
+      }
+    },
+    {
+      "symbol": "ARBUSDT",
+      "side": "숏",
+      "is_long": false,
+      "interval": "15m",
+      "fit": 2,
+      "score": 63.1,
+      "rsi": 55.4,
+      "pct_b": 0.98,
+      "touches": 1,
+      "near_pct": 0.05,
+      "risk_pct": 2.02,
+      "rr": 1.42,
+      "room_r": 0.71,
+      "ema_dist_pct": -0.27,
+      "trend_aligned": true,
+      "last": 0.22182,
+      "chg_24h": 1.94,
+      "tf": {
+        "1h": {
+          "ok": true,
+          "pct_b_entry": 0.37
+        },
+        "4h": {
+          "ok": true,
+          "pct_b_entry": 0.68
+        },
+        "1d": {
+          "ok": true,
+          "pct_b_entry": 0.9
+        }
+      }
+    },
+    {
+      "symbol": "AVAXUSDT",
+      "side": "숏",
+      "is_long": false,
+      "interval": "15m",
+      "fit": 2,
+      "score": 63.0,
+      "rsi": 56.2,
+      "pct_b": 1.1,
+      "touches": 1,
+      "near_pct": 0.85,
+      "risk_pct": 2.03,
+      "rr": 1.42,
+      "room_r": 0.55,
+      "ema_dist_pct": 1.16,
+      "trend_aligned": false,
+      "last": 10.933,
+      "chg_24h": -2.02,
+      "tf": {
+        "1h": {
+          "ok": true,
+          "pct_b_entry": 0.5
+        },
+        "4h": {
+          "ok": true,
+          "pct_b_entry": 0.66
+        },
+        "1d": {
+          "ok": true,
+          "pct_b_entry": 1.01
+        }
+      }
+    },
+    {
+      "symbol": "BCHUSDT",
+      "side": "숏",
+      "is_long": false,
+      "interval": "15m",
+      "fit": 2,
+      "score": 61.3,
+      "rsi": 60.5,
+      "pct_b": 1.17,
+      "touches": 2,
+      "near_pct": 0.02,
+      "risk_pct": 1.7,
+      "rr": 1.4,
+      "room_r": 0.92,
+      "ema_dist_pct": 0.04,
+      "trend_aligned": false,
+      "last": 268.91,
+      "chg_24h": 3.58,
+      "tf": {
+        "1h": {
+          "ok": true,
+          "pct_b_entry": 0.87
+        },
+        "4h": {
+          "ok": true,
+          "pct_b_entry": 0.89
+        },
+        "1d": {
+          "ok": true,
+          "pct_b_entry": 0.86
         }
       }
     },
     {
       "symbol": "DOGEUSDT",
-      "side": "롱",
-      "is_long": true,
+      "side": "숏",
+      "is_long": false,
       "interval": "15m",
       "fit": 2,
-      "score": 53.5,
-      "rsi": 39.8,
-      "pct_b": 0.15,
-      "touches": 2,
-      "near_pct": 0.27,
-      "risk_pct": 2.25,
-      "rr": 1.42,
-      "room_r": 0.53,
-      "ema_dist_pct": -0.75,
-      "trend_aligned": false,
-      "last": 0.09819,
-      "chg_24h": 7.85,
+      "score": 59.4,
+      "rsi": 48.1,
+      "pct_b": 0.49,
+      "touches": 1,
+      "near_pct": 0.63,
+      "risk_pct": 2.31,
+      "rr": 1.43,
+      "room_r": 0.5,
+      "ema_dist_pct": -0.24,
+      "trend_aligned": true,
+      "last": 0.09937,
+      "chg_24h": 8.15,
       "tf": {
         "1h": {
           "ok": true,
-          "pct_b_entry": 0.4
+          "pct_b_entry": 0.66
         },
         "4h": {
           "ok": true,
-          "pct_b_entry": 0.8
+          "pct_b_entry": 0.89
         },
         "1d": {
           "ok": true,
-          "pct_b_entry": 1.04
+          "pct_b_entry": 1.12
         }
       }
     },
     {
-      "symbol": "WLDUSDT",
-      "side": "숏",
-      "is_long": false,
+      "symbol": "ONDOUSDT",
+      "side": "롱",
+      "is_long": true,
       "interval": "15m",
-      "fit": 0,
-      "score": 49.9,
-      "rsi": 39.9,
-      "pct_b": 0.58,
+      "fit": 1,
+      "score": 57.4,
+      "rsi": 51.8,
+      "pct_b": 0.86,
       "touches": 2,
-      "near_pct": 1.23,
-      "risk_pct": 2.43,
-      "rr": 1.43,
-      "room_r": 0.62,
-      "ema_dist_pct": -1.15,
+      "near_pct": 0.03,
+      "risk_pct": 1.95,
+      "rr": 1.41,
+      "room_r": 0.12,
+      "ema_dist_pct": 0.6,
       "trend_aligned": true,
-      "last": 0.4481,
-      "chg_24h": 0.22,
+      "last": 0.4374,
+      "chg_24h": -0.48,
       "tf": {
         "1h": {
           "ok": true,
-          "pct_b_entry": 0.57
+          "pct_b_entry": 0.3
         },
         "4h": {
           "ok": true,
-          "pct_b_entry": 0.85
+          "pct_b_entry": 0.65
         },
         "1d": {
           "ok": true,
-          "pct_b_entry": 0.85
+          "pct_b_entry": 0.94
+        }
+      }
+    },
+    {
+      "symbol": "UNIUSDT",
+      "side": "롱",
+      "is_long": true,
+      "interval": "15m",
+      "fit": 2,
+      "score": 56.6,
+      "rsi": 55.0,
+      "pct_b": 0.24,
+      "touches": 1,
+      "near_pct": 1.74,
+      "risk_pct": 2.44,
+      "rr": 1.43,
+      "room_r": 0.29,
+      "ema_dist_pct": -0.58,
+      "trend_aligned": false,
+      "last": 9.018,
+      "chg_24h": 2.17,
+      "tf": {
+        "1h": {
+          "ok": true,
+          "pct_b_entry": 0.38
+        },
+        "4h": {
+          "ok": true,
+          "pct_b_entry": 0.53
+        },
+        "1d": {
+          "ok": true,
+          "pct_b_entry": 0.9
+        }
+      }
+    },
+    {
+      "symbol": "SUIUSDT",
+      "side": "숏",
+      "is_long": false,
+      "interval": "15m",
+      "fit": 1,
+      "score": 54.6,
+      "rsi": 51.8,
+      "pct_b": 0.94,
+      "touches": 2,
+      "near_pct": 0.75,
+      "risk_pct": 2.16,
+      "rr": 1.42,
+      "room_r": 1.11,
+      "ema_dist_pct": -0.9,
+      "trend_aligned": true,
+      "last": 1.0253,
+      "chg_24h": 4.77,
+      "tf": {
+        "1h": {
+          "ok": true,
+          "pct_b_entry": 0.63
+        },
+        "4h": {
+          "ok": true,
+          "pct_b_entry": 0.82
+        },
+        "1d": {
+          "ok": true,
+          "pct_b_entry": 1.12
+        }
+      }
+    },
+    {
+      "symbol": "FILUSDT",
+      "side": "롱",
+      "is_long": true,
+      "interval": "15m",
+      "fit": 2,
+      "score": 52.7,
+      "rsi": 55.0,
+      "pct_b": 0.04,
+      "touches": 3,
+      "near_pct": 1.58,
+      "risk_pct": 1.82,
+      "rr": 1.41,
+      "room_r": 0.61,
+      "ema_dist_pct": -0.48,
+      "trend_aligned": false,
+      "last": 0.9997,
+      "chg_24h": 2.19,
+      "tf": {
+        "1h": {
+          "ok": true,
+          "pct_b_entry": 0.51
+        },
+        "4h": {
+          "ok": true,
+          "pct_b_entry": 0.62
+        },
+        "1d": {
+          "ok": true,
+          "pct_b_entry": 0.9
+        }
+      }
+    },
+    {
+      "symbol": "ADAUSDT",
+      "side": "롱",
+      "is_long": true,
+      "interval": "15m",
+      "fit": 1,
+      "score": 51.2,
+      "rsi": 56.6,
+      "pct_b": 0.21,
+      "touches": 3,
+      "near_pct": 1.97,
+      "risk_pct": 1.92,
+      "rr": 1.41,
+      "room_r": 0.32,
+      "ema_dist_pct": -0.59,
+      "trend_aligned": false,
+      "last": 0.2483,
+      "chg_24h": 5.12,
+      "tf": {
+        "1h": {
+          "ok": true,
+          "pct_b_entry": 0.21
+        },
+        "4h": {
+          "ok": true,
+          "pct_b_entry": 0.77
+        },
+        "1d": {
+          "ok": true,
+          "pct_b_entry": 0.99
         }
       }
     }
   ],
-  "copy_md": "# 바이낸스 USDT-M 선물 — 멀티TF 후보 검토\n\n- 스캔 시각: 2026-09-22 17:30:06 (로컬)\n- 기준 봉: **15m** · 상위 문맥: 1h / 4h / 1d\n- 후보 수: 19개 (기준 봉 스캔 결과 전부. 자르지 않았다)\n- 잔고 $1,000.00 · 리스크 2% (1R = $20.00) · 레버리지 20x 격리\n- 수수료: 메이커 0.02% / 테이커 0.05%\n- 지난 LLM 선택 성적: 당신(LLM)이 고른 것들의 실제 판정: 79건 · 승률 41% · 평균 -0.04R · 무작위 대조군 149건 승률 36%\n- 시장 거시(BTC): BTCUSDT  1h EMA20 +0.09% · RSI 58 · %B +0.24  |  4h EMA20 +2.82% · RSI 73 · %B +0.79  |  12h 지지 80,095.9 (-6.19%) 터치 1 · 저항 87,385.1 (+2.35%)\n  (참고다. 이걸로 후보를 기각하지 마라 — BTC 지지 이격도는 재봤고 미검증 효과 +0.0012R 로 사실상 0 이었다)\n\n## 부탁\n\n아래는 **기준 봉에서 지지/저항 인근에 온 종목을 전부** 모은 것이다.\n롱은 지지선에서 과매도된 것, 숏은 저항선에서 과매수된 것을 찾고 있다.\n각 종목의 기준 셋업과 상위 봉 맥락을 같이 보고 순위를 매겨 달라.\n\n### 반드시 지킬 것\n\n1. **기준 봉 외의 값으로 진입·손절·익절·수량을 다시 계산하지 마라.**\n   거래 숫자는 기준 봉 셋업에 한 벌만 있고 그게 실제로 주문할 값이다.\n   상위 봉 블록에는 그런 값이 아예 없다.\n2. **상위 봉 방향·EMA 위치·지지/저항 하나만으로 후보를 기각하지 마라.**\n   우리가 찾는 '지지선 과매도 롱' 은 구조적으로 역추세다. 추세 필터를\n   실제로 켰을 때 과매도 후보가 0.0% 가 됐다 — 목적이 통째로 사라졌다.\n   상위 봉 레벨 겹침은 따로 재서 기각됐다(학습 -0.002R · 미검증 -0.034R).\n3. **상위 봉 지표가 선택에 도움이 되는지는 아직 측정되지 않았다.**\n   이 복사본은 정보를 보이게 하는 도구이지 검증된 필터가 아니다.\n   맥락을 근거로 쓸 때는 그게 미측정 근거임을 같이 말해 달라.\n4. **여기 없는 값(호가창·청산맵·뉴스·체결 결과)은 추정하지 마라.**\n5. `—` 와 `판단 불가` 는 **모른다**는 뜻이다. 0 으로 취급하지 마라.\n   반대로 `0.00%` 는 레벨에 **정확히 닿았다**는 뜻이라 정반대다.\n6. 후보에 **`호가창(실측)`** 줄이 **있으면** 그건 지금 오더북 측정값이다(추정 아님) — 그때는 4번의 '호가창 추정 금지'에 앞선다. `수량 초과` 나 큰 청산슬리피지는 우리 수량을 깔끔히 못 받아 실제 손익비가 나빠질 수 있다는 뜻이니 신중히 보라. 줄이 없거나 `— 못 읽음` 이면 여전히 모름이다.\n\n### 어느 봉으로 계산했나 — 지표와 레벨이 다르다\n\n- **지표(%B·RSI·StochRSI·밴드폭·EMA20 이격·ATR)는 진행 중인 봉을 포함**해\n  계산한다. 스캔 표와 같은 기준이라 화면과 값이 일치한다. 대신 **4h·1d 는\n  그 봉이 마감될 때까지 값이 더 변한다** — 1d RSI 는 최대 하루치가 미확정이다.\n- **지지/저항 레벨은 마감된 봉만**으로 만든다. 진행 중인 봉을 넣으면 레벨이\n  하루 종일 흔들리고, 같은 문서 위쪽의 BTC 거시 지지와 다른 규칙이 된다\n  (그 차이를 BTC 12h 에서 재봤을 때 24.0% 의 시각에서 값이 달랐다).\n- 그래서 '현재가' 와 '레벨' 은 서로 다른 봉 집합에서 나온다. 레벨은 조금\n  보수적(덜 최신)이고, 지표는 조금 잠정적이다.\n\n### %B 를 두 개 싣는 이유\n\n지정가를 레벨에 걸어 두므로 판단할 것은 '지금 가격이 어떤가' 가 아니라\n**'내가 주문 걸 가격이 어떤가'** 다. %B 는 가격만 넣으면 값이 나오는 순수\n함수라 상위 봉 밴드에도 **기준 봉 진입가**를 대입할 수 있다. 상위 봉 블록의\n`%B(기준진입가)` 가 그것이고, **이 값이 보려는 값**이다. `%B(현재)` 는 비교용.\n\n근사의 방향도 알고 써 달라 — 가격이 실제로 진입가까지 가면 밴드도 같이\n움직여 실제 %B 는 이 값보다 덜 극단적이다. 다만 그 오차는 밴드가 빨리\n움직이는 하위 봉에서 크고 **상위 봉일수록 작다**(1d 밴드는 그동안 제자리다).\nRSI 는 모멘텀이라 같은 방식으로 옮길 수 없어 현재값 그대로다.\n\n## 한눈에 — 전체 후보\n\n**순위가 아니다.** 아래 상세 블록과 같은 순서이고, 스캔이 준 순서 그대로다.\n무엇으로든 줄을 세우면 그게 곧 순위 주장이 되는데, 이 앱의 「점수」는\n실측상 무작위를 못 이겼고 「적합」도 넷 중 셋이 미측정이다.\n\n상위 봉 %B 열은 **기준 진입가를 그 봉 밴드에 대입한 값**이다(현재가 아님).\n\n| # | 종목 | 방향 | 적합 | %B(진입) | RSI | 1h %B | 4h %B | 1d %B | 꼬리 | 여유R |\n|---|---|---|---|---|---|---|---|---|---|---|\n| 1 | SOLUSDT | 숏 | 2/4 | 0.44 | 37.7 | 0.19 | 0.75 | 0.99 | 0.30 | 0.6 |\n| 2 | HYPEUSDT | 롱 | 2/4 | 0.54 | 55.1 | 0.66 | 0.70 | 0.89 | 0.87 | 0.3 |\n| 3 | LTCUSDT | 숏 | 3/4 | 1.01 | 38.6 | 0.36 | 0.78 | 1.02 | 0.59 | 0.8 |\n| 4 | AAVEUSDT | 롱 | 3/4 | 0.05 | 35.1 | -0.03 | 0.49 | 0.83 | 0.29 | 1.3 |\n| 5 | XLMUSDT | 롱 | 3/4 | 0.08 | 40.8 | 0.30 | 0.76 | 1.02 | 0.95 | 0.5 |\n| 6 | XRPUSDT | 롱 | 0/4 | 0.22 | 47.9 | 0.43 | 0.81 | 0.96 | 1.03 | 0.5 |\n| 7 | TRUMPUSDT | 롱 | 2/4 | 0.24 | 44.9 | 0.17 | 0.68 | 0.55 | 0.49 | 0.6 |\n| 8 | ASTERUSDT | 숏 | 1/4 | 0.79 | 41.0 | 0.39 | 0.31 | 0.54 | 2.25 | 0.3 |\n| 9 | SUIUSDT | 숏 | 2/4 | 0.59 | 41.9 | 0.43 | 0.79 | 1.10 | 0.33 | 0.6 |\n| 10 | LINKUSDT | 숏 | 2/4 | 0.86 | 39.3 | 0.45 | 0.78 | 0.87 | 0.51 | 0.8 |\n| 11 | ARBUSDT | 롱 | 1/4 | 0.39 | 45.3 | 0.23 | 0.58 | 0.88 | 1.34 | 0.3 |\n| 12 | UNIUSDT | 숏 | 2/4 | 0.52 | 44.8 | 0.52 | 0.65 | 0.92 | 0.83 | 0.3 |\n| 13 | BCHUSDT | 롱 | 1/4 | 0.44 | 49.8 | 0.38 | 0.77 | 0.81 | 0.59 | 0.3 |\n| 14 | FILUSDT | 숏 | 1/4 | 0.57 | 46.1 | 0.74 | 0.74 | 0.95 | 0.51 | 0.4 |\n| 15 | ONDOUSDT | 숏 | 1/4 | 0.44 | 38.7 | 0.19 | 0.58 | 0.91 | 0.48 | 0.4 |\n| 16 | ZECUSDT | 롱 | 0/4 | 0.69 | 57.7 | 0.73 | 0.56 | 0.85 | 1.02 | 0.1 |\n| 17 | ADAUSDT | 숏 | 1/4 | 0.41 | 45.3 | 0.50 | 0.82 | 1.04 | 0.79 | 0.3 |\n| 18 | DOGEUSDT | 롱 | 2/4 | 0.15 | 39.8 | 0.40 | 0.80 | 1.04 | 0.43 | 0.5 |\n| 19 | WLDUSDT | 숏 | 0/4 | 0.58 | 39.9 | 0.57 | 0.85 | 0.85 | 1.10 | 0.6 |\n\n## 1. SOLUSDT · 숏\n\n### 거래 (15m 기준 셋업 — 주문은 이 값으로 나간다)\n\n- 현재가 115.94 · 진입 116.38 · 손절 117.74775448 · 익절 114.32836829\n- 근접 0.38% · 손절폭 1.18% · 수량 13.7940 · 증거금 $80.27\n- 순RR 1.36 · 손익분기승률 42.4% · 주문 가능\n\n### 15m 기준 재료\n\n- 적합 2/4 (터치·꼬리) · 점수 73\n- %B(진입) 0.44 · %B(현재) 0.08 · 밴드폭 1.05%\n- RSI14 37.7 · StochRSI 67 · ATR 0.48% · 손절÷ATR 2.5\n- 터치 1 · 레벨나이 95봉전 · 꼬리÷버퍼 0.30 · 여유R 0.6\n- 접근거래량 0.74배 · 캔들몸통÷ATR 0.51 · 합류 ★저항 ★HVN  (합류는 실측상 마이너스 — 근거로 삼지 말 것)\n- EMA20 이격 -0.58% · 24h 2.1% · 거래량 3.8B\n- 진입 주변 레벨: R 116.38(+0.00R·1회) · R 116.86(+0.35R·1회) · R 117.126(+0.55R·5회) · S 115.53(-0.62R·2회)\n\n### 1h 문맥 (거래 신호가 아니다)\n\n- 현재가 115.93 · %B(현재) 0.08 · %B(기준진입가) 0.19 · RSI14 47.8 · StochRSI 1 · 밴드폭 3.48% · EMA20 이격 -0.39% · ATR 1.08%\n- 지지 115.53 (-0.34%) · 터치 2  /  저항 117.13 (+1.03%) · 터치 1\n\n### 4h 문맥 (거래 신호가 아니다)\n\n- 현재가 115.94 · %B(현재) 0.72 · %B(기준진입가) 0.75 · RSI14 65.3 · StochRSI 46 · 밴드폭 11.87% · EMA20 이격 +3.04% · ATR 1.92%\n- 지지 111.15 (-4.13%) · 터치 1  /  저항 119.99 (+3.49%) · 터치 2\n\n### 1d 문맥 (거래 신호가 아니다)\n\n- 현재가 115.94 · %B(현재) 0.97 · %B(기준진입가) 0.99 · RSI14 65.4 · StochRSI 88 · 밴드폭 20.34% · EMA20 이격 +14.01% · ATR 4.60%\n- 지지 97.35 (-16.03%) · 터치 2  /  저항 119.99 (+3.49%) · 터치 1\n\n## 2. HYPEUSDT · 롱\n\n### 거래 (15m 기준 셋업 — 주문은 이 값으로 나간다)\n\n- 현재가 94.261 · 진입 93.943 · 손절 92.78659196 · 익절 95.67761206\n- 근접 0.34% · 손절폭 1.23% · 수량 16.3721 · 증거금 $76.90\n- 순RR 1.37 · 손익분기승률 42.3% · 주문 가능\n\n### 15m 기준 재료\n\n- 적합 2/4 (터치·꼬리) · 점수 73\n- %B(진입) 0.54 · %B(현재) 0.67 · 밴드폭 2.62%\n- RSI14 55.1 · StochRSI 55 · ATR 0.59% · 손절÷ATR 2.1\n- 터치 1 · 레벨나이 134봉전 · 꼬리÷버퍼 0.87 · 여유R 0.3\n- 접근거래량 1.22배 · 캔들몸통÷ATR 0.68 · 합류 ★지지 ★HVN  (합류는 실측상 마이너스 — 근거로 삼지 말 것)\n- EMA20 이격 0.29% · 24h -0.5% · 거래량 933M\n- 진입 주변 레벨: S 93.943(+0.00R·1회) · S 93.67(-0.24R·1회) · R 94.2685(+0.28R·4회) · S 93.524(-0.36R·3회)\n\n### 1h 문맥 (거래 신호가 아니다)\n\n- 현재가 94.26 · %B(현재) 0.78 · %B(기준진입가) 0.66 · RSI14 55.7 · StochRSI 93 · 밴드폭 2.72% · EMA20 이격 +1.06% · ATR 1.06%\n- 지지 92.864 (-1.48%) · 터치 1  /  저항 96.0395 (+1.89%) · 터치 2\n\n### 4h 문맥 (거래 신호가 아니다)\n\n- 현재가 94.26 · %B(현재) 0.77 · %B(기준진입가) 0.70 · RSI14 63.0 · StochRSI 17 · 밴드폭 4.84% · EMA20 이격 +2.65% · ATR 2.06%\n- 지지 92.00 (-2.40%) · 터치 1  /  저항 96.079 (+1.93%) · 터치 2\n\n### 1d 문맥 (거래 신호가 아니다)\n\n- 현재가 94.26 · %B(현재) 0.90 · %B(기준진입가) 0.89 · RSI14 67.8 · StochRSI 100 · 밴드폭 24.42% · EMA20 이격 +11.40% · ATR 5.14%\n- 지지 78.335 (-16.89%) · 터치 2  /  저항 96.079 (+1.93%) · 터치 1\n\n## 3. LTCUSDT · 숏\n\n### 거래 (15m 기준 셋업 — 주문은 이 값으로 나간다)\n\n- 현재가 60.41 · 진입 61.17 · 손절 61.91372638 · 익절 60.05441043\n- 근접 1.24% · 손절폭 1.22% · 수량 25.4156 · 증거금 $77.73\n- 순RR 1.36 · 손익분기승률 42.3% · 주문 가능\n\n### 15m 기준 재료\n\n- 적합 3/4 (터치·꼬리·과열) · 점수 72\n- %B(진입) 1.01 · %B(현재) -0.03 · 밴드폭 1.20%\n- RSI14 38.6 · StochRSI 38 · ATR 0.59% · 손절÷ATR 2.1\n- 터치 1 · 레벨나이 79봉전 · 꼬리÷버퍼 0.59 · 여유R 0.8\n- 접근거래량 0.84배 · 캔들몸통÷ATR 0.15 · 합류 ★저항 ★HVN  (합류는 실측상 마이너스 — 근거로 삼지 말 것)\n- EMA20 이격 -0.20% · 24h 2.9% · 거래량 236M\n- 진입 주변 레벨: R 61.17(+0.00R·1회) · R 61.34(+0.23R·2회) · R 61.68(+0.69R·1회) · S 60.54333333(-0.84R·3회)\n\n### 1h 문맥 (거래 신호가 아니다)\n\n- 현재가 60.41 · %B(현재) 0.12 · %B(기준진입가) 0.36 · RSI14 46.5 · StochRSI 5 · 밴드폭 5.06% · EMA20 이격 -0.54% · ATR 1.43%\n- 지지 60.13 (-0.46%) · 터치 2  /  저항 61.34 (+1.54%) · 터치 1\n\n### 4h 문맥 (거래 신호가 아니다)\n\n- 현재가 60.41 · %B(현재) 0.67 · %B(기준진입가) 0.78 · RSI14 60.2 · StochRSI 26 · 밴드폭 12.15% · EMA20 이격 +2.62% · ATR 2.54%\n- 지지 56.56666667 (-6.36%) · 터치 3  /  저항 63.88 (+5.74%) · 터치 2\n\n### 1d 문맥 (거래 신호가 아니다)\n\n- 현재가 60.41 · %B(현재) 0.96 · %B(기준진입가) 1.02 · RSI14 69.4 · StochRSI 90 · 밴드폭 20.46% · EMA20 이격 +13.72% · ATR 4.25%\n- 지지 56.12 (-7.10%) · 터치 2  /  저항 63.88 (+5.74%) · 터치 1\n\n## 4. AAVEUSDT · 롱\n\n### 거래 (15m 기준 셋업 — 주문은 이 값으로 나간다)\n\n- 현재가 140.71 · 진입 140.62 · 손절 138.41453279 · 익절 143.92820081\n- 근접 0.06% · 손절폭 1.57% · 수량 8.6851 · 증거금 $61.06\n- 순RR 1.39 · 손익분기승률 41.8% · 주문 가능\n\n### 15m 기준 재료\n\n- 적합 3/4 (터치·꼬리·과열) · 점수 70\n- %B(진입) 0.05 · %B(현재) 0.07 · 밴드폭 2.65%\n- RSI14 35.1 · StochRSI 11 · ATR 0.78% · 손절÷ATR 2.0\n- 터치 1 · 레벨나이 124봉전 · 꼬리÷버퍼 0.29 · 여유R 1.3\n- 접근거래량 0.86배 · 캔들몸통÷ATR 0.34 · 합류 —  (합류는 실측상 마이너스 — 근거로 삼지 말 것)\n- EMA20 이격 -1.09% · 24h 0.6% · 거래량 192M\n- 진입 주변 레벨: S 140.62(+0.00R·1회) · S 140.18(-0.20R·1회) · S 137.885(-1.24R·2회) · R 143.54(+1.32R·1회)\n\n### 1h 문맥 (거래 신호가 아니다)\n\n- 현재가 140.74 · %B(현재) -0.01 · %B(기준진입가) -0.03 · RSI14 43.2 · StochRSI 0 · 밴드폭 4.32% · EMA20 이격 -1.13% · ATR 1.64%\n- 지지 140.62 (-0.09%) · 터치 1  /  저항 141.97666667 (+0.88%) · 터치 3\n\n### 4h 문맥 (거래 신호가 아니다)\n\n- 현재가 140.74 · %B(현재) 0.50 · %B(기준진입가) 0.49 · RSI14 54.9 · StochRSI 19 · 밴드폭 9.14% · EMA20 이격 +1.19% · ATR 3.02%\n- 지지 133.15 (-5.39%) · 터치 2  /  저항 141.88 (+0.81%) · 터치 1\n\n### 1d 문맥 (거래 신호가 아니다)\n\n- 현재가 140.71 · %B(현재) 0.84 · %B(기준진입가) 0.83 · RSI14 60.6 · StochRSI 83 · 밴드폭 20.67% · EMA20 이격 +12.33% · ATR 6.01%\n- 지지 119.775 (-14.88%) · 터치 2  /  저항 149.26 (+6.08%) · 터치 1\n\n## 5. XLMUSDT · 롱\n\n### 거래 (15m 기준 셋업 — 주문은 이 값으로 나간다)\n\n- 현재가 0.21024 · 진입 0.21012 · 손절 0.20655881 · 익절 0.21546179\n- 근접 0.06% · 손절폭 1.69% · 수량 5395.9357 · 증거금 $56.69\n- 순RR 1.40 · 손익분기승률 41.7% · 주문 가능\n\n### 15m 기준 재료\n\n- 적합 3/4 (터치·꼬리·과열) · 점수 68\n- %B(진입) 0.08 · %B(현재) 0.10 · 밴드폭 2.33%\n- RSI14 40.8 · StochRSI 36 · ATR 0.83% · 손절÷ATR 2.1\n- 터치 1 · 레벨나이 88봉전 · 꼬리÷버퍼 0.95 · 여유R 0.5\n- 접근거래량 1.54배 · 캔들몸통÷ATR 0.38 · 합류 ★지지 ★HVN  (합류는 실측상 마이너스 — 근거로 삼지 말 것)\n- EMA20 이격 -0.91% · 24h 4.5% · 거래량 160M\n- 진입 주변 레벨: S 0.21012(+0.00R·1회) · S 0.20934(-0.22R·2회) · R 0.21205333(+0.54R·3회) · S 0.20811(-0.56R·1회)\n\n### 1h 문맥 (거래 신호가 아니다)\n\n- 현재가 0.21023 · %B(현재) 0.31 · %B(기준진입가) 0.30 · RSI14 52.0 · StochRSI 0 · 밴드폭 4.67% · EMA20 이격 +0.46% · ATR 1.69%\n- 지지 0.20934 (-0.42%) · 터치 1  /  저항 0.21321 (+1.42%) · 터치 1\n\n### 4h 문맥 (거래 신호가 아니다)\n\n- 현재가 0.21025 · %B(현재) 0.77 · %B(기준진입가) 0.76 · RSI14 64.7 · StochRSI 72 · 밴드폭 16.30% · EMA20 이격 +4.92% · ATR 2.85%\n- 지지 0.19064 (-9.33%) · 터치 1  /  저항 0.21321 (+1.41%) · 터치 1\n\n### 1d 문맥 (거래 신호가 아니다)\n\n- 현재가 0.21024 · %B(현재) 1.03 · %B(기준진입가) 1.02 · RSI14 63.7 · StochRSI 90 · 밴드폭 20.30% · EMA20 이격 +14.68% · ATR 5.64%\n- 지지 0.18014167 (-14.32%) · 터치 6  /  저항 0.216745 (+3.09%) · 터치 2\n\n## 6. XRPUSDT · 롱\n\n### 거래 (15m 기준 셋업 — 주문은 이 값으로 나간다)\n\n- 현재가 1.5154 · 진입 1.5099 · 손절 1.49191702 · 익절 1.53687447\n- 근접 0.36% · 손절폭 1.19% · 수량 1050.9214 · 증거금 $79.34\n- 순RR 1.36 · 손익분기승률 42.4% · 주문 가능\n\n### 15m 기준 재료\n\n- 적합 0/4 (없음) · 점수 66\n- %B(진입) 0.22 · %B(현재) 0.47 · 밴드폭 1.45%\n- RSI14 47.9 · StochRSI 71 · ATR 0.63% · 손절÷ATR 1.9\n- 터치 2 · 레벨나이 69봉전 · 꼬리÷버퍼 1.03 · 여유R 0.5\n- 접근거래량 0.54배 · 캔들몸통÷ATR 0.39 · 합류 ★지지 ★HVN  (합류는 실측상 마이너스 — 근거로 삼지 말 것)\n- EMA20 이격 -0.14% · 24h 4.5% · 거래량 2.2B\n- 진입 주변 레벨: S 1.5099(+0.00R·2회) · S 1.5071(-0.16R·1회) · S 1.5041(-0.32R·1회) · R 1.518(+0.45R·1회)\n\n### 1h 문맥 (거래 신호가 아니다)\n\n- 현재가 1.5154 · %B(현재) 0.51 · %B(기준진입가) 0.43 · RSI14 59.4 · StochRSI 8 · 밴드폭 4.66% · EMA20 이격 +0.80% · ATR 1.40%\n- 지지 1.5041 (-0.75%) · 터치 1  /  저항 1.5745 (+3.90%) · 터치 2\n\n### 4h 문맥 (거래 신호가 아니다)\n\n- 현재가 1.5154 · %B(현재) 0.84 · %B(기준진입가) 0.81 · RSI14 70.5 · StochRSI 73 · 밴드폭 13.62% · EMA20 이격 +4.96% · ATR 2.34%\n- 지지 1.434 (-5.37%) · 터치 1  /  저항 1.5745 (+3.90%) · 터치 2\n\n### 1d 문맥 (거래 신호가 아니다)\n\n- 현재가 1.5154 · %B(현재) 0.98 · %B(기준진입가) 0.96 · RSI14 63.1 · StochRSI 88 · 밴드폭 16.82% · EMA20 이격 +11.54% · ATR 5.64%\n- 지지 1.4104 (-6.93%) · 터치 1  /  저항 1.5499 (+2.28%) · 터치 2\n\n## 7. TRUMPUSDT · 롱\n\n### 거래 (15m 기준 셋업 — 주문은 이 값으로 나간다)\n\n- 현재가 2.142 · 진입 2.136 · 손절 2.0953821 · 익절 2.19692684\n- 근접 0.28% · 손절폭 1.90% · 수량 475.1408 · 증거금 $50.75\n- 순RR 1.41 · 손익분기승률 41.5% · 주문 가능\n\n### 15m 기준 재료\n\n- 적합 2/4 (터치·꼬리) · 점수 65\n- %B(진입) 0.24 · %B(현재) 0.35 · 밴드폭 2.48%\n- RSI14 44.9 · StochRSI 78 · ATR 1.00% · 손절÷ATR 1.9\n- 터치 1 · 레벨나이 95봉전 · 꼬리÷버퍼 0.49 · 여유R 0.6\n- 접근거래량 0.97배 · 캔들몸통÷ATR 0.26 · 합류 —  (합류는 실측상 마이너스 — 근거로 삼지 말 것)\n- EMA20 이격 -0.47% · 24h 2.0% · 거래량 247M\n- 진입 주변 레벨: S 2.136(+0.00R·1회) · S 2.1298(-0.15R·5회) · S 2.12(-0.39R·1회) · S 2.11433333(-0.53R·3회)\n\n### 1h 문맥 (거래 신호가 아니다)\n\n- 현재가 2.141 · %B(현재) 0.23 · %B(기준진입가) 0.17 · RSI14 48.8 · StochRSI 5 · 밴드폭 3.81% · EMA20 이격 -0.15% · ATR 1.97%\n- 지지 2.115 (-1.21%) · 터치 2  /  저항 2.19833333 (+2.68%) · 터치 3\n\n### 4h 문맥 (거래 신호가 아니다)\n\n- 현재가 2.142 · %B(현재) 0.70 · %B(기준진입가) 0.68 · RSI14 58.6 · StochRSI 64 · 밴드폭 10.42% · EMA20 이격 +2.37% · ATR 3.50%\n- 지지 2.136 (-0.28%) · 터치 1  /  저항 2.197 (+2.57%) · 터치 1\n\n### 1d 문맥 (거래 신호가 아니다)\n\n- 현재가 2.141 · %B(현재) 0.55 · %B(기준진입가) 0.55 · RSI14 53.1 · StochRSI 81 · 밴드폭 29.91% · EMA20 이격 +5.11% · ATR 8.99%\n- 지지 2.109 (-1.50%) · 터치 1  /  저항 2.396 (+11.91%) · 터치 1\n\n## 8. ASTERUSDT · 숏\n\n### 거래 (15m 기준 셋업 — 주문은 이 값으로 나간다)\n\n- 현재가 0.7261 · 진입 0.735 · 손절 0.74922451 · 익절 0.71366323\n- 근접 1.21% · 손절폭 1.94% · 수량 1356.2884 · 증거금 $49.84\n- 순RR 1.41 · 손익분기승률 41.4% · 주문 가능\n\n### 15m 기준 재료\n\n- 적합 1/4 (터치) · 점수 64\n- %B(진입) 0.79 · %B(현재) 0.23 · 밴드폭 2.16%\n- RSI14 41.0 · StochRSI 59 · ATR 0.80% · 손절÷ATR 2.4\n- 터치 1 · 레벨나이 149봉전 · 꼬리÷버퍼 2.25 · 여유R 0.3\n- 접근거래량 0.43배 · 캔들몸통÷ATR 0.19 · 합류 —  (합류는 실측상 마이너스 — 근거로 삼지 말 것)\n- EMA20 이격 0.13% · 24h -1.9% · 거래량 130M\n- 진입 주변 레벨: R 0.735(+0.00R·1회) · S 0.7307(-0.30R·3회) · R 0.7398(+0.34R·2회) · S 0.7281(-0.49R·2회)\n\n### 1h 문맥 (거래 신호가 아니다)\n\n- 현재가 0.726 · %B(현재) 0.13 · %B(기준진입가) 0.39 · RSI14 39.6 · StochRSI 42 · 밴드폭 4.75% · EMA20 이격 -0.64% · ATR 1.50%\n- 지지 0.7201 (-0.81%) · 터치 2  /  저항 0.7368 (+1.49%) · 터치 1\n\n### 4h 문맥 (거래 신호가 아니다)\n\n- 현재가 0.7261 · %B(현재) 0.14 · %B(기준진입가) 0.31 · RSI14 43.7 · StochRSI 8 · 밴드폭 7.17% · EMA20 이격 -1.07% · ATR 2.62%\n- 지지 0.7259 (-0.03%) · 터치 1  /  저항 0.7381 (+1.65%) · 터치 1\n\n### 1d 문맥 (거래 신호가 아니다)\n\n- 현재가 0.7261 · %B(현재) 0.47 · %B(기준진입가) 0.54 · RSI14 52.5 · StochRSI 50 · 밴드폭 18.26% · EMA20 이격 +3.19% · ATR 5.61%\n- 지지 0.6708 (-7.62%) · 터치 1  /  저항 0.7469 (+2.87%) · 터치 1\n\n## 9. SUIUSDT · 숏\n\n### 거래 (15m 기준 셋업 — 주문은 이 값으로 나간다)\n\n- 현재가 1.0107 · 진입 1.0212 · 손절 1.04161648 · 익절 0.99057528\n- 근접 1.03% · 손절폭 2.00% · 수량 946.0055 · 증거금 $48.30\n- 순RR 1.42 · 손익분기승률 41.4% · 주문 가능\n\n### 15m 기준 재료\n\n- 적합 2/4 (터치·꼬리) · 점수 64\n- %B(진입) 0.59 · %B(현재) 0.26 · 밴드폭 3.15%\n- RSI14 41.9 · StochRSI 81 · ATR 1.07% · 손절÷ATR 1.9\n- 터치 1 · 레벨나이 91봉전 · 꼬리÷버퍼 0.33 · 여유R 0.6\n- 접근거래량 0.51배 · 캔들몸통÷ATR 0.31 · 합류 ★저항 ★POC·HVN  (합류는 실측상 마이너스 — 근거로 삼지 말 것)\n- EMA20 이격 -0.90% · 24h 4.2% · 거래량 977M\n- 진입 주변 레벨: R 1.0212(+0.00R·1회) · R 1.0243(+0.15R·1회) · R 1.033(+0.58R·2회) · S 1.0082(-0.64R·2회)\n\n### 1h 문맥 (거래 신호가 아니다)\n\n- 현재가 1.0109 · %B(현재) 0.24 · %B(기준진입가) 0.43 · RSI14 53.0 · StochRSI 0 · 밴드폭 5.38% · EMA20 이격 -0.09% · ATR 2.52%\n- 지지 0.9977 (-1.31%) · 터치 1  /  저항 1.038 (+2.68%) · 터치 1\n\n### 4h 문맥 (거래 신호가 아니다)\n\n- 현재가 1.0108 · %B(현재) 0.76 · %B(기준진입가) 0.79 · RSI14 72.7 · StochRSI 74 · 밴드폭 33.72% · EMA20 이격 +9.16% · ATR 4.01%\n- 지지 0.80785 (-20.08%) · 터치 2  /  저항 1.0568 (+4.55%) · 터치 1\n\n### 1d 문맥 (거래 신호가 아니다)\n\n- 현재가 1.0107 · %B(현재) 1.07 · %B(기준진입가) 1.10 · RSI14 72.2 · StochRSI 96 · 밴드폭 37.11% · EMA20 이격 +30.93% · ATR 6.12%\n- 지지 1.0089 (-0.18%) · 터치 1  /  저항 1.0568 (+4.56%) · 터치 1\n\n## 10. LINKUSDT · 숏\n\n### 거래 (15m 기준 셋업 — 주문은 이 값으로 나간다)\n\n- 현재가 12.829 · 진입 12.981 · 손절 13.18834483 · 익절 12.66998275\n- 근접 1.17% · 손절폭 1.60% · 수량 92.3637 · 증거금 $59.95\n- 순RR 1.40 · 손익분기승률 41.8% · 주문 가능\n\n### 15m 기준 재료\n\n- 적합 2/4 (꼬리·과열) · 점수 63\n- %B(진입) 0.86 · %B(현재) 0.09 · 밴드폭 1.54%\n- RSI14 39.3 · StochRSI 50 · ATR 0.63% · 손절÷ATR 2.5\n- 터치 2 · 레벨나이 92봉전 · 꼬리÷버퍼 0.51 · 여유R 0.8\n- 접근거래량 0.66배 · 캔들몸통÷ATR 0.40 · 합류 ★저항 ★POC·HVN  (합류는 실측상 마이너스 — 근거로 삼지 말 것)\n- EMA20 이격 -0.70% · 24h 1.3% · 거래량 297M\n- 진입 주변 레벨: R 12.981(+0.00R·2회) · R 13.059(+0.38R·2회) · R 13.082(+0.49R·2회) · R 13.103(+0.59R·1회)\n\n### 1h 문맥 (거래 신호가 아니다)\n\n- 현재가 12.828 · %B(현재) 0.10 · %B(기준진입가) 0.45 · RSI14 46.2 · StochRSI 1 · 밴드폭 3.32% · EMA20 이격 -0.38% · ATR 1.35%\n- 지지 12.805 (-0.18%) · 터치 1  /  저항 13.165 (+2.63%) · 터치 1\n\n### 4h 문맥 (거래 신호가 아니다)\n\n- 현재가 12.828 · %B(현재) 0.67 · %B(기준진입가) 0.78 · RSI14 60.2 · StochRSI 53 · 밴드폭 10.69% · EMA20 이격 +2.56% · ATR 2.31%\n- 지지 12.285 (-4.23%) · 터치 1  /  저항 13.282 (+3.54%) · 터치 2\n\n### 1d 문맥 (거래 신호가 아니다)\n\n- 현재가 12.828 · %B(현재) 0.81 · %B(기준진입가) 0.87 · RSI14 62.1 · StochRSI 83 · 밴드폭 21.20% · EMA20 이격 +11.64% · ATR 5.21%\n- 지지 10.974 (-14.45%) · 터치 3  /  저항 13.677 (+6.62%) · 터치 2\n\n## 11. ARBUSDT · 롱\n\n### 거래 (15m 기준 셋업 — 주문은 이 값으로 나간다)\n\n- 현재가 0.21908 · 진입 0.21875 · 손절 0.21418625 · 익절 0.22559562\n- 근접 0.15% · 손절폭 2.09% · 수량 4242.1494 · 증거금 $46.40\n- 순RR 1.42 · 손익분기승률 41.3% · 주문 가능\n\n### 15m 기준 재료\n\n- 적합 1/4 (터치) · 점수 62\n- %B(진입) 0.39 · %B(현재) 0.46 · 밴드폭 2.18%\n- RSI14 45.3 · StochRSI 75 · ATR 1.00% · 손절÷ATR 2.1\n- 터치 1 · 레벨나이 137봉전 · 꼬리÷버퍼 1.34 · 여유R 0.3\n- 접근거래량 0.91배 · 캔들몸통÷ATR 0.30 · 합류 ★지지 ★POC  (합류는 실측상 마이너스 — 근거로 삼지 말 것)\n- EMA20 이격 -0.27% · 24h 2.1% · 거래량 298M\n- 진입 주변 레벨: S 0.21875(+0.00R·1회) · S 0.21768(-0.23R·2회) · R 0.22022(+0.32R·1회) · S 0.21697(-0.39R·1회)\n\n### 1h 문맥 (거래 신호가 아니다)\n\n- 현재가 0.21909 · %B(현재) 0.25 · %B(기준진입가) 0.23 · RSI14 46.2 · StochRSI 12 · 밴드폭 9.83% · EMA20 이격 -1.50% · ATR 2.71%\n- 지지 0.21586333 (-1.47%) · 터치 3  /  저항 0.219115 (+0.01%) · 터치 2\n\n### 4h 문맥 (거래 신호가 아니다)\n\n- 현재가 0.21909 · %B(현재) 0.60 · %B(기준진입가) 0.58 · RSI14 57.0 · StochRSI 12 · 밴드폭 13.82% · EMA20 이격 +2.11% · ATR 5.96%\n- 지지 0.201365 (-8.09%) · 터치 2  /  저항 0.21917 (+0.04%) · 터치 1\n\n### 1d 문맥 (거래 신호가 아니다)\n\n- 현재가 0.21908 · %B(현재) 0.88 · %B(기준진입가) 0.88 · RSI14 70.4 · StochRSI 78 · 밴드폭 58.70% · EMA20 이격 +35.79% · ATR 9.81%\n- 지지 0.13121 (-40.11%) · 터치 1  /  저항 0.24787 (+13.14%) · 터치 1\n\n## 12. UNIUSDT · 숏\n\n### 거래 (15m 기준 셋업 — 주문은 이 값으로 나간다)\n\n- 현재가 8.884 · 진입 8.927 · 손절 9.12128424 · 익절 8.63557364\n- 근접 0.48% · 손절폭 2.18% · 수량 99.6858 · 증거금 $44.49\n- 순RR 1.42 · 손익분기승률 41.3% · 주문 가능\n\n### 15m 기준 재료\n\n- 적합 2/4 (터치·꼬리) · 점수 61\n- %B(진입) 0.52 · %B(현재) 0.34 · 밴드폭 2.75%\n- RSI14 44.8 · StochRSI 68 · ATR 1.13% · 손절÷ATR 1.9\n- 터치 1 · 레벨나이 137봉전 · 꼬리÷버퍼 0.83 · 여유R 0.3\n- 접근거래량 0.63배 · 캔들몸통÷ATR 0.34 · 합류 ★저항 ★POC·HVN  (합류는 실측상 마이너스 — 근거로 삼지 말 것)\n- EMA20 이격 -0.58% · 24h 2.2% · 거래량 646M\n- 진입 주변 레벨: R 8.927(+0.00R·1회) · R 8.96(+0.17R·1회) · S 8.864(-0.32R·1회) · R 9.005(+0.40R·2회)\n\n### 1h 문맥 (거래 신호가 아니다)\n\n- 현재가 8.881 · %B(현재) 0.43 · %B(기준진입가) 0.52 · RSI14 49.1 · StochRSI 12 · 밴드폭 5.51% · EMA20 이격 -0.05% · ATR 2.48%\n- 지지 8.7895 (-1.03%) · 터치 2  /  저항 8.988 (+1.21%) · 터치 4\n\n### 4h 문맥 (거래 신호가 아니다)\n\n- 현재가 8.884 · %B(현재) 0.58 · %B(기준진입가) 0.65 · RSI14 61.1 · StochRSI 38 · 밴드폭 6.67% · EMA20 이격 +2.60% · ATR 4.40%\n- 지지 8.48475 (-4.49%) · 터치 4  /  저항 8.971 (+0.98%) · 터치 2\n\n### 1d 문맥 (거래 신호가 아니다)\n\n- 현재가 8.881 · %B(현재) 0.91 · %B(기준진입가) 0.92 · RSI14 74.6 · StochRSI 88 · 밴드폭 48.35% · EMA20 이격 +27.79% · ATR 8.07%\n- 지지 5.994 (-32.51%) · 터치 1  /  저항 9.522 (+7.22%) · 터치 2\n\n## 13. BCHUSDT · 롱\n\n### 거래 (15m 기준 셋업 — 주문은 이 값으로 나간다)\n\n- 현재가 265.45 · 진입 264.72 · 손절 259.934201 · 익절 271.8986985\n- 근접 0.28% · 손절폭 1.81% · 수량 4.0252 · 증거금 $53.28\n- 순RR 1.41 · 손익분기승률 41.5% · 주문 가능\n\n### 15m 기준 재료\n\n- 적합 1/4 (꼬리) · 점수 60\n- %B(진입) 0.44 · %B(현재) 0.60 · 밴드폭 1.68%\n- RSI14 49.8 · StochRSI 69 · ATR 0.86% · 손절÷ATR 2.1\n- 터치 2 · 레벨나이 87봉전 · 꼬리÷버퍼 0.59 · 여유R 0.3\n- 접근거래량 2.50배 · 캔들몸통÷ATR 0.85 · 합류 ★지지 ★POC  (합류는 실측상 마이너스 — 근거로 삼지 말 것)\n- EMA20 이격 0.04% · 24h 3.5% · 거래량 218M\n- 진입 주변 레벨: S 264.72(+0.00R·2회) · S 263.568(-0.24R·5회) · R 266.11666667(+0.29R·3회) · R 267.11666667(+0.50R·3회)\n\n### 1h 문맥 (거래 신호가 아니다)\n\n- 현재가 265.45 · %B(현재) 0.47 · %B(기준진입가) 0.38 · RSI14 55.2 · StochRSI 25 · 밴드폭 2.97% · EMA20 이격 +0.89% · ATR 1.56%\n- 지지 261.72 (-1.41%) · 터치 2  /  저항 267.26 (+0.68%) · 터치 1\n\n### 4h 문맥 (거래 신호가 아니다)\n\n- 현재가 265.49 · %B(현재) 0.80 · %B(기준진입가) 0.77 · RSI14 67.0 · StochRSI 67 · 밴드폭 11.83% · EMA20 이격 +4.21% · ATR 2.79%\n- 지지 255.30 (-3.84%) · 터치 1  /  저항 269.45 (+1.49%) · 터치 1\n\n### 1d 문맥 (거래 신호가 아니다)\n\n- 현재가 265.63 · %B(현재) 0.82 · %B(기준진입가) 0.81 · RSI14 62.0 · StochRSI 96 · 밴드폭 25.51% · EMA20 이격 +9.88% · ATR 6.09%\n- 지지 240.27 (-9.55%) · 터치 2  /  저항 267.78 (+0.81%) · 터치 2\n\n## 14. FILUSDT · 숏\n\n### 거래 (15m 기준 셋업 — 주문은 이 값으로 나간다)\n\n- 현재가 0.9879 · 진입 0.99515 · 손절 1.01317728 · 익절 0.96810908\n- 근접 0.73% · 손절폭 1.81% · 수량 1067.6404 · 증거금 $53.12\n- 순RR 1.41 · 손익분기승률 41.5% · 주문 가능\n\n### 15m 기준 재료\n\n- 적합 1/4 (꼬리) · 점수 60\n- %B(진입) 0.57 · %B(현재) 0.22 · 밴드폭 2.09%\n- RSI14 46.1 · StochRSI 49 · ATR 0.96% · 손절÷ATR 1.9\n- 터치 2 · 레벨나이 92봉전 · 꼬리÷버퍼 0.51 · 여유R 0.4\n- 접근거래량 0.65배 · 캔들몸통÷ATR 0.32 · 합류 ★저항 ★HVN  (합류는 실측상 마이너스 — 근거로 삼지 말 것)\n- EMA20 이격 -0.11% · 24h 2.2% · 거래량 183M\n- 진입 주변 레벨: R 0.99515(+0.00R·2회) · R 0.9979(+0.15R·1회) · R 1.0014(+0.35R·2회) · S 0.988(-0.40R·1회)\n\n### 1h 문맥 (거래 신호가 아니다)\n\n- 현재가 0.988 · %B(현재) 0.60 · %B(기준진입가) 0.74 · RSI14 53.8 · StochRSI 45 · 밴드폭 5.30% · EMA20 이격 +0.77% · ATR 1.87%\n- 지지 0.9812 (-0.69%) · 터치 1  /  저항 0.9986 (+1.07%) · 터치 2\n\n### 4h 문맥 (거래 신호가 아니다)\n\n- 현재가 0.9879 · %B(현재) 0.67 · %B(기준진입가) 0.74 · RSI14 59.0 · StochRSI 81 · 밴드폭 9.94% · EMA20 이격 +3.53% · ATR 3.93%\n- 지지 0.9507 (-3.77%) · 터치 1  /  저항 1.0166 (+2.90%) · 터치 1\n\n### 1d 문맥 (거래 신호가 아니다)\n\n- 현재가 0.988 · %B(현재) 0.92 · %B(기준진입가) 0.95 · RSI14 65.4 · StochRSI 66 · 밴드폭 30.86% · EMA20 이격 +14.87% · ATR 8.57%\n- 지지 0.905 (-8.40%) · 터치 2  /  저항 0.995 (+0.71%) · 터치 2\n\n## 15. ONDOUSDT · 숏\n\n### 거래 (15m 기준 셋업 — 주문은 이 값으로 나간다)\n\n- 현재가 0.4307 · 진입 0.433 · 손절 0.44100655 · 익절 0.42099018\n- 근접 0.53% · 손절폭 1.85% · 수량 2405.6818 · 증거금 $52.08\n- 순RR 1.41 · 손익분기승률 41.5% · 주문 가능\n\n### 15m 기준 재료\n\n- 적합 1/4 (꼬리) · 점수 59\n- %B(진입) 0.44 · %B(현재) 0.22 · 밴드폭 2.43%\n- RSI14 38.7 · StochRSI 76 · ATR 0.92% · 손절÷ATR 2.0\n- 터치 2 · 레벨나이 146봉전 · 꼬리÷버퍼 0.48 · 여유R 0.4\n- 접근거래량 0.99배 · 캔들몸통÷ATR 0.42 · 합류 ★저항 ★HVN  (합류는 실측상 마이너스 — 근거로 삼지 말 것)\n- EMA20 이격 -0.93% · 24h -1.2% · 거래량 233M\n- 진입 주변 레벨: R 0.433(+0.00R·2회) · R 0.4347(+0.21R·1회) · S 0.43(-0.37R·3회) · S 0.428675(-0.54R·4회)\n\n### 1h 문맥 (거래 신호가 아니다)\n\n- 현재가 0.4307 · %B(현재) 0.12 · %B(기준진입가) 0.19 · RSI14 42.4 · StochRSI 1 · 밴드폭 7.74% · EMA20 이격 -1.73% · ATR 2.17%\n- 지지 0.4287 (-0.46%) · 터치 2  /  저항 0.4343 (+0.84%) · 터치 2\n\n### 4h 문맥 (거래 신호가 아니다)\n\n- 현재가 0.4307 · %B(현재) 0.55 · %B(기준진입가) 0.58 · RSI14 56.4 · StochRSI 4 · 밴드폭 14.63% · EMA20 이격 +1.82% · ATR 4.08%\n- 지지 0.4006 (-6.99%) · 터치 1  /  저항 0.4435 (+2.97%) · 터치 1\n\n### 1d 문맥 (거래 신호가 아니다)\n\n- 현재가 0.4307 · %B(현재) 0.90 · %B(기준진입가) 0.91 · RSI14 62.5 · StochRSI 90 · 밴드폭 31.95% · EMA20 이격 +20.49% · ATR 6.13%\n- 지지 0.3723 (-13.56%) · 터치 2  /  저항 0.4629 (+7.48%) · 터치 1\n\n## 16. ZECUSDT · 롱\n\n### 거래 (15m 기준 셋업 — 주문은 이 값으로 나간다)\n\n- 현재가 1504.28 · 진입 1502.22 · 손절 1472.30123087 · 익절 1547.0981537\n- 근접 0.14% · 손절폭 1.99% · 수량 0.6461 · 증거금 $48.53\n- 순RR 1.42 · 손익분기승률 41.4% · 주문 가능\n\n### 15m 기준 재료\n\n- 적합 0/4 (없음) · 점수 58\n- %B(진입) 0.69 · %B(현재) 0.71 · 밴드폭 5.48%\n- RSI14 57.7 · StochRSI 35 · ATR 1.03% · 손절÷ATR 1.9\n- 터치 2 · 레벨나이 148봉전 · 꼬리÷버퍼 1.02 · 여유R 0.1\n- 접근거래량 1.22배 · 캔들몸통÷ATR 0.40 · 합류 ★지지 ★HVN  (합류는 실측상 마이너스 — 근거로 삼지 말 것)\n- EMA20 이격 0.94% · 24h -0.2% · 거래량 2.3B\n- 진입 주변 레벨: S 1502.22(+0.00R·2회) · R 1504.93(+0.09R·2회) · S 1497.06(-0.17R·1회) · S 1486.50(-0.53R·2회)\n\n### 1h 문맥 (거래 신호가 아니다)\n\n- 현재가 1504.59 · %B(현재) 0.75 · %B(기준진입가) 0.73 · RSI14 55.6 · StochRSI 94 · 밴드폭 5.90% · EMA20 이격 +2.08% · ATR 1.79%\n- 지지 1485.00 (-1.30%) · 터치 1  /  저항 1536.23666667 (+2.10%) · 터치 3\n\n### 4h 문맥 (거래 신호가 아니다)\n\n- 현재가 1504.44 · %B(현재) 0.57 · %B(기준진입가) 0.56 · RSI14 55.6 · StochRSI 27 · 밴드폭 9.72% · EMA20 이격 +2.50% · ATR 3.77%\n- 지지 1443.145 (-4.07%) · 터치 2  /  저항 1537.15 (+2.17%) · 터치 1\n\n### 1d 문맥 (거래 신호가 아니다)\n\n- 현재가 1503.88 · %B(현재) 0.85 · %B(기준진입가) 0.85 · RSI14 68.3 · StochRSI 48 · 밴드폭 49.84% · EMA20 이격 +20.23% · ATR 8.42%\n- 지지 1047.395 (-30.35%) · 터치 2  /  저항 1595.30 (+6.08%) · 터치 2\n\n## 17. ADAUSDT · 숏\n\n### 거래 (15m 기준 셋업 — 주문은 이 값으로 나간다)\n\n- 현재가 0.244 · 진입 0.245 · 손절 0.24988282 · 익절 0.23767577\n- 근접 0.41% · 손절폭 1.99% · 수량 3955.0993 · 증거금 $48.45\n- 순RR 1.42 · 손익분기승률 41.4% · 주문 가능\n\n### 15m 기준 재료\n\n- 적합 1/4 (꼬리) · 점수 57\n- %B(진입) 0.41 · %B(현재) 0.29 · 밴드폭 3.48%\n- RSI14 45.3 · StochRSI 66 · ATR 0.97% · 손절÷ATR 2.1\n- 터치 2 · 레벨나이 80봉전 · 꼬리÷버퍼 0.79 · 여유R 0.3\n- 접근거래량 0.39배 · 캔들몸통÷ATR 0.41 · 합류 ★저항 ★POC  (합류는 실측상 마이너스 — 근거로 삼지 말 것)\n- EMA20 이격 -0.59% · 24h 4.5% · 거래량 406M\n- 진입 주변 레벨: R 0.245(+0.00R·2회) · R 0.2461(+0.23R·1회) · S 0.2435(-0.31R·3회) · R 0.2467(+0.35R·2회)\n\n### 1h 문맥 (거래 신호가 아니다)\n\n- 현재가 0.244 · %B(현재) 0.31 · %B(기준진입가) 0.50 · RSI14 55.0 · StochRSI 6 · 밴드폭 2.18% · EMA20 이격 +0.81% · ATR 1.81%\n- 지지 0.2426 (-0.57%) · 터치 1  /  저항 0.2477 (+1.52%) · 터치 2\n\n### 4h 문맥 (거래 신호가 아니다)\n\n- 현재가 0.244 · %B(현재) 0.79 · %B(기준진입가) 0.82 · RSI14 68.7 · StochRSI 81 · 밴드폭 15.63% · EMA20 이격 +5.48% · ATR 2.87%\n- 지지 0.2209 (-9.47%) · 터치 1  /  저항 0.249 (+2.05%) · 터치 1\n\n### 1d 문맥 (거래 신호가 아니다)\n\n- 현재가 0.244 · %B(현재) 1.02 · %B(기준진입가) 1.04 · RSI14 68.0 · StochRSI 99 · 밴드폭 22.21% · EMA20 이격 +14.46% · ATR 5.86%\n- 지지 0.2369 (-2.91%) · 터치 2  /  저항 0.249 (+2.05%) · 터치 1\n\n## 18. DOGEUSDT · 롱\n\n### 거래 (15m 기준 셋업 — 주문은 이 값으로 나간다)\n\n- 현재가 0.09819 · 진입 0.097925 · 손절 0.09571843 · 익절 0.10123485\n- 근접 0.27% · 손절폭 2.25% · 수량 8795.0307 · 증거금 $43.06\n- 순RR 1.42 · 손익분기승률 41.2% · 주문 가능\n\n### 15m 기준 재료\n\n- 적합 2/4 (꼬리·과열) · 점수 54\n- %B(진입) 0.15 · %B(현재) 0.19 · 밴드폭 6.63%\n- RSI14 39.8 · StochRSI 7 · ATR 1.13% · 손절÷ATR 2.0\n- 터치 2 · 레벨나이 68봉전 · 꼬리÷버퍼 0.43 · 여유R 0.5\n- 접근거래량 0.39배 · 캔들몸통÷ATR 0.16 · 합류 —  (합류는 실측상 마이너스 — 근거로 삼지 말 것)\n- EMA20 이격 -0.75% · 24h 7.9% · 거래량 1.7B\n- 진입 주변 레벨: S 0.097925(+0.00R·2회) · S 0.09751(-0.19R·1회) · S 0.09843667(+0.23R·3회) · S 0.09885(+0.42R·1회)\n\n### 1h 문맥 (거래 신호가 아니다)\n\n- 현재가 0.09819 · %B(현재) 0.43 · %B(기준진입가) 0.40 · RSI14 55.5 · StochRSI 0 · 밴드폭 7.96% · EMA20 이격 +0.94% · ATR 2.38%\n- 지지 0.09779 (-0.41%) · 터치 1  /  저항 0.10217 (+4.05%) · 터치 1\n\n### 4h 문맥 (거래 신호가 아니다)\n\n- 현재가 0.09819 · %B(현재) 0.82 · %B(기준진입가) 0.80 · RSI14 69.3 · StochRSI 74 · 밴드폭 22.68% · EMA20 이격 +7.44% · ATR 3.16%\n- 지지 0.08851 (-9.86%) · 터치 1  /  저항 0.10594 (+7.89%) · 터치 1\n\n### 1d 문맥 (거래 신호가 아니다)\n\n- 현재가 0.09818 · %B(현재) 1.05 · %B(기준진입가) 1.04 · RSI14 67.4 · StochRSI 84 · 밴드폭 20.73% · EMA20 이격 +16.05% · ATR 5.29%\n- 지지 0.09680333 (-1.40%) · 터치 3  /  저항 0.10166333 (+3.55%) · 터치 3\n\n## 19. WLDUSDT · 숏\n\n### 거래 (15m 기준 셋업 — 주문은 이 값으로 나간다)\n\n- 현재가 0.4481 · 진입 0.4537 · 손절 0.46470578 · 익절 0.43719133\n- 근접 1.23% · 손절폭 2.43% · 수량 1765.4005 · 증거금 $40.05\n- 순RR 1.43 · 손익분기승률 41.2% · 주문 가능\n\n### 15m 기준 재료\n\n- 적합 0/4 (없음) · 점수 50\n- %B(진입) 0.58 · %B(현재) 0.12 · 밴드폭 2.71%\n- RSI14 39.9 · StochRSI 36 · ATR 1.21% · 손절÷ATR 2.0\n- 터치 2 · 레벨나이 104봉전 · 꼬리÷버퍼 1.10 · 여유R 0.6\n- 접근거래량 0.75배 · 캔들몸통÷ATR 0.26 · 합류 ★저항 ★POC·HVN  (합류는 실측상 마이너스 — 근거로 삼지 말 것)\n- EMA20 이격 -1.15% · 24h 0.2% · 거래량 334M\n- 진입 주변 레벨: R 0.4537(+0.00R·2회) · R 0.45605(+0.21R·2회) · R 0.4584(+0.43R·2회) · S 0.44684(-0.62R·5회)\n\n### 1h 문맥 (거래 신호가 아니다)\n\n- 현재가 0.448 · %B(현재) 0.44 · %B(기준진입가) 0.57 · RSI14 49.0 · StochRSI 25 · 밴드폭 9.25% · EMA20 이격 +0.13% · ATR 2.59%\n- 지지 0.4467 (-0.29%) · 터치 1  /  저항 0.4547 (+1.50%) · 터치 2\n\n### 4h 문맥 (거래 신호가 아니다)\n\n- 현재가 0.448 · %B(현재) 0.73 · %B(기준진입가) 0.85 · RSI14 60.6 · StochRSI 63 · 밴드폭 10.61% · EMA20 이격 +3.68% · ATR 3.92%\n- 지지 0.42715 (-4.65%) · 터치 2  /  저항 0.4561 (+1.81%) · 터치 2\n\n### 1d 문맥 (거래 신호가 아니다)\n\n- 현재가 0.4481 · %B(현재) 0.80 · %B(기준진입가) 0.85 · RSI14 60.6 · StochRSI 80 · 밴드폭 27.54% · EMA20 이격 +12.94% · ATR 7.54%\n- 지지 0.4251 (-5.13%) · 터치 1  /  저항 0.4639 (+3.53%) · 터치 1\n\n---\n## BTC 12h 방향예측 (참고 · 레벨 스캔과 별개 트랙)\n- LONG 74% / SHORT 26% · 등급 중립 · 판정 관망(NO_TRADE)\n- 기준 2026-09-22 09:30 KST (8.0시간 전 발행 · 다음 22:00)\n- 게이트 차단: 가중 일치도 13%(<60%) — 관망\n- ⚠ 우리 6팩터 계산값(바이낸스 원재료 기반). 게이트 미개방(관망) 주 지평(종가→시가) 검증 표본 0건이라 \"검증된 엣지\"가 아님. 위 후보 레벨을 자르는 기준으로 쓰지 말 것.\n",
+  "copy_md": "# 바이낸스 USDT-M 선물 — 멀티TF 후보 검토\n\n- 스캔 시각: 2026-09-22 17:45:04 (로컬)\n- 기준 봉: **15m** · 상위 문맥: 1h / 4h / 1d\n- 후보 수: 21개 (기준 봉 스캔 결과 전부. 자르지 않았다)\n- 잔고 $1,000.00 · 리스크 2% (1R = $20.00) · 레버리지 20x 격리\n- 수수료: 메이커 0.02% / 테이커 0.05%\n- 지난 LLM 선택 성적: 당신(LLM)이 고른 것들의 실제 판정: 79건 · 승률 41% · 평균 -0.04R · 무작위 대조군 149건 승률 36%\n- 시장 거시(BTC): BTCUSDT  1h EMA20 +0.87% · RSI 66 · %B +0.61  |  4h EMA20 +3.62% · RSI 76 · %B +0.86  |  12h 지지 80,095.9 (-6.99%) 터치 1 · 저항 87,385.1 (+1.47%)\n  (참고다. 이걸로 후보를 기각하지 마라 — BTC 지지 이격도는 재봤고 미검증 효과 +0.0012R 로 사실상 0 이었다)\n\n## 부탁\n\n아래는 **기준 봉에서 지지/저항 인근에 온 종목을 전부** 모은 것이다.\n롱은 지지선에서 과매도된 것, 숏은 저항선에서 과매수된 것을 찾고 있다.\n각 종목의 기준 셋업과 상위 봉 맥락을 같이 보고 순위를 매겨 달라.\n\n### 반드시 지킬 것\n\n1. **기준 봉 외의 값으로 진입·손절·익절·수량을 다시 계산하지 마라.**\n   거래 숫자는 기준 봉 셋업에 한 벌만 있고 그게 실제로 주문할 값이다.\n   상위 봉 블록에는 그런 값이 아예 없다.\n2. **상위 봉 방향·EMA 위치·지지/저항 하나만으로 후보를 기각하지 마라.**\n   우리가 찾는 '지지선 과매도 롱' 은 구조적으로 역추세다. 추세 필터를\n   실제로 켰을 때 과매도 후보가 0.0% 가 됐다 — 목적이 통째로 사라졌다.\n   상위 봉 레벨 겹침은 따로 재서 기각됐다(학습 -0.002R · 미검증 -0.034R).\n3. **상위 봉 지표가 선택에 도움이 되는지는 아직 측정되지 않았다.**\n   이 복사본은 정보를 보이게 하는 도구이지 검증된 필터가 아니다.\n   맥락을 근거로 쓸 때는 그게 미측정 근거임을 같이 말해 달라.\n4. **여기 없는 값(호가창·청산맵·뉴스·체결 결과)은 추정하지 마라.**\n5. `—` 와 `판단 불가` 는 **모른다**는 뜻이다. 0 으로 취급하지 마라.\n   반대로 `0.00%` 는 레벨에 **정확히 닿았다**는 뜻이라 정반대다.\n6. 후보에 **`호가창(실측)`** 줄이 **있으면** 그건 지금 오더북 측정값이다(추정 아님) — 그때는 4번의 '호가창 추정 금지'에 앞선다. `수량 초과` 나 큰 청산슬리피지는 우리 수량을 깔끔히 못 받아 실제 손익비가 나빠질 수 있다는 뜻이니 신중히 보라. 줄이 없거나 `— 못 읽음` 이면 여전히 모름이다.\n\n### 어느 봉으로 계산했나 — 지표와 레벨이 다르다\n\n- **지표(%B·RSI·StochRSI·밴드폭·EMA20 이격·ATR)는 진행 중인 봉을 포함**해\n  계산한다. 스캔 표와 같은 기준이라 화면과 값이 일치한다. 대신 **4h·1d 는\n  그 봉이 마감될 때까지 값이 더 변한다** — 1d RSI 는 최대 하루치가 미확정이다.\n- **지지/저항 레벨은 마감된 봉만**으로 만든다. 진행 중인 봉을 넣으면 레벨이\n  하루 종일 흔들리고, 같은 문서 위쪽의 BTC 거시 지지와 다른 규칙이 된다\n  (그 차이를 BTC 12h 에서 재봤을 때 24.0% 의 시각에서 값이 달랐다).\n- 그래서 '현재가' 와 '레벨' 은 서로 다른 봉 집합에서 나온다. 레벨은 조금\n  보수적(덜 최신)이고, 지표는 조금 잠정적이다.\n\n### %B 를 두 개 싣는 이유\n\n지정가를 레벨에 걸어 두므로 판단할 것은 '지금 가격이 어떤가' 가 아니라\n**'내가 주문 걸 가격이 어떤가'** 다. %B 는 가격만 넣으면 값이 나오는 순수\n함수라 상위 봉 밴드에도 **기준 봉 진입가**를 대입할 수 있다. 상위 봉 블록의\n`%B(기준진입가)` 가 그것이고, **이 값이 보려는 값**이다. `%B(현재)` 는 비교용.\n\n근사의 방향도 알고 써 달라 — 가격이 실제로 진입가까지 가면 밴드도 같이\n움직여 실제 %B 는 이 값보다 덜 극단적이다. 다만 그 오차는 밴드가 빨리\n움직이는 하위 봉에서 크고 **상위 봉일수록 작다**(1d 밴드는 그동안 제자리다).\nRSI 는 모멘텀이라 같은 방식으로 옮길 수 없어 현재값 그대로다.\n\n## 한눈에 — 전체 후보\n\n**순위가 아니다.** 아래 상세 블록과 같은 순서이고, 스캔이 준 순서 그대로다.\n무엇으로든 줄을 세우면 그게 곧 순위 주장이 되는데, 이 앱의 「점수」는\n실측상 무작위를 못 이겼고 「적합」도 넷 중 셋이 미측정이다.\n\n상위 봉 %B 열은 **기준 진입가를 그 봉 밴드에 대입한 값**이다(현재가 아님).\n\n| # | 종목 | 방향 | 적합 | %B(진입) | RSI | 1h %B | 4h %B | 1d %B | 꼬리 | 여유R |\n|---|---|---|---|---|---|---|---|---|---|---|\n| 1 | ETHUSDT | 숏 | 3/4 | 1.20 | 56.8 | 0.50 | 0.82 | 1.05 | 0.98 | 0.5 |\n| 2 | LTCUSDT | 숏 | 3/4 | 1.03 | 50.8 | 0.35 | 0.77 | 1.01 | 0.54 | 0.8 |\n| 3 | HYPEUSDT | 숏 | 3/4 | 1.17 | 62.9 | 1.24 | 1.04 | 0.95 | 0.06 | 1.4 |\n| 4 | SOLUSDT | 롱 | 1/4 | 0.79 | 54.4 | 0.30 | 0.78 | 1.00 | 1.11 | 0.8 |\n| 5 | AAVEUSDT | 롱 | 3/4 | -0.02 | 49.6 | -0.10 | 0.48 | 0.82 | 0.29 | 1.3 |\n| 6 | ASTERUSDT | 숏 | 2/4 | 0.63 | 48.9 | 0.31 | 0.25 | 0.52 | 0.43 | 0.2 |\n| 7 | XLMUSDT | 롱 | 3/4 | 0.02 | 52.1 | 0.28 | 0.76 | 1.01 | 0.95 | 0.5 |\n| 8 | XRPUSDT | 숏 | 2/4 | 1.08 | 61.2 | 0.79 | 0.93 | 1.04 | 0.20 | 0.6 |\n| 9 | ZECUSDT | 롱 | 1/4 | 0.71 | 58.9 | 0.77 | 0.58 | 0.85 | 1.26 | 0.7 |\n| 10 | TRUMPUSDT | 롱 | 2/4 | 0.23 | 54.5 | 0.14 | 0.67 | 0.54 | 0.49 | 0.6 |\n| 11 | LINKUSDT | 숏 | 2/4 | 1.19 | 55.6 | 0.62 | 0.82 | 0.89 | 1.03 | 1.6 |\n| 12 | ARBUSDT | 숏 | 2/4 | 0.98 | 55.4 | 0.37 | 0.68 | 0.90 | 1.45 | 0.7 |\n| 13 | AVAXUSDT | 숏 | 2/4 | 1.10 | 56.2 | 0.50 | 0.66 | 1.01 | 1.05 | 0.5 |\n| 14 | BCHUSDT | 숏 | 2/4 | 1.17 | 60.5 | 0.87 | 0.89 | 0.86 | 0.52 | 0.9 |\n| 15 | DOGEUSDT | 숏 | 2/4 | 0.49 | 48.1 | 0.66 | 0.89 | 1.12 | 0.82 | 0.5 |\n| 16 | ONDOUSDT | 롱 | 1/4 | 0.86 | 51.8 | 0.30 | 0.65 | 0.94 | 0.87 | 0.1 |\n| 17 | UNIUSDT | 롱 | 2/4 | 0.24 | 55.0 | 0.38 | 0.53 | 0.90 | 0.80 | 0.3 |\n| 18 | SUIUSDT | 숏 | 1/4 | 0.94 | 51.8 | 0.63 | 0.82 | 1.12 | 1.09 | 1.1 |\n| 19 | FILUSDT | 롱 | 2/4 | 0.04 | 55.0 | 0.51 | 0.62 | 0.90 | 0.47 | 0.6 |\n| 20 | ADAUSDT | 롱 | 1/4 | 0.21 | 56.6 | 0.21 | 0.77 | 0.99 | 0.58 | 0.3 |\n| 21 | WLDUSDT | 숏 | 1/4 | 0.77 | 49.7 | 0.62 | 0.88 | 0.86 | 0.83 | 0.8 |\n\n## 1. ETHUSDT · 숏\n\n### 거래 (15m 기준 셋업 — 주문은 이 값으로 나간다)\n\n- 현재가 2745.25 · 진입 2748.60 · 손절 2774.74228202 · 익절 2709.38657697\n- 근접 0.12% · 손절폭 0.95% · 수량 0.7123 · 증거금 $97.89\n- 순RR 1.33 · 손익분기승률 42.9% · 주문 가능\n\n### 15m 기준 재료\n\n- 적합 3/4 (터치·꼬리·과열) · 점수 77\n- %B(진입) 1.20 · %B(현재) 1.07 · 밴드폭 0.93%\n- RSI14 56.8 · StochRSI 87 · ATR 0.38% · 손절÷ATR 2.5\n- 터치 1 · 레벨나이 92봉전 · 꼬리÷버퍼 0.98 · 여유R 0.5\n- 접근거래량 1.68배 · 캔들몸통÷ATR 1.15 · 합류 ★저항 ★HVN  (합류는 실측상 마이너스 — 근거로 삼지 말 것)\n- EMA20 이격 0.45% · 24h 1.5% · 거래량 15.5B\n- 진입 주변 레벨: R 2748.60(+0.00R·1회) · R 2758.00(+0.36R·1회) · S 2734.44(-0.54R·3회) · R 2768.00(+0.74R·1회)\n\n### 1h 문맥 (거래 신호가 아니다)\n\n- 현재가 2745.26 · %B(현재) 0.45 · %B(기준진입가) 0.50 · RSI14 57.6 · StochRSI 9 · 밴드폭 2.44% · EMA20 이격 -0.30% · ATR 0.83%\n- 지지 2712.06333333 (-1.21%) · 터치 3  /  저항 2748.60 (+0.12%) · 터치 1\n\n### 4h 문맥 (거래 신호가 아니다)\n\n- 현재가 2745.26 · %B(현재) 0.81 · %B(기준진입가) 0.82 · RSI14 68.7 · StochRSI 52 · 밴드폭 9.15% · EMA20 이격 +2.32% · ATR 1.62%\n- 지지 2562.31 (-6.66%) · 터치 2  /  저항 2806.76 (+2.24%) · 터치 2\n\n### 1d 문맥 (거래 신호가 아니다)\n\n- 현재가 2745.26 · %B(현재) 1.04 · %B(기준진입가) 1.05 · RSI14 69.1 · StochRSI 96 · 밴드폭 14.64% · EMA20 이격 +10.44% · ATR 3.86%\n- 지지 2403.33 (-12.46%) · 터치 1  /  저항 2806.76 (+2.24%) · 터치 1\n\n## 2. LTCUSDT · 숏\n\n### 거래 (15m 기준 셋업 — 주문은 이 값으로 나간다)\n\n- 현재가 60.94 · 진입 61.17 · 손절 61.97404064 · 익절 59.96393904\n- 근접 0.38% · 손절폭 1.31% · 수량 23.6055 · 증거금 $72.20\n- 순RR 1.37 · 손익분기승률 42.1% · 주문 가능\n\n### 15m 기준 재료\n\n- 적합 3/4 (터치·꼬리·과열) · 점수 74\n- %B(진입) 1.03 · %B(현재) 0.69 · 밴드폭 1.13%\n- RSI14 50.8 · StochRSI 67 · ATR 0.65% · 손절÷ATR 2.0\n- 터치 1 · 레벨나이 81봉전 · 꼬리÷버퍼 0.54 · 여유R 0.8\n- 접근거래량 1.28배 · 캔들몸통÷ATR 0.74 · 합류 ★저항 ★HVN  (합류는 실측상 마이너스 — 근거로 삼지 말 것)\n- EMA20 이격 0.15% · 24h 2.8% · 거래량 235M\n- 진입 주변 레벨: R 61.17(+0.00R·1회) · R 61.34(+0.21R·2회) · R 61.68(+0.63R·1회) · S 60.54333333(-0.78R·3회)\n\n### 1h 문맥 (거래 신호가 아니다)\n\n- 현재가 60.94 · %B(현재) 0.27 · %B(기준진입가) 0.35 · RSI14 51.4 · StochRSI 11 · 밴드폭 4.80% · EMA20 이격 -0.54% · ATR 1.43%\n- 지지 60.13 (-1.33%) · 터치 2  /  저항 61.34 (+0.66%) · 터치 1\n\n### 4h 문맥 (거래 신호가 아니다)\n\n- 현재가 60.93 · %B(현재) 0.74 · %B(기준진입가) 0.77 · RSI14 62.9 · StochRSI 30 · 밴드폭 12.19% · EMA20 이격 +2.62% · ATR 2.54%\n- 지지 56.56666667 (-7.16%) · 터치 3  /  저항 63.88 (+4.84%) · 터치 2\n\n### 1d 문맥 (거래 신호가 아니다)\n\n- 현재가 60.94 · %B(현재) 0.99 · %B(기준진입가) 1.01 · RSI14 71.5 · StochRSI 93 · 밴드폭 20.62% · EMA20 이격 +13.72% · ATR 4.25%\n- 지지 56.12 (-7.91%) · 터치 2  /  저항 63.88 (+4.82%) · 터치 1\n\n## 3. HYPEUSDT · 숏\n\n### 거래 (15m 기준 셋업 — 주문은 이 값으로 나간다)\n\n- 현재가 95.102 · 진입 95.675 · 손절 96.90940804 · 익절 93.82338794\n- 근접 0.60% · 손절폭 1.29% · 수량 15.3610 · 증거금 $73.48\n- 순RR 1.37 · 손익분기승률 42.2% · 주문 가능\n\n### 15m 기준 재료\n\n- 적합 3/4 (터치·꼬리·과열) · 점수 74\n- %B(진입) 1.17 · %B(현재) 0.96 · 밴드폭 2.82%\n- RSI14 62.9 · StochRSI 72 · ATR 0.59% · 손절÷ATR 2.2\n- 터치 1 · 레벨나이 93봉전 · 꼬리÷버퍼 0.06 · 여유R 1.4\n- 접근거래량 1.22배 · 캔들몸통÷ATR 0.68 · 합류 —  (합류는 실측상 마이너스 — 근거로 삼지 말 것)\n- EMA20 이격 0.29% · 24h 0.1% · 거래량 915M\n- 진입 주변 레벨: R 95.675(+0.00R·1회) · R 96.026(+0.28R·3회) · R 95.021(-0.53R·1회) · R 94.482(-0.97R·5회)\n\n### 1h 문맥 (거래 신호가 아니다)\n\n- 현재가 95.093 · %B(현재) 1.03 · %B(기준진입가) 1.24 · RSI14 62.3 · StochRSI 100 · 밴드폭 2.99% · EMA20 이격 +1.06% · ATR 1.06%\n- 지지 92.864 (-2.34%) · 터치 1  /  저항 96.0395 (+0.99%) · 터치 2\n\n### 4h 문맥 (거래 신호가 아니다)\n\n- 현재가 95.103 · %B(현재) 0.93 · %B(기준진입가) 1.04 · RSI14 66.3 · StochRSI 23 · 밴드폭 5.05% · EMA20 이격 +2.65% · ATR 2.06%\n- 지지 92.00 (-3.26%) · 터치 1  /  저항 96.079 (+1.03%) · 터치 2\n\n### 1d 문맥 (거래 신호가 아니다)\n\n- 현재가 95.103 · %B(현재) 0.93 · %B(기준진입가) 0.95 · RSI14 68.6 · StochRSI 100 · 밴드폭 24.50% · EMA20 이격 +11.40% · ATR 5.14%\n- 지지 78.335 (-17.63%) · 터치 2  /  저항 96.079 (+1.03%) · 터치 1\n\n## 4. SOLUSDT · 롱\n\n### 거래 (15m 기준 셋업 — 주문은 이 값으로 나간다)\n\n- 현재가 117.18 · 진입 116.93 · 손절 115.64422649 · 익절 118.85866026\n- 근접 0.21% · 손절폭 1.10% · 수량 14.6308 · 증거금 $85.54\n- 순RR 1.35 · 손익분기승률 42.5% · 주문 가능\n\n### 15m 기준 재료\n\n- 적합 1/4 (터치) · 점수 72\n- %B(진입) 0.79 · %B(현재) 0.97 · 밴드폭 1.19%\n- RSI14 54.4 · StochRSI 84 · ATR 0.53% · 손절÷ATR 2.1\n- 터치 1 · 레벨나이 92봉전 · 꼬리÷버퍼 1.11 · 여유R 0.8\n- 접근거래량 1.22배 · 캔들몸통÷ATR 1.05 · 합류 ★지지 ★HVN  (합류는 실측상 마이너스 — 근거로 삼지 말 것)\n- EMA20 이격 0.45% · 24h 1.3% · 거래량 3.6B\n- 진입 주변 레벨: S 116.93(+0.00R·1회) · S 116.64(-0.23R·3회) · S 116.305(-0.49R·2회) · S 116.12(-0.63R·1회)\n\n### 1h 문맥 (거래 신호가 아니다)\n\n- 현재가 117.18 · %B(현재) 0.37 · %B(기준진입가) 0.30 · RSI14 56.9 · StochRSI 8 · 밴드폭 3.20% · EMA20 이격 -0.39% · ATR 1.08%\n- 지지 115.53 (-1.41%) · 터치 2  /  저항 119.16 (+1.69%) · 터치 1\n\n### 4h 문맥 (거래 신호가 아니다)\n\n- 현재가 117.17 · %B(현재) 0.80 · %B(기준진입가) 0.78 · RSI14 68.8 · StochRSI 52 · 밴드폭 11.97% · EMA20 이격 +3.04% · ATR 1.92%\n- 지지 111.15 (-5.14%) · 터치 1  /  저항 119.99 (+2.41%) · 터치 2\n\n### 1d 문맥 (거래 신호가 아니다)\n\n- 현재가 117.18 · %B(현재) 1.01 · %B(기준진입가) 1.00 · RSI14 67.2 · StochRSI 91 · 밴드폭 20.55% · EMA20 이격 +14.01% · ATR 4.60%\n- 지지 97.35 (-16.92%) · 터치 2  /  저항 119.99 (+2.40%) · 터치 1\n\n## 5. AAVEUSDT · 롱\n\n### 거래 (15m 기준 셋업 — 주문은 이 값으로 나간다)\n\n- 현재가 142.54 · 진입 140.62 · 손절 138.41453279 · 익절 143.92820081\n- 근접 1.37% · 손절폭 1.57% · 수량 8.6851 · 증거금 $61.06\n- 순RR 1.39 · 손익분기승률 41.8% · 주문 가능\n\n### 15m 기준 재료\n\n- 적합 3/4 (터치·꼬리·과열) · 점수 70\n- %B(진입) -0.02 · %B(현재) 0.54 · 밴드폭 2.41%\n- RSI14 49.6 · StochRSI 44 · ATR 0.78% · 손절÷ATR 2.0\n- 터치 1 · 레벨나이 124봉전 · 꼬리÷버퍼 0.29 · 여유R 1.3\n- 접근거래량 0.86배 · 캔들몸통÷ATR 0.34 · 합류 —  (합류는 실측상 마이너스 — 근거로 삼지 말 것)\n- EMA20 이격 -1.09% · 24h 0.5% · 거래량 189M\n- 진입 주변 레벨: S 140.62(+0.00R·1회) · S 140.18(-0.20R·1회) · S 137.885(-1.24R·2회) · R 143.54(+1.32R·1회)\n\n### 1h 문맥 (거래 신호가 아니다)\n\n- 현재가 142.63 · %B(현재) 0.27 · %B(기준진입가) -0.10 · RSI14 49.3 · StochRSI 8 · 밴드폭 3.86% · EMA20 이격 -1.13% · ATR 1.64%\n- 지지 141.454 (-0.82%) · 터치 5  /  저항 144.14 (+1.06%) · 터치 1\n\n### 4h 문맥 (거래 신호가 아니다)\n\n- 현재가 142.54 · %B(현재) 0.63 · %B(기준진입가) 0.48 · RSI14 58.6 · StochRSI 26 · 밴드폭 9.09% · EMA20 이격 +1.19% · ATR 3.02%\n- 지지 133.15 (-6.59%) · 터치 2  /  저항 147.00 (+3.13%) · 터치 1\n\n### 1d 문맥 (거래 신호가 아니다)\n\n- 현재가 142.63 · %B(현재) 0.89 · %B(기준진입가) 0.82 · RSI14 62.5 · StochRSI 86 · 밴드폭 20.78% · EMA20 이격 +12.33% · ATR 6.01%\n- 지지 119.775 (-16.02%) · 터치 2  /  저항 149.26 (+4.65%) · 터치 1\n\n## 6. ASTERUSDT · 숏\n\n### 거래 (15m 기준 셋업 — 주문은 이 값으로 나간다)\n\n- 현재가 0.7316 · 진입 0.7328 · 손절 0.74482666 · 익절 0.71476002\n- 근접 0.16% · 손절폭 1.64% · 수량 1594.1807 · 증거금 $58.41\n- 순RR 1.40 · 손익분기승률 41.7% · 주문 가능\n\n### 15m 기준 재료\n\n- 적합 2/4 (터치·꼬리) · 점수 69\n- %B(진입) 0.63 · %B(현재) 0.55 · 밴드폭 1.97%\n- RSI14 48.9 · StochRSI 49 · ATR 0.84% · 손절÷ATR 2.0\n- 터치 1 · 레벨나이 142봉전 · 꼬리÷버퍼 0.43 · 여유R 0.2\n- 접근거래량 0.66배 · 캔들몸통÷ATR 0.69 · 합류 —  (합류는 실측상 마이너스 — 근거로 삼지 말 것)\n- EMA20 이격 -0.04% · 24h -2.5% · 거래량 129M\n- 진입 주변 레벨: R 0.7328(+0.00R·1회) · S 0.7307(-0.17R·3회) · R 0.735(+0.18R·2회) · S 0.7281(-0.39R·2회)\n\n### 1h 문맥 (거래 신호가 아니다)\n\n- 현재가 0.7316 · %B(현재) 0.27 · %B(기준진입가) 0.31 · RSI14 43.3 · StochRSI 52 · 밴드폭 4.53% · EMA20 이격 -0.64% · ATR 1.50%\n- 지지 0.72805 (-0.48%) · 터치 4  /  저항 0.7368 (+0.71%) · 터치 1\n\n### 4h 문맥 (거래 신호가 아니다)\n\n- 현재가 0.7318 · %B(현재) 0.23 · %B(기준진입가) 0.25 · RSI14 46.1 · StochRSI 12 · 밴드폭 6.92% · EMA20 이격 -1.07% · ATR 2.62%\n- 지지 0.7259 (-0.81%) · 터치 1  /  저항 0.7381 (+0.86%) · 터치 1\n\n### 1d 문맥 (거래 신호가 아니다)\n\n- 현재가 0.7315 · %B(현재) 0.51 · %B(기준진입가) 0.52 · RSI14 53.6 · StochRSI 52 · 밴드폭 18.12% · EMA20 이격 +3.19% · ATR 5.61%\n- 지지 0.6708 (-8.30%) · 터치 1  /  저항 0.7469 (+2.10%) · 터치 1\n\n## 7. XLMUSDT · 롱\n\n### 거래 (15m 기준 셋업 — 주문은 이 값으로 나간다)\n\n- 현재가 0.21301 · 진입 0.21012 · 손절 0.20655881 · 익절 0.21546179\n- 근접 1.38% · 손절폭 1.69% · 수량 5395.9357 · 증거금 $56.69\n- 순RR 1.40 · 손익분기승률 41.7% · 주문 가능\n\n### 15m 기준 재료\n\n- 적합 3/4 (터치·꼬리·과열) · 점수 68\n- %B(진입) 0.02 · %B(현재) 0.65 · 밴드폭 2.16%\n- RSI14 52.1 · StochRSI 63 · ATR 0.83% · 손절÷ATR 2.1\n- 터치 1 · 레벨나이 88봉전 · 꼬리÷버퍼 0.95 · 여유R 0.5\n- 접근거래량 1.54배 · 캔들몸통÷ATR 0.38 · 합류 ★지지 ★HVN  (합류는 실측상 마이너스 — 근거로 삼지 말 것)\n- EMA20 이격 -0.91% · 24h 4.6% · 거래량 158M\n- 진입 주변 레벨: S 0.21012(+0.00R·1회) · S 0.20934(-0.22R·2회) · R 0.21205333(+0.54R·3회) · S 0.20811(-0.56R·1회)\n\n### 1h 문맥 (거래 신호가 아니다)\n\n- 현재가 0.21304 · %B(현재) 0.59 · %B(기준진입가) 0.28 · RSI14 60.0 · StochRSI 6 · 밴드폭 4.55% · EMA20 이격 +0.46% · ATR 1.69%\n- 지지 0.21064 (-1.13%) · 터치 1  /  저항 0.21321 (+0.08%) · 터치 1\n\n### 4h 문맥 (거래 신호가 아니다)\n\n- 현재가 0.21304 · %B(현재) 0.84 · %B(기준진입가) 0.76 · RSI14 68.8 · StochRSI 78 · 밴드폭 16.41% · EMA20 이격 +4.92% · ATR 2.85%\n- 지지 0.19064 (-10.51%) · 터치 1  /  저항 0.21321 (+0.08%) · 터치 1\n\n### 1d 문맥 (거래 신호가 아니다)\n\n- 현재가 0.21312 · %B(현재) 1.07 · %B(기준진입가) 1.01 · RSI14 65.9 · StochRSI 93 · 밴드폭 20.62% · EMA20 이격 +14.68% · ATR 5.64%\n- 지지 0.18014167 (-15.47%) · 터치 6  /  저항 0.216745 (+1.70%) · 터치 2\n\n## 8. XRPUSDT · 숏\n\n### 거래 (15m 기준 셋업 — 주문은 이 값으로 나간다)\n\n- 현재가 1.536 · 진입 1.5369 · 손절 1.55660421 · 익절 1.50734369\n- 근접 0.06% · 손절폭 1.28% · 수량 962.0060 · 증거금 $73.93\n- 순RR 1.37 · 손익분기승률 42.2% · 주문 가능\n\n### 15m 기준 재료\n\n- 적합 2/4 (꼬리·과열) · 점수 68\n- %B(진입) 1.08 · %B(현재) 1.05 · 밴드폭 2.10%\n- RSI14 61.2 · StochRSI 87 · ATR 0.68% · 손절÷ATR 1.9\n- 터치 2 · 레벨나이 47봉전 · 꼬리÷버퍼 0.20 · 여유R 0.6\n- 접근거래량 0.94배 · 캔들몸통÷ATR 0.94 · 합류 —  (합류는 실측상 마이너스 — 근거로 삼지 말 것)\n- EMA20 이격 1.07% · 24h 4.3% · 거래량 2.1B\n- 진입 주변 레벨: R 1.5369(+0.00R·2회) · R 1.5399(+0.15R·1회) · S 1.5252(-0.59R·1회) · S 1.5099(-1.37R·2회)\n\n### 1h 문맥 (거래 신호가 아니다)\n\n- 현재가 1.536 · %B(현재) 0.77 · %B(기준진입가) 0.79 · RSI14 67.2 · StochRSI 18 · 밴드폭 4.75% · EMA20 이격 +0.80% · ATR 1.40%\n- 지지 1.5041 (-2.08%) · 터치 1  /  저항 1.5745 (+2.51%) · 터치 2\n\n### 4h 문맥 (거래 신호가 아니다)\n\n- 현재가 1.536 · %B(현재) 0.92 · %B(기준진입가) 0.93 · RSI14 73.8 · StochRSI 78 · 밴드폭 13.85% · EMA20 이격 +4.96% · ATR 2.34%\n- 지지 1.434 (-6.64%) · 터치 1  /  저항 1.5745 (+2.51%) · 터치 2\n\n### 1d 문맥 (거래 신호가 아니다)\n\n- 현재가 1.536 · %B(현재) 1.04 · %B(기준진입가) 1.04 · RSI14 65.3 · StochRSI 91 · 밴드폭 17.14% · EMA20 이격 +11.54% · ATR 5.64%\n- 지지 1.4104 (-8.18%) · 터치 1  /  저항 1.5499 (+0.91%) · 터치 2\n\n## 9. ZECUSDT · 롱\n\n### 거래 (15m 기준 셋업 — 주문은 이 값으로 나간다)\n\n- 현재가 1507.76 · 진입 1506.19 · 손절 1478.14971707 · 익절 1548.25042439\n- 근접 0.10% · 손절폭 1.86% · 수량 0.6877 · 증거금 $51.79\n- 순RR 1.41 · 손익분기승률 41.5% · 주문 가능\n\n### 15m 기준 재료\n\n- 적합 1/4 (터치) · 점수 67\n- %B(진입) 0.71 · %B(현재) 0.73 · 밴드폭 5.36%\n- RSI14 58.9 · StochRSI 29 · ATR 1.00% · 손절÷ATR 1.9\n- 터치 1 · 레벨나이 148봉전 · 꼬리÷버퍼 1.26 · 여유R 0.7\n- 접근거래량 0.78배 · 캔들몸통÷ATR 0.33 · 합류 ★지지 ★HVN  (합류는 실측상 마이너스 — 근거로 삼지 말 것)\n- EMA20 이격 1.07% · 24h -0.0% · 거래량 2.3B\n- 진입 주변 레벨: S 1506.19(+0.00R·1회) · S 1502.22(-0.14R·2회) · S 1497.06(-0.33R·1회) · R 1524.91(+0.67R·5회)\n\n### 1h 문맥 (거래 신호가 아니다)\n\n- 현재가 1507.75 · %B(현재) 0.78 · %B(기준진입가) 0.77 · RSI14 56.7 · StochRSI 96 · 밴드폭 5.93% · EMA20 이격 +2.08% · ATR 1.79%\n- 지지 1485.00 (-1.51%) · 터치 1  /  저항 1536.23666667 (+1.89%) · 터치 3\n\n### 4h 문맥 (거래 신호가 아니다)\n\n- 현재가 1507.76 · %B(현재) 0.59 · %B(기준진입가) 0.58 · RSI14 56.1 · StochRSI 28 · 밴드폭 9.71% · EMA20 이격 +2.50% · ATR 3.77%\n- 지지 1443.145 (-4.29%) · 터치 2  /  저항 1537.15 (+1.95%) · 터치 1\n\n### 1d 문맥 (거래 신호가 아니다)\n\n- 현재가 1507.76 · %B(현재) 0.86 · %B(기준진입가) 0.85 · RSI14 68.4 · StochRSI 48 · 밴드폭 49.78% · EMA20 이격 +20.23% · ATR 8.42%\n- 지지 1047.395 (-30.53%) · 터치 2  /  저항 1595.30 (+5.81%) · 터치 2\n\n## 10. TRUMPUSDT · 롱\n\n### 거래 (15m 기준 셋업 — 주문은 이 값으로 나간다)\n\n- 현재가 2.17 · 진입 2.136 · 손절 2.0953821 · 익절 2.19692684\n- 근접 1.59% · 손절폭 1.90% · 수량 475.1408 · 증거금 $50.75\n- 순RR 1.41 · 손익분기승률 41.5% · 주문 가능\n\n### 15m 기준 재료\n\n- 적합 2/4 (터치·꼬리) · 점수 65\n- %B(진입) 0.23 · %B(현재) 0.84 · 밴드폭 2.55%\n- RSI14 54.5 · StochRSI 89 · ATR 1.00% · 손절÷ATR 1.9\n- 터치 1 · 레벨나이 95봉전 · 꼬리÷버퍼 0.49 · 여유R 0.6\n- 접근거래량 0.97배 · 캔들몸통÷ATR 0.26 · 합류 —  (합류는 실측상 마이너스 — 근거로 삼지 말 것)\n- EMA20 이격 -0.47% · 24h 2.1% · 거래량 246M\n- 진입 주변 레벨: S 2.136(+0.00R·1회) · S 2.1298(-0.15R·5회) · S 2.12(-0.39R·1회) · S 2.11433333(-0.53R·3회)\n\n### 1h 문맥 (거래 신호가 아니다)\n\n- 현재가 2.17 · %B(현재) 0.57 · %B(기준진입가) 0.14 · RSI14 55.7 · StochRSI 18 · 밴드폭 3.65% · EMA20 이격 -0.15% · ATR 1.97%\n- 지지 2.115 (-2.54%) · 터치 2  /  저항 2.19833333 (+1.31%) · 터치 3\n\n### 4h 문맥 (거래 신호가 아니다)\n\n- 현재가 2.17 · %B(현재) 0.82 · %B(기준진입가) 0.67 · RSI14 62.3 · StochRSI 71 · 밴드폭 10.55% · EMA20 이격 +2.37% · ATR 3.50%\n- 지지 2.136 (-1.57%) · 터치 1  /  저항 2.197 (+1.24%) · 터치 1\n\n### 1d 문맥 (거래 신호가 아니다)\n\n- 현재가 2.17 · %B(현재) 0.60 · %B(기준진입가) 0.54 · RSI14 54.4 · StochRSI 85 · 밴드폭 29.60% · EMA20 이격 +5.11% · ATR 8.99%\n- 지지 2.109 (-2.81%) · 터치 1  /  저항 2.396 (+10.41%) · 터치 1\n\n## 11. LINKUSDT · 숏\n\n### 거래 (15m 기준 셋업 — 주문은 이 값으로 나간다)\n\n- 현재가 13.013 · 진입 13.059 · 손절 13.21134483 · 익절 12.83048275\n- 근접 0.35% · 손절폭 1.17% · 수량 123.7913 · 증거금 $80.83\n- 순RR 1.36 · 손익분기승률 42.4% · 주문 가능\n\n### 15m 기준 재료\n\n- 적합 2/4 (여유·과열) · 점수 64\n- %B(진입) 1.19 · %B(현재) 0.96 · 밴드폭 1.55%\n- RSI14 55.6 · StochRSI 72 · ATR 0.63% · 손절÷ATR 1.9\n- 터치 2 · 레벨나이 91봉전 · 꼬리÷버퍼 1.03 · 여유R 1.6\n- 접근거래량 0.66배 · 캔들몸통÷ATR 0.40 · 합류 ★저항 ★POC·HVN  (합류는 실측상 마이너스 — 근거로 삼지 말 것)\n- EMA20 이격 -0.70% · 24h 1.6% · 거래량 291M\n- 진입 주변 레벨: R 13.059(+0.00R·2회) · R 13.082(+0.15R·2회) · R 13.103(+0.29R·1회) · R 13.131(+0.47R·2회)\n\n### 1h 문맥 (거래 신호가 아니다)\n\n- 현재가 13.014 · %B(현재) 0.51 · %B(기준진입가) 0.62 · RSI14 55.3 · StochRSI 12 · 밴드폭 3.04% · EMA20 이격 -0.38% · ATR 1.35%\n- 지지 12.8575 (-1.20%) · 터치 2  /  저항 13.165 (+1.16%) · 터치 1\n\n### 4h 문맥 (거래 신호가 아니다)\n\n- 현재가 13.014 · %B(현재) 0.79 · %B(기준진입가) 0.82 · RSI14 64.7 · StochRSI 61 · 밴드폭 10.79% · EMA20 이격 +2.56% · ATR 2.31%\n- 지지 12.285 (-5.60%) · 터치 1  /  저항 13.282 (+2.06%) · 터치 2\n\n### 1d 문맥 (거래 신호가 아니다)\n\n- 현재가 13.014 · %B(현재) 0.87 · %B(기준진입가) 0.89 · RSI14 64.5 · StochRSI 87 · 밴드폭 21.30% · EMA20 이격 +11.64% · ATR 5.21%\n- 지지 10.974 (-15.68%) · 터치 3  /  저항 13.677 (+5.09%) · 터치 2\n\n## 12. ARBUSDT · 숏\n\n### 거래 (15m 기준 셋업 — 주문은 이 값으로 나간다)\n\n- 현재가 0.22182 · 진입 0.22194 · 손절 0.22642625 · 익절 0.21521063\n- 근접 0.05% · 손절폭 2.02% · 수량 4306.7721 · 증거금 $47.79\n- 순RR 1.42 · 손익분기승률 41.4% · 주문 가능\n\n### 15m 기준 재료\n\n- 적합 2/4 (터치·과열) · 점수 63\n- %B(진입) 0.98 · %B(현재) 0.96 · 밴드폭 2.37%\n- RSI14 55.4 · StochRSI 85 · ATR 1.00% · 손절÷ATR 2.0\n- 터치 1 · 레벨나이 136봉전 · 꼬리÷버퍼 1.45 · 여유R 0.7\n- 접근거래량 0.91배 · 캔들몸통÷ATR 0.30 · 합류 ★저항 ★HVN  (합류는 실측상 마이너스 — 근거로 삼지 말 것)\n- EMA20 이격 -0.27% · 24h 1.9% · 거래량 299M\n- 진입 주변 레벨: R 0.22194(+0.00R·1회) · R 0.2229325(+0.22R·4회) · R 0.22022(-0.38R·1회) · R 0.22431(+0.53R·1회)\n\n### 1h 문맥 (거래 신호가 아니다)\n\n- 현재가 0.22179 · %B(현재) 0.37 · %B(기준진입가) 0.37 · RSI14 49.9 · StochRSI 24 · 밴드폭 9.52% · EMA20 이격 -1.50% · ATR 2.71%\n- 지지 0.21586333 (-2.67%) · 터치 3  /  저항 0.22292 (+0.51%) · 터치 1\n\n### 4h 문맥 (거래 신호가 아니다)\n\n- 현재가 0.22179 · %B(현재) 0.68 · %B(기준진입가) 0.68 · RSI14 58.5 · StochRSI 18 · 밴드폭 13.79% · EMA20 이격 +2.11% · ATR 5.96%\n- 지지 0.201365 (-9.21%) · 터치 2  /  저항 0.23018 (+3.78%) · 터치 2\n\n### 1d 문맥 (거래 신호가 아니다)\n\n- 현재가 0.22179 · %B(현재) 0.90 · %B(기준진입가) 0.90 · RSI14 71.6 · StochRSI 80 · 밴드폭 58.37% · EMA20 이격 +35.79% · ATR 9.81%\n- 지지 0.13121 (-40.84%) · 터치 1  /  저항 0.24787 (+11.76%) · 터치 1\n\n## 13. AVAXUSDT · 숏\n\n### 거래 (15m 기준 셋업 — 주문은 이 값으로 나간다)\n\n- 현재가 10.933 · 진입 11.027 · 손절 11.25128883 · 익절 10.69056676\n- 근접 0.85% · 손절폭 2.03% · 수량 86.1624 · 증거금 $47.51\n- 순RR 1.42 · 손익분기승률 41.4% · 주문 가능\n\n### 15m 기준 재료\n\n- 적합 2/4 (터치·과열) · 점수 63\n- %B(진입) 1.10 · %B(현재) 0.88 · 밴드폭 4.05%\n- RSI14 56.2 · StochRSI 94 · ATR 0.91% · 손절÷ATR 2.2\n- 터치 1 · 레벨나이 149봉전 · 꼬리÷버퍼 1.05 · 여유R 0.5\n- 접근거래량 1.13배 · 캔들몸통÷ATR 1.13 · 합류 —  (합류는 실측상 마이너스 — 근거로 삼지 말 것)\n- EMA20 이격 1.16% · 24h -2.0% · 거래량 388M\n- 진입 주변 레벨: R 11.027(+0.00R·1회) · R 11.092(+0.29R·1회) · S 10.904(-0.55R·1회) · R 11.226(+0.89R·3회)\n\n### 1h 문맥 (거래 신호가 아니다)\n\n- 현재가 10.937 · %B(현재) 0.38 · %B(기준진입가) 0.50 · RSI14 48.7 · StochRSI 20 · 밴드폭 7.10% · EMA20 이격 -2.38% · ATR 2.03%\n- 지지 10.514 (-3.87%) · 터치 2  /  저항 11.404 (+4.27%) · 터치 2\n\n### 4h 문맥 (거래 신호가 아니다)\n\n- 현재가 10.937 · %B(현재) 0.63 · %B(기준진입가) 0.66 · RSI14 64.1 · StochRSI 3 · 밴드폭 30.62% · EMA20 이격 +3.72% · ATR 4.49%\n- 지지 8.201 (-25.02%) · 터치 1  /  저항 11.792 (+7.82%) · 터치 2\n\n### 1d 문맥 (거래 신호가 아니다)\n\n- 현재가 10.934 · %B(현재) 0.99 · %B(기준진입가) 1.01 · RSI14 77.7 · StochRSI 93 · 밴드폭 49.35% · EMA20 이격 +33.66% · ATR 5.71%\n- 지지 8.909 (-18.52%) · 터치 4  /  저항 11.792 (+7.85%) · 터치 1\n\n## 14. BCHUSDT · 숏\n\n### 거래 (15m 기준 셋업 — 주문은 이 값으로 나간다)\n\n- 현재가 268.91 · 진입 268.955 · 손절 273.538799 · 익절 262.0793015\n- 근접 0.02% · 손절폭 1.70% · 수량 4.1890 · 증거금 $56.33\n- 순RR 1.40 · 손익분기승률 41.6% · 주문 가능\n\n### 15m 기준 재료\n\n- 적합 2/4 (꼬리·과열) · 점수 61\n- %B(진입) 1.17 · %B(현재) 1.17 · 밴드폭 2.08%\n- RSI14 60.5 · StochRSI 84 · ATR 0.86% · 손절÷ATR 2.0\n- 터치 2 · 레벨나이 81봉전 · 꼬리÷버퍼 0.52 · 여유R 0.9\n- 접근거래량 2.50배 · 캔들몸통÷ATR 0.85 · 합류 ★저항 ★HVN  (합류는 실측상 마이너스 — 근거로 삼지 말 것)\n- EMA20 이격 0.04% · 24h 3.6% · 거래량 213M\n- 진입 주변 레벨: R 268.955(+0.00R·2회) · R 269.905(+0.21R·2회) · R 270.55(+0.35R·1회) · R 267.11666667(-0.40R·3회)\n\n### 1h 문맥 (거래 신호가 아니다)\n\n- 현재가 269.01 · %B(현재) 0.88 · %B(기준진입가) 0.87 · RSI14 63.3 · StochRSI 39 · 밴드폭 3.12% · EMA20 이격 +0.89% · ATR 1.56%\n- 지지 261.72 (-2.71%) · 터치 2  /  저항 272.25 (+1.20%) · 터치 3\n\n### 4h 문맥 (거래 신호가 아니다)\n\n- 현재가 269.02 · %B(현재) 0.89 · %B(기준진입가) 0.89 · RSI14 71.1 · StochRSI 74 · 밴드폭 12.04% · EMA20 이격 +4.21% · ATR 2.79%\n- 지지 255.30 (-5.10%) · 터치 1  /  저항 269.45 (+0.16%) · 터치 1\n\n### 1d 문맥 (거래 신호가 아니다)\n\n- 현재가 268.99 · %B(현재) 0.86 · %B(기준진입가) 0.86 · RSI14 63.7 · StochRSI 98 · 밴드폭 25.54% · EMA20 이격 +9.88% · ATR 6.09%\n- 지지 240.27 (-10.68%) · 터치 2  /  저항 272.40 (+1.27%) · 터치 1\n\n## 15. DOGEUSDT · 숏\n\n### 거래 (15m 기준 셋업 — 주문은 이 값으로 나간다)\n\n- 현재가 0.09937 · 진입 0.1 · 손절 0.10231034 · 익절 0.09653448\n- 근접 0.63% · 손절폭 2.31% · 수량 8398.0730 · 증거금 $41.99\n- 순RR 1.43 · 손익분기승률 41.2% · 주문 가능\n\n### 15m 기준 재료\n\n- 적합 2/4 (터치·꼬리) · 점수 59\n- %B(진입) 0.49 · %B(현재) 0.40 · 밴드폭 6.41%\n- RSI14 48.1 · StochRSI 55 · ATR 1.17% · 손절÷ATR 2.0\n- 터치 1 · 레벨나이 56봉전 · 꼬리÷버퍼 0.82 · 여유R 0.5\n- 접근거래량 0.89배 · 캔들몸통÷ATR 0.63 · 합류 ★저항 ★POC  (합류는 실측상 마이너스 — 근거로 삼지 말 것)\n- EMA20 이격 -0.24% · 24h 8.2% · 거래량 1.7B\n- 진입 주변 레벨: R 0.1(+0.00R·1회) · R 0.100445(+0.19R·2회) · R 0.10081(+0.35R·1회) · S 0.09885(-0.50R·1회)\n\n### 1h 문맥 (거래 신호가 아니다)\n\n- 현재가 0.09933 · %B(현재) 0.57 · %B(기준진입가) 0.66 · RSI14 60.1 · StochRSI 2 · 밴드폭 7.87% · EMA20 이격 +0.94% · ATR 2.38%\n- 지지 0.09841 (-0.93%) · 터치 1  /  저항 0.10217 (+2.86%) · 터치 1\n\n### 4h 문맥 (거래 신호가 아니다)\n\n- 현재가 0.09933 · %B(현재) 0.86 · %B(기준진입가) 0.89 · RSI14 72.4 · StochRSI 77 · 밴드폭 22.73% · EMA20 이격 +7.44% · ATR 3.16%\n- 지지 0.08851 (-10.89%) · 터치 1  /  저항 0.10594 (+6.66%) · 터치 1\n\n### 1d 문맥 (거래 신호가 아니다)\n\n- 현재가 0.09933 · %B(현재) 1.09 · %B(기준진입가) 1.12 · RSI14 69.5 · StochRSI 87 · 밴드폭 21.01% · EMA20 이격 +16.05% · ATR 5.29%\n- 지지 0.09680333 (-2.54%) · 터치 3  /  저항 0.10166333 (+2.35%) · 터치 3\n\n## 16. ONDOUSDT · 롱\n\n### 거래 (15m 기준 셋업 — 주문은 이 값으로 나간다)\n\n- 현재가 0.4374 · 진입 0.43725 · 손절 0.42871819 · 익절 0.45004772\n- 근접 0.03% · 손절폭 1.95% · 수량 2264.0773 · 증거금 $49.50\n- 순RR 1.41 · 손익분기승률 41.4% · 주문 가능\n\n### 15m 기준 재료\n\n- 적합 1/4 (꼬리) · 점수 57\n- %B(진입) 0.86 · %B(현재) 0.87 · 밴드폭 2.19%\n- RSI14 51.8 · StochRSI 87 · ATR 0.97% · 손절÷ATR 2.0\n- 터치 2 · 레벨나이 136봉전 · 꼬리÷버퍼 0.87 · 여유R 0.1\n- 접근거래량 1.20배 · 캔들몸통÷ATR 0.89 · 합류 ★지지 ★HVN  (합류는 실측상 마이너스 — 근거로 삼지 말 것)\n- EMA20 이격 0.60% · 24h -0.5% · 거래량 230M\n- 진입 주변 레벨: S 0.43725(+0.00R·2회) · R 0.4383(+0.12R·3회) · S 0.4355(-0.21R·1회) · R 0.4397(+0.29R·1회)\n\n### 1h 문맥 (거래 신호가 아니다)\n\n- 현재가 0.4374 · %B(현재) 0.30 · %B(기준진입가) 0.30 · RSI14 48.3 · StochRSI 10 · 밴드폭 7.26% · EMA20 이격 -1.73% · ATR 2.17%\n- 지지 0.4287 (-1.99%) · 터치 2  /  저항 0.4435 (+1.40%) · 터치 1\n\n### 4h 문맥 (거래 신호가 아니다)\n\n- 현재가 0.4374 · %B(현재) 0.65 · %B(기준진입가) 0.65 · RSI14 59.3 · StochRSI 7 · 밴드폭 14.53% · EMA20 이격 +1.82% · ATR 4.08%\n- 지지 0.4006 (-8.41%) · 터치 1  /  저항 0.4435 (+1.40%) · 터치 1\n\n### 1d 문맥 (거래 신호가 아니다)\n\n- 현재가 0.4375 · %B(현재) 0.94 · %B(기준진입가) 0.94 · RSI14 64.5 · StochRSI 93 · 밴드폭 31.97% · EMA20 이격 +20.49% · ATR 6.13%\n- 지지 0.3723 (-14.90%) · 터치 2  /  저항 0.4629 (+5.81%) · 터치 1\n\n## 17. UNIUSDT · 롱\n\n### 거래 (15m 기준 셋업 — 주문은 이 값으로 나간다)\n\n- 현재가 9.018 · 진입 8.864 · 손절 8.64738243 · 익절 9.18892636\n- 근접 1.74% · 손절폭 2.44% · 수량 89.8012 · 증거금 $39.80\n- 순RR 1.43 · 손익분기승률 41.1% · 주문 가능\n\n### 15m 기준 재료\n\n- 적합 2/4 (터치·꼬리) · 점수 57\n- %B(진입) 0.24 · %B(현재) 0.85 · 밴드폭 2.83%\n- RSI14 55.0 · StochRSI 83 · ATR 1.13% · 손절÷ATR 2.2\n- 터치 1 · 레벨나이 137봉전 · 꼬리÷버퍼 0.80 · 여유R 0.3\n- 접근거래량 0.63배 · 캔들몸통÷ATR 0.34 · 합류 ★지지 ★POC·HVN  (합류는 실측상 마이너스 — 근거로 삼지 말 것)\n- EMA20 이격 -0.58% · 24h 2.2% · 거래량 638M\n- 진입 주변 레벨: S 8.864(+0.00R·1회) · S 8.80866667(-0.26R·3회) · R 8.927(+0.29R·1회) · R 8.96(+0.44R·1회)\n\n### 1h 문맥 (거래 신호가 아니다)\n\n- 현재가 9.022 · %B(현재) 0.70 · %B(기준진입가) 0.38 · RSI14 54.6 · StochRSI 23 · 밴드폭 5.50% · EMA20 이격 -0.05% · ATR 2.48%\n- 지지 8.919 (-1.14%) · 터치 1  /  저항 9.055 (+0.37%) · 터치 1\n\n### 4h 문맥 (거래 신호가 아니다)\n\n- 현재가 9.019 · %B(현재) 0.79 · %B(기준진입가) 0.53 · RSI14 64.7 · StochRSI 52 · 밴드폭 6.79% · EMA20 이격 +2.60% · ATR 4.40%\n- 지지 8.48475 (-5.92%) · 터치 4  /  저항 9.297 (+3.08%) · 터치 1\n\n### 1d 문맥 (거래 신호가 아니다)\n\n- 현재가 9.026 · %B(현재) 0.94 · %B(기준진입가) 0.90 · RSI14 76.7 · StochRSI 92 · 밴드폭 48.12% · EMA20 이격 +27.79% · ATR 8.07%\n- 지지 5.994 (-33.59%) · 터치 1  /  저항 9.522 (+5.50%) · 터치 2\n\n## 18. SUIUSDT · 숏\n\n### 거래 (15m 기준 셋업 — 주문은 이 값으로 나간다)\n\n- 현재가 1.0253 · 진입 1.033 · 손절 1.05531648 · 익절 0.99952528\n- 근접 0.75% · 손절폭 2.16% · 수량 867.6512 · 증거금 $44.81\n- 순RR 1.42 · 손익분기승률 41.3% · 주문 가능\n\n### 15m 기준 재료\n\n- 적합 1/4 (과열) · 점수 55\n- %B(진입) 0.94 · %B(현재) 0.69 · 밴드폭 3.08%\n- RSI14 51.8 · StochRSI 91 · ATR 1.07% · 손절÷ATR 2.0\n- 터치 2 · 레벨나이 83봉전 · 꼬리÷버퍼 1.09 · 여유R 1.1\n- 접근거래량 0.51배 · 캔들몸통÷ATR 0.31 · 합류 ★저항 ★HVN  (합류는 실측상 마이너스 — 근거로 삼지 말 것)\n- EMA20 이격 -0.90% · 24h 4.8% · 거래량 961M\n- 진입 주변 레벨: R 1.033(+0.00R·2회) · R 1.038(+0.22R·1회) · R 1.0243(-0.39R·1회) · R 1.0437(+0.48R·1회)\n\n### 1h 문맥 (거래 신호가 아니다)\n\n- 현재가 1.0255 · %B(현재) 0.49 · %B(기준진입가) 0.63 · RSI14 57.8 · StochRSI 8 · 밴드폭 5.15% · EMA20 이격 -0.09% · ATR 2.52%\n- 지지 0.9977 (-2.71%) · 터치 1  /  저항 1.038 (+1.22%) · 터치 1\n\n### 4h 문맥 (거래 신호가 아니다)\n\n- 현재가 1.0254 · %B(현재) 0.80 · %B(기준진입가) 0.82 · RSI14 74.7 · StochRSI 76 · 밴드폭 33.56% · EMA20 이격 +9.16% · ATR 4.01%\n- 지지 0.80785 (-21.22%) · 터치 2  /  저항 1.0568 (+3.06%) · 터치 1\n\n### 1d 문맥 (거래 신호가 아니다)\n\n- 현재가 1.0253 · %B(현재) 1.10 · %B(기준진입가) 1.12 · RSI14 74.3 · StochRSI 98 · 밴드폭 37.25% · EMA20 이격 +30.93% · ATR 6.12%\n- 지지 1.0089 (-1.60%) · 터치 1  /  저항 1.0568 (+3.07%) · 터치 1\n\n## 19. FILUSDT · 롱\n\n### 거래 (15m 기준 셋업 — 주문은 이 값으로 나간다)\n\n- 현재가 0.9997 · 진입 0.98416667 · 손절 0.96622822 · 익절 1.01107433\n- 근접 1.58% · 손절폭 1.82% · 수량 1074.2067 · 증거금 $52.86\n- 순RR 1.41 · 손익분기승률 41.5% · 주문 가능\n\n### 15m 기준 재료\n\n- 적합 2/4 (꼬리·과열) · 점수 53\n- %B(진입) 0.04 · %B(현재) 0.79 · 밴드폭 2.07%\n- RSI14 55.0 · StochRSI 63 · ATR 0.94% · 손절÷ATR 1.9\n- 터치 3 · 레벨나이 94봉전 · 꼬리÷버퍼 0.47 · 여유R 0.6\n- 접근거래량 0.86배 · 캔들몸통÷ATR 0.19 · 합류 ★지지 ★HVN  (합류는 실측상 마이너스 — 근거로 삼지 말 것)\n- EMA20 이격 -0.48% · 24h 2.2% · 거래량 180M\n- 진입 주변 레벨: S 0.98416667(+0.00R·3회) · S 0.9811(-0.17R·3회) · S 0.978(-0.34R·1회) · R 0.99515(+0.61R·2회)\n\n### 1h 문맥 (거래 신호가 아니다)\n\n- 현재가 0.9997 · %B(현재) 0.80 · %B(기준진입가) 0.51 · RSI14 59.6 · StochRSI 62 · 밴드폭 5.43% · EMA20 이격 +0.77% · ATR 1.87%\n- 지지 0.9812 (-1.85%) · 터치 1  /  저항 1.0064 (+0.67%) · 터치 1\n\n### 4h 문맥 (거래 신호가 아니다)\n\n- 현재가 0.9997 · %B(현재) 0.77 · %B(기준진입가) 0.62 · RSI14 61.3 · StochRSI 89 · 밴드폭 10.03% · EMA20 이격 +3.53% · ATR 3.93%\n- 지지 0.9507 (-4.90%) · 터치 1  /  저항 1.0166 (+1.69%) · 터치 1\n\n### 1d 문맥 (거래 신호가 아니다)\n\n- 현재가 1.0002 · %B(현재) 0.95 · %B(기준진입가) 0.90 · RSI14 66.2 · StochRSI 68 · 밴드폭 30.91% · EMA20 이격 +14.87% · ATR 8.57%\n- 지지 0.905 (-9.52%) · 터치 2  /  저항 1.03895 (+3.87%) · 터치 2\n\n## 20. ADAUSDT · 롱\n\n### 거래 (15m 기준 셋업 — 주문은 이 값으로 나간다)\n\n- 현재가 0.2483 · 진입 0.2435 · 손절 0.23881718 · 익절 0.25052423\n- 근접 1.97% · 손절폭 1.92% · 수량 4122.9206 · 증거금 $50.20\n- 순RR 1.41 · 손익분기승률 41.5% · 주문 가능\n\n### 15m 기준 재료\n\n- 적합 1/4 (꼬리) · 점수 51\n- %B(진입) 0.21 · %B(현재) 0.77 · 밴드폭 3.47%\n- RSI14 56.6 · StochRSI 83 · ATR 0.97% · 손절÷ATR 2.0\n- 터치 3 · 레벨나이 85봉전 · 꼬리÷버퍼 0.58 · 여유R 0.3\n- 접근거래량 0.39배 · 캔들몸통÷ATR 0.41 · 합류 ★지지 ★HVN  (합류는 실측상 마이너스 — 근거로 삼지 말 것)\n- EMA20 이격 -0.59% · 24h 5.1% · 거래량 399M\n- 진입 주변 레벨: S 0.2435(+0.00R·3회) · S 0.2426(-0.19R·1회) · R 0.245(+0.32R·2회) · S 0.242(-0.32R·2회)\n\n### 1h 문맥 (거래 신호가 아니다)\n\n- 현재가 0.2484 · %B(현재) 1.03 · %B(기준진입가) 0.21 · RSI14 65.4 · StochRSI 26 · 밴드폭 2.41% · EMA20 이격 +0.81% · ATR 1.81%\n- 지지 0.2426 (-2.33%) · 터치 1  /  저항 0.249 (+0.24%) · 터치 1\n\n### 4h 문맥 (거래 신호가 아니다)\n\n- 현재가 0.2484 · %B(현재) 0.89 · %B(기준진입가) 0.77 · RSI14 73.6 · StochRSI 88 · 밴드폭 15.84% · EMA20 이격 +5.48% · ATR 2.87%\n- 지지 0.2209 (-11.07%) · 터치 1  /  저항 0.249 (+0.24%) · 터치 1\n\n### 1d 문맥 (거래 신호가 아니다)\n\n- 현재가 0.2485 · %B(현재) 1.08 · %B(기준진입가) 0.99 · RSI14 69.9 · StochRSI 100 · 밴드폭 22.60% · EMA20 이격 +14.46% · ATR 5.86%\n- 지지 0.2369 (-4.67%) · 터치 2  /  저항 0.249 (+0.20%) · 터치 1\n\n## 21. WLDUSDT · 숏\n\n### 거래 (15m 기준 셋업 — 주문은 이 값으로 나간다)\n\n- 현재가 0.4538 · 진입 0.45605 · 손절 0.46705578 · 익절 0.43954133\n- 근접 0.49% · 손절폭 2.41% · 수량 1765.1441 · 증거금 $40.25\n- 순RR 1.43 · 손익분기승률 41.2% · 주문 가능\n\n### 15m 기준 재료\n\n- 적합 1/4 (꼬리) · 점수 50\n- %B(진입) 0.77 · %B(현재) 0.57 · 밴드폭 2.52%\n- RSI14 49.7 · StochRSI 64 · ATR 1.21% · 손절÷ATR 2.0\n- 터치 2 · 레벨나이 94봉전 · 꼬리÷버퍼 0.83 · 여유R 0.8\n- 접근거래량 0.75배 · 캔들몸통÷ATR 0.26 · 합류 ★저항 ★HVN  (합류는 실측상 마이너스 — 근거로 삼지 말 것)\n- EMA20 이격 -1.15% · 24h 0.8% · 거래량 333M\n- 진입 주변 레벨: R 0.45605(+0.00R·2회) · R 0.4537(-0.21R·2회) · R 0.4584(+0.21R·2회) · R 0.46233333(+0.57R·3회)\n\n### 1h 문맥 (거래 신호가 아니다)\n\n- 현재가 0.4538 · %B(현재) 0.57 · %B(기준진입가) 0.62 · RSI14 52.7 · StochRSI 32 · 밴드폭 9.14% · EMA20 이격 +0.13% · ATR 2.59%\n- 지지 0.4467 (-1.56%) · 터치 1  /  저항 0.4547 (+0.20%) · 터치 2\n\n### 4h 문맥 (거래 신호가 아니다)\n\n- 현재가 0.4541 · %B(현재) 0.84 · %B(기준진입가) 0.88 · RSI14 64.7 · StochRSI 74 · 밴드폭 10.78% · EMA20 이격 +3.68% · ATR 3.92%\n- 지지 0.42715 (-5.93%) · 터치 2  /  저항 0.4561 (+0.44%) · 터치 2\n\n### 1d 문맥 (거래 신호가 아니다)\n\n- 현재가 0.4538 · %B(현재) 0.84 · %B(기준진입가) 0.86 · RSI14 62.2 · StochRSI 83 · 밴드폭 27.52% · EMA20 이격 +12.94% · ATR 7.54%\n- 지지 0.4251 (-6.32%) · 터치 1  /  저항 0.4639 (+2.23%) · 터치 1\n\n---\n## BTC 12h 방향예측 (참고 · 레벨 스캔과 별개 트랙)\n- LONG 74% / SHORT 26% · 등급 중립 · 판정 관망(NO_TRADE)\n- 기준 2026-09-22 09:30 KST (8.3시간 전 발행 · 다음 22:00)\n- 게이트 차단: 가중 일치도 13%(<60%) — 관망\n- ⚠ 우리 6팩터 계산값(바이낸스 원재료 기반). 게이트 미개방(관망) 주 지평(종가→시가) 검증 표본 0건이라 \"검증된 엣지\"가 아님. 위 후보 레벨을 자르는 기준으로 쓰지 말 것.\n",
   "error": null,
   "disclaimer": "지지/저항 인근 후보지다. 추천·매매 지시가 아니다. 기계적으로 전부 잡으면 건당 -0.0254R(측정). 오버나이트·BTC 선물 점수·게이트와 무관하다. 1h·4h·1d 는 맥락이다. 이걸로 후보를 자르지 않는다."
 }
