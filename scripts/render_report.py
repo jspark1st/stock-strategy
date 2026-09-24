@@ -472,6 +472,12 @@ def build_entry_gate(r: dict) -> str:
     if exit_open:
         verdict = ('<span class="badge badge-warn">'
                    + ("개장 즉시 청산" if pstate == "EXIT_OPEN" else "관망") + '</span>')
+    elif preopen:
+        # 개장전 게이트는 '전일 종가 조건 충족' 여부일 뿐, 오늘 신규 매수 가부가 아니다.
+        # 초록 '진입 허용' 배지가 뜨면 '권장 익스포저 신규 0%'와 상충돼 보여 매수 여부를
+        # 헷갈린다(ambiguous 비평 9회) → 과거 조건 충족과 오늘 행동을 분리 표기한다.
+        verdict = ('<span class="badge badge-warn">전일 조건 충족</span>' if allow
+                   else '<span class="badge badge-warn">전일 조건 미충족</span>')
     elif allow:
         verdict = '<span class="badge badge-ok">진입 허용</span>'
     else:
@@ -480,52 +486,75 @@ def build_entry_gate(r: dict) -> str:
     title = "전일 종가 진입 게이트" if preopen else "종가 진입 게이트"
     note = ("개장 08:50 상태가 권위 — 아래 체크리스트는 전일 종가 시점 기록이다."
             if preopen else "전부 충족일 때만 진입(총점이 아니라 조건 조합)")
+    # 개장전: 과거 충족과 오늘 행동을 명시적으로 나눠 적는다(비평 권고 문구 그대로).
+    action_line = ""
+    if preopen:
+        action_line = ('<div class="note muted">전일 진입 게이트: '
+                       + ("충족(전일 종가 기준)" if allow else "미충족(전일 종가 기준)")
+                       + ' · 오늘 장전 행동: <b>신규 매수 아님</b>(전일 진입분 관리)</div>')
     return (f'<div class="card"><h2>{title} {verdict}{_info(note)}</h2>'
-            f'<ul class="gate-ul">{rows}</ul></div>')
+            f'{action_line}<ul class="gate-ul">{rows}</ul></div>')
 
 
-def build_hypotheses(r: dict) -> str:
+def build_hypotheses(r: dict, keep_empty: bool = False) -> str:
     """가설·해석(P1-11) — 관측 사실과 **분리**해 표시. 각 가설에 근거·반증조건 병기.
 
     '기관 -7,951억'은 팩트지만 '개인 매수의 질이 낮다'는 해석이다. 둘을 섞지 않도록,
     해석은 이 카드에만 담고 '사실 아님·반증조건 있음'을 명시한다.
+
+    keep_empty=True(주식 마감/개장전 뷰)면 LLM 이 가설을 안 만든 회차에도 카드를 남긴다
+    — 한 시장만 가설이 오면 카드 수가 달라져 ui_market_format_mismatch 가 점화하기 때문
+    (build_reopen 과 같은 규율, 실측 recurrence). BTC 는 단일 뷰라 keep_empty 를 안 쓴다.
     """
     hy = (r.get("narrative", {}) or {}).get("hypotheses") or []
     if not hy:
-        return ""
-    rows = ""
-    for h in hy:
-        if not isinstance(h, dict):
-            rows += f'<li>{esc(str(h))}</li>'
-            continue
-        rows += (f'<li><div class="hyp-claim">가설: {esc(h.get("claim",""))}</div>'
-                 f'<div class="muted">근거: {esc(h.get("basis",""))}</div>'
-                 f'<div class="muted">반증: {esc(h.get("counter",""))}</div></li>')
+        if not keep_empty:
+            return ""
+        body = ('<p class="note muted">이번 회차에서는 항목이 생성되지 않았습니다 — '
+                '점수·확률·게이트에는 영향이 없습니다.</p>')
+    else:
+        rows = ""
+        for h in hy:
+            if not isinstance(h, dict):
+                rows += f'<li>{esc(str(h))}</li>'
+                continue
+            rows += (f'<li><div class="hyp-claim">가설: {esc(h.get("claim",""))}</div>'
+                     f'<div class="muted">근거: {esc(h.get("basis",""))}</div>'
+                     f'<div class="muted">반증: {esc(h.get("counter",""))}</div></li>')
+        body = f'<ul class="hyp-ul">{rows}</ul>'
     return (f'<div class="card"><h2>가설·해석 <span class="badge badge-warn">해석 · 사실 아님</span>'
             f'{_info("관측 사실·모델 판정과 구분되는 추론입니다. 반증 조건이 나오면 폐기합니다.")}</h2>'
-            f'<ul class="hyp-ul">{rows}</ul></div>')
+            f'{body}</div>')
 
 
-def build_lineage(r: dict) -> str:
+def build_lineage(r: dict, keep_empty: bool = False) -> str:
     """데이터 계보(P0-2) — 각 수치의 출처·기준시각·잠정/확정·시장범위.
 
-    본문 수급값과 출처 기사 수치가 달라 보이던 혼동을 없앤다(모델 입력값 기준을 명시)."""
+    본문 수급값과 출처 기사 수치가 달라 보이던 혼동을 없앤다(모델 입력값 기준을 명시).
+
+    keep_empty=True(주식 뷰)면 계보가 빈 회차에도 카드를 남긴다 — 한 시장만 계보가
+    채워지면 카드 수가 어긋나 ui_market_format_mismatch 가 점화(build_reopen 과 같은 규율)."""
     lin = r.get("lineage") or {}
     if not lin:
-        return ""
-    rows = ""
-    for metric, m in lin.items():
-        st = m.get("status", "")
-        scol = ("var(--neutral)" if "잠정" in st else
-                "var(--good)" if ("확정" in st or "검증" in st) else "var(--muted)")
-        rows += (f'<tr><td><b>{esc(metric)}</b></td><td>{esc(m.get("source",""))}</td>'
-                 f'<td>{esc(m.get("as_of",""))}</td>'
-                 f'<td style="color:{scol};font-weight:700">{esc(st)}</td>'
-                 f'<td class="muted">{esc(m.get("scope",""))}</td></tr>')
+        if not keep_empty:
+            return ""
+        body = ('<p class="note muted">이번 회차에서는 항목이 생성되지 않았습니다 — '
+                '점수·확률·게이트에는 영향이 없습니다.</p>')
+    else:
+        rows = ""
+        for metric, m in lin.items():
+            st = m.get("status", "")
+            scol = ("var(--neutral)" if "잠정" in st else
+                    "var(--good)" if ("확정" in st or "검증" in st) else "var(--muted)")
+            rows += (f'<tr><td><b>{esc(metric)}</b></td><td>{esc(m.get("source",""))}</td>'
+                     f'<td>{esc(m.get("as_of",""))}</td>'
+                     f'<td style="color:{scol};font-weight:700">{esc(st)}</td>'
+                     f'<td class="muted">{esc(m.get("scope",""))}</td></tr>')
+        body = (f'<div style="overflow-x:auto"><table class="cd-table"><thead><tr><th>지표</th><th>출처</th>'
+                f'<th>기준시각</th><th>상태</th><th>범위</th></tr></thead><tbody>{rows}</tbody></table></div>')
     return (f'<div class="card"><h2>데이터 계보 <span class="pill pill-ghost">모델 입력값 기준</span>'
             f'{_info("화면 수치는 아래 출처·시각·상태의 값입니다. 기사 인용치와 시점·집계가 다를 수 있습니다.")}</h2>'
-            f'<div style="overflow-x:auto"><table class="cd-table"><thead><tr><th>지표</th><th>출처</th>'
-            f'<th>기준시각</th><th>상태</th><th>범위</th></tr></thead><tbody>{rows}</tbody></table></div></div>')
+            f'{body}</div>')
 
 
 def build_order_card(r: dict) -> str:
@@ -682,7 +711,10 @@ def build_preopen_state(r: dict) -> str:
     cm = ov.get("confirm_mult")
     cmtxt = f' · 야간 컨펌 배수 {cm:.2f}' if cm is not None else ''
     xp = ov.get("exit_plan") or {}
-    xtxt = (f'<div class="note muted">개장 후 청산 규칙: {esc(xp.get("description",""))}</div>'
+    # 08:50(판단)과 09:05(매도)이 다른 카드에 섞여 있어 언제 파는지 혼선을 준다(ambiguous 비평)
+    # → 두 시각의 역할을 한 줄로 통일: 08:50 은 판단, 09:05 는 실제 매도.
+    xtxt = (f'<div class="note muted">개장 후 청산 규칙: {esc(xp.get("description",""))}<br>'
+            f'<b>08:50</b> = 장전 상태 재평가(판단) · <b>09:05</b> = 실제 매도 시각</div>'
             if xp.get("description") else '')
     return (f'<div class="card"><h2>개장 전 최종 결정 '
             f'<span class="pill" style="background:{scol}">{esc(st["state"])}</span>'
@@ -1982,6 +2014,10 @@ def build_level_scan_view() -> str:
                  "1등이 추천이 아니다. 고르는 일은 사람. "
                  "1h·4h·1d %B 는 기준 진입가를 그 봉 밴드에 대입한 값이다(현재가 아님).")
     tf_tip = _info("기준 15m 진입가를 그 봉 밴드에 넣은 %B. 상위 봉의 새 진입가가 아니다.")
+    # 초보자용 축약어 풀이(too_technical 비평) — 헤더는 짧게 두고 기본 명칭은 툴팁으로.
+    _pctb_tip = _info("볼린저밴드 위치(%B) — 0이면 하단, 1이면 상단. 기준 진입가를 밴드에 대입한 값이다(현재가 아님).")
+    _touch_tip = _info("지지/저항 터치 횟수 — 그 레벨에 닿은 횟수. 많을수록 시장이 인식하는 자리다.")
+    _roomr_tip = _info("여유R(기대수익비) — 손절폭(1R) 대비 다음 저항/지지까지 남은 거리를 R 배수로 나타낸 것.")
     return f"""
     <div class="view-head"><div class="view-title">레벨 스캔 <span class="view-sub">· 15분 자동</span></div>
       <div class="muted">지지/저항 인근 후보지 — 추천이 아니다. BTC 선물 점수·게이트와 무관.</div>
@@ -2017,15 +2053,15 @@ def build_level_scan_view() -> str:
             <th class="scan-th" title="클릭하면 정렬">적합</th>
             <th class="scan-th" title="클릭하면 정렬">점수</th>
             <th class="scan-th" title="클릭하면 정렬">RSI</th>
-            <th class="scan-th" title="클릭하면 정렬">%B</th>
+            <th class="scan-th" title="클릭하면 정렬">%B{_pctb_tip}</th>
             <th class="scan-th" title="클릭하면 정렬">1h %B{tf_tip}</th>
             <th class="scan-th" title="클릭하면 정렬">4h %B{tf_tip}</th>
             <th class="scan-th" title="클릭하면 정렬">1d %B{tf_tip}</th>
-            <th class="scan-th" title="클릭하면 정렬">터치</th>
+            <th class="scan-th" title="클릭하면 정렬">터치{_touch_tip}</th>
             <th class="scan-th" title="클릭하면 정렬">근접%</th>
             <th class="scan-th" title="클릭하면 정렬">손절%</th>
             <th class="scan-th" title="클릭하면 정렬">손익비</th>
-            <th class="scan-th" title="클릭하면 정렬">여유R</th>
+            <th class="scan-th" title="클릭하면 정렬">여유R{_roomr_tip}</th>
             <th class="scan-th" title="클릭하면 정렬">추세</th>
           </tr></thead>
           <tbody id="scan-body">
@@ -3153,11 +3189,11 @@ def render_report_view(r: dict, date: str) -> str:
     {build_performance(r)}
     {build_intraday(r)}
     {build_flows(r)}
-    {build_lineage(r)}
+    {build_lineage(r, keep_empty=True)}
     {build_index_chart(r)}
     {build_levels(r)}
     {build_risks(r)}
-    {build_hypotheses(r)}
+    {build_hypotheses(r, keep_empty=True)}
     {build_materials(r)}
     {build_accuracy(r)}
     {build_paper(r)}
